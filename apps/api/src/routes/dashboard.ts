@@ -110,7 +110,7 @@ router.get("/detalhe", async (req, res, next) => {
     // em_producao | concluidos | cursos
     const statusFilter =
       tipo === "concluidos"   ? { status: "CONCLUIDO"    as const } :
-      tipo === "em_producao"  ? { status: { in: ["PENDENTE", "EM_ANDAMENTO", "BLOQUEADO"] as const } } :
+      tipo === "em_producao"  ? { status: { in: ["PENDENTE", "EM_ANDAMENTO", "BLOQUEADO"] as ("PENDENTE" | "EM_ANDAMENTO" | "BLOQUEADO")[] } } :
       {};
 
     const oas = await prisma.objetoAprendizagem.findMany({

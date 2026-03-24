@@ -153,6 +153,7 @@ export interface MICapitulo {
 export interface MIPreview {
   totalCapitulos: number;
   totalObjetivos: number;
+  totalOAs: number;
   unidades: { numero: number; nome: string; totalCapitulos: number }[];
   amostra: MICapitulo[];
   avisos: string[];

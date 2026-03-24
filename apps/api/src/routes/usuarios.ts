@@ -63,7 +63,7 @@ router.patch("/:id", adminOnly, async (req, res, next) => {
     const data    = atualizarSchema.parse(req.body);
     const usuario = await prisma.usuario.update({
       where: { id: req.params["id"]! },
-      data,
+      data:  data as Parameters<typeof prisma.usuario.update>[0]["data"],
       select,
     });
     res.json(usuario);

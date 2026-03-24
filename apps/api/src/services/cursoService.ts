@@ -34,7 +34,7 @@ export class CursoService {
     const curso = await this.repo.create({
       codigo: data.codigo,
       nome: data.nome,
-      descricao: data.descricao,
+      descricao: data.descricao ?? null,
       chTotalPlanejada: data.chTotalPlanejada ?? 0,
       status: "RASCUNHO",
       membros: {

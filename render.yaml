@@ -9,7 +9,7 @@ services:
     region: oregon          # mais próximo do Brasil disponível no free tier
 
     buildCommand: |
-      pnpm install --no-frozen-lockfile
+      NODE_ENV=development pnpm install --no-frozen-lockfile
       pnpm --filter api build
 
     startCommand: pnpm --filter api run start:prod
