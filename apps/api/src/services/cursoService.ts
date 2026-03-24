@@ -46,7 +46,8 @@ export class CursoService {
   }
 
   atualizar(id: string, data: { nome?: string | undefined; descricao?: string | undefined; status?: any }) {
-    return this.repo.update(id, data);
+    const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));
+    return this.repo.update(id, clean as Parameters<typeof this.repo.update>[1]);
   }
 
   arquivar(id: string) {
