@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   Box, Typography, Card, CardContent, Avatar, Chip,
   Skeleton, Alert, Tooltip, ToggleButton, ToggleButtonGroup,
-  Divider,
 } from "@mui/material";
 import PeopleAltIcon      from "@mui/icons-material/PeopleAlt";
 import CalendarMonthIcon  from "@mui/icons-material/CalendarMonth";
@@ -62,15 +61,6 @@ const PAPEL_CORES: Record<string, { bg: string; border: string; text: string }> 
   VALIDADOR_FINAL:       { bg: "#fff1f2", border: "#fda4af", text: "#be123c" },
 };
 
-const PAPEL_LABEL: Record<string, string> = {
-  CONTEUDISTA:           "Conteudista",
-  DESIGNER_INSTRUCIONAL: "Designer Instrucional",
-  PROFESSOR_ATOR:        "Prof. Ator",
-  PROFESSOR_TECNICO:     "Revisor Técnico",
-  ACESSIBILIDADE:        "Acessibilidade",
-  PRODUTOR_FINAL:        "Produtor Final",
-  VALIDADOR_FINAL:       "Validador Final",
-};
 
 function initials(nome: string) {
   return nome.split(" ").slice(0, 2).map((n) => n[0]).join("").toUpperCase();

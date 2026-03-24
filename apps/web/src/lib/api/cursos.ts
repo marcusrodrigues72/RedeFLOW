@@ -27,7 +27,7 @@ export function useDashboardStats() {
 }
 
 export function useDashboardDetalhe(tipo: DashboardDetalheTipo | null) {
-  return useQuery({
+  return useQuery<(DashboardDetalheAtraso | DashboardDetalheOA)[]>({
     queryKey: ["dashboard", "detalhe", tipo],
     queryFn:  () => tipo === "atrasos"
       ? api.get<DashboardDetalheAtraso[]>(`/dashboard/detalhe?tipo=${tipo}`).then((r) => r.data)

@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   Box, Typography, Chip, Button, Card, CardContent,
   Table, TableHead, TableRow, TableCell, TableBody,
-  LinearProgress, Skeleton, Avatar, AvatarGroup,
+  Skeleton, Avatar, AvatarGroup,
   Tabs, Tab, Accordion, AccordionSummary, AccordionDetails,
   Alert, IconButton, Tooltip, Drawer, Divider, Switch, FormControlLabel,
   Snackbar,
@@ -29,21 +29,6 @@ export const Route = createFileRoute("/_authed/cursos/$cursoId")({
   component: CursoDetalhePage,
 });
 
-const STATUS_OA: Record<StatusOA, { label: string; color: string; bg: string }> = {
-  PENDENTE:      { label: "Pendente",      color: "#64748b", bg: "#f8fafc" },
-  EM_ANDAMENTO:  { label: "Em Andamento",  color: "#f59e0b", bg: "#fffbeb" },
-  BLOQUEADO:     { label: "Bloqueado",     color: "#ef4444", bg: "#fff5f5" },
-  CONCLUIDO:     { label: "Concluído",     color: "#10b981", bg: "#f0fdf4" },
-};
-
-const TIPO_LABELS: Record<TipoOA, { label: string; color: string }> = {
-  VIDEO:      { label: "Vídeo",        color: "#2b7cee" },
-  SLIDE:      { label: "Slide",        color: "#7c3aed" },
-  QUIZ:       { label: "Quiz",         color: "#0891b2" },
-  EBOOK:      { label: "E-book",       color: "#059669" },
-  PLANO_AULA: { label: "Plano de Aula",color: "#d97706" },
-  TAREFA:     { label: "Tarefa",       color: "#dc2626" },
-};
 
 function CursoDetalhePage() {
   const { cursoId }                   = Route.useParams();
@@ -555,7 +540,7 @@ function StatusCursoChip({ status }: { status: string }) {
   return <Chip label={s.label} size="small" sx={{ bgcolor: s.bg, color: s.color, fontWeight: 600, fontSize: "0.7rem" }} />;
 }
 
-function EmptyMC({ cursoId }: { cursoId: string }) {
+function EmptyMC(_: { cursoId: string }) {
   return (
     <Card>
       <CardContent sx={{ p: 6, textAlign: "center" }}>
