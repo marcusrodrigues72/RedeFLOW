@@ -47,5 +47,5 @@ Thumbs.db
 # Testes
 coverage/
 
-# TanStack Router (gerado automaticamente)
-apps/web/src/routeTree.gen.ts
+# TanStack Router — arquivo gerado, mas deve ser commitado para CI/CD
+# apps/web/src/routeTree.gen.ts

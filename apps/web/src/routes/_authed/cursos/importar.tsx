@@ -58,12 +58,11 @@ function ImportarPage() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const { mutate: buscarPreviewMC,  isPending: loadPreviewMC,  error: errPreviewMC  } = useImportarPreview(cursoId);
-  const { mutate: confirmarMC,      isPending: loadConfirmMC,  error: errConfirmMC  } = useImportarConfirmar(cursoId);
+  const { mutate: confirmarMC,      isPending: loadConfirmMC  } = useImportarConfirmar(cursoId);
   const { mutate: buscarPreviewMI,  isPending: loadPreviewMI,  error: errPreviewMI  } = useImportarMINovoPreview();
   const { mutate: confirmarMINovo,  isPending: loadConfirmMI,  error: errConfirmMI  } = useImportarMINovoCurso();
 
   const loadPreview = tipoImport === "MC" ? loadPreviewMC : loadPreviewMI;
-  const loadConfirm = tipoImport === "MC" ? loadConfirmMC : loadConfirmMI;
   const errPreview  = tipoImport === "MC" ? errPreviewMC  : errPreviewMI;
 
   const podeAvancar = tipoImport === "MI"

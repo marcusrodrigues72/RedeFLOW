@@ -52,7 +52,6 @@ function RelatoriosPage() {
   const totalOAs    = pipeline?.porStatusOA.reduce((s, e) => s + e.total, 0) ?? 0;
   const emProducao  = pipeline?.porStatusOA.find((e) => e.status === "EM_ANDAMENTO")?.total ?? 0;
   const concluidos  = pipeline?.porStatusOA.find((e) => e.status === "CONCLUIDO")?.total ?? 0;
-  const bloqueados  = pipeline?.porStatusOA.find((e) => e.status === "BLOQUEADO")?.total ?? 0;
   const totalAtrasos = atrasos.reduce((s, r) => s + r.total, 0);
 
   return (

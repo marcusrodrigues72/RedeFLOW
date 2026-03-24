@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Box, Typography, Grid2 as Grid, Card, CardContent,
   LinearProgress, Chip, Skeleton, Button, Divider, Avatar, Tooltip,
-  Drawer, IconButton, Table, TableHead, TableRow, TableCell, TableBody, Alert,
+  Drawer, IconButton, Table, TableHead, TableRow, TableCell, TableBody,
 } from "@mui/material";
 import AddIcon                from "@mui/icons-material/Add";
 import TrendingUpIcon         from "@mui/icons-material/TrendingUp";
@@ -602,7 +602,7 @@ const STATUS_LABEL: Record<string, { label: string; color: string }> = {
 function DetalheDrawer({ tipo, onClose }: { tipo: DashboardDetalheTipo | null; onClose: () => void }) {
   const { data, isLoading } = useDashboardDetalhe(tipo);
   const cfg = tipo ? DETALHE_CONFIG[tipo] : null;
-  const items = data ?? [];
+  const items = (data ?? []) as (DashboardDetalheAtraso | DashboardDetalheOA)[];
 
   return (
     <Drawer
