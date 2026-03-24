@@ -1,0 +1,124 @@
+
+<style>
+#erd svg { width: 100%; }
+#erd svg.erDiagram .divider path { stroke-opacity: 0.5; }
+#erd svg.erDiagram .row-rect-odd path,
+#erd svg.erDiagram .row-rect-odd rect,
+#erd svg.erDiagram .row-rect-even path,
+#erd svg.erDiagram .row-rect-even rect { stroke: none !important; }
+</style>
+<div id="erd"></div>
+<script type="module">
+import mermaid from 'https://esm.sh/mermaid@11/dist/mermaid.esm.min.mjs';
+const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+await document.fonts.ready;
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'base',
+  fontFamily: '"Anthropic Sans", sans-serif',
+  themeVariables: {
+    darkMode: dark,
+    fontSize: '13px',
+    fontFamily: '"Anthropic Sans", sans-serif',
+    lineColor: dark ? '#9c9a92' : '#73726c',
+    textColor: dark ? '#c2c0b6' : '#3d3d3a',
+  },
+});
+const diagram = `erDiagram
+  CURSO ||--o{ UNIDADE : "contém"
+  UNIDADE ||--o{ CAPITULO : "contém"
+  CAPITULO ||--o{ OBJETIVO_EDUCACIONAL : "define"
+  CAPITULO ||--o{ OBJETO_APRENDIZAGEM : "gera"
+  OBJETO_APRENDIZAGEM ||--|| ETAPA_PRODUCAO : "possui"
+  OBJETO_APRENDIZAGEM }o--|| USUARIO : "atribuído a"
+  ETAPA_PRODUCAO }o--|| USUARIO : "responsável"
+  CURSO }o--o{ USUARIO : "equipe"
+
+  CURSO {
+    uuid id PK
+    string nome
+    string codigo
+    int carga_horaria_total
+    string status
+    date data_inicio
+    date data_fim
+  }
+  UNIDADE {
+    uuid id PK
+    uuid curso_id FK
+    int numero
+    string nome
+    time ch_sincrona
+    time ch_assincrona
+  }
+  CAPITULO {
+    uuid id PK
+    uuid unidade_id FK
+    int numero
+    string nome
+    text conteudo_resumo
+    int periodo_dias
+  }
+  OBJETIVO_EDUCACIONAL {
+    uuid id PK
+    uuid capitulo_id FK
+    int numero
+    text descricao
+    string nivel_bloom
+    string papeis_atores
+  }
+  OBJETO_APRENDIZAGEM {
+    uuid id PK
+    uuid capitulo_id FK
+    string codigo
+    enum tipo
+    int numero
+    string link_objeto
+    string link_objeto_final
+    int progresso_pct
+    string validador_final
+    date deadline_final
+    string status_final
+  }
+  ETAPA_PRODUCAO {
+    uuid id PK
+    uuid oa_id FK
+    enum papel
+    uuid responsavel_id FK
+    date deadline_previsto
+    date deadline_real
+    string status
+    text observacoes
+  }
+  USUARIO {
+    uuid id PK
+    string nome
+    string email
+    enum papel_padrao
+    string avatar_url
+  }`;
+const { svg } = await mermaid.render('erd-svg', diagram);
+document.getElementById('erd').innerHTML = svg;
+document.querySelectorAll('#erd svg.erDiagram .node').forEach(node => {
+  const firstPath = node.querySelector('path[d]');
+  if (!firstPath) return;
+  const d = firstPath.getAttribute('d');
+  const nums = d.match(/-?[\d.]+/g)?.map(Number);
+  if (!nums || nums.length < 8) return;
+  const xs = [nums[0], nums[2], nums[4], nums[6]];
+  const ys = [nums[1], nums[3], nums[5], nums[7]];
+  const x = Math.min(...xs), y = Math.min(...ys);
+  const w = Math.max(...xs) - x, h = Math.max(...ys) - y;
+  const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  rect.setAttribute('x', x); rect.setAttribute('y', y);
+  rect.setAttribute('width', w); rect.setAttribute('height', h);
+  rect.setAttribute('rx', '8');
+  for (const a of ['fill', 'stroke', 'stroke-width', 'class', 'style']) {
+    if (firstPath.hasAttribute(a)) rect.setAttribute(a, firstPath.getAttribute(a));
+  }
+  firstPath.replaceWith(rect);
+});
+document.querySelectorAll('#erd svg.erDiagram .row-rect-odd path, #erd svg.erDiagram .row-rect-even path').forEach(p => {
+  p.setAttribute('stroke', 'none');
+});
+</script>

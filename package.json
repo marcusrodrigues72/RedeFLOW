@@ -1,0 +1,25 @@
+{
+  "name": "redeflow",
+  "private": true,
+  "version": "0.0.1",
+  "packageManager": "pnpm@9.4.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel -r dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "db:generate": "pnpm --filter api exec prisma generate",
+    "db:migrate": "pnpm --filter api exec prisma migrate dev",
+    "db:migrate:deploy": "pnpm --filter api exec prisma migrate deploy",
+    "db:seed": "pnpm --filter api exec prisma db seed",
+    "db:studio": "pnpm --filter api exec prisma studio",
+    "db:reset": "pnpm --filter api exec prisma migrate reset"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}

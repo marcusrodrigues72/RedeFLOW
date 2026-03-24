@@ -1,0 +1,56 @@
+﻿;;;;;;;;;;;;;;;;;;
+;[Microeletrônica Geral] Matriz Instrucional;;   CH Total Síncrona (h):;9:00;Atenção: Não é necessário preencher manualmente a tabela ao lado. Todos os valores serão calculados e atualizados automaticamente por meio das fórmulas já configuradas.;;;;;;;;;;;;;
+;;;   CH Total Assíncrona (h):;26:00;;;;;;;;;;;;;;
+;Data de Criação: 09/07/2025;;   CH Atividades (h):;0:00;;;;;;;;;;;;;;
+;Carga Horária do Curso: 320h;;   Carga Horária Total (h):;35:00;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;
+;Nº Capítulo;Nome Capítulo;Conteúdo (resumo);Nº Objetivo Educacional;Objetivo Educacional;Nível (TRB);Papéis e atores;Objetos de Aprendizagem;Nº Objetos de Aprendizagem;CH Síncrona (min);CH Assíncrona  (min);Período (dias);Ferramentas;Atividade Formativa;Atividade Somativa;CH Atividades (min);Atividade Pontuação;Feedback
+;1;"Estrutura de cristais semicondutores (Si, Ge, GaAs) & Diodo semicondutor
+";Este capítulo aborda a estrutura de cristais de semicondutores, como silício (Si), germânio (Ge) e arseneto de gálio (GaAs), incluindo seus níveis de energia e a formação de materiais do tipo p e do tipo n. Também apresenta o funcionamento e as características básicas do diodo, como níveis de resistência e capacitância, destacando as diferenças entre o diodo ideal e o prático.;1;Definir a estrutura de cristais semicondutores, abrangendo materiais do tipo p e do tipo n, que constituem a base para a construção de dispositivos CMOS, e proporcionar a compreensão do funcionamento e das características básicas do diodo, incluindo seus níveis de resistência e capacitância, evidenciando as diferenças entre o diodo ideal e o prático para fundamentar aplicações em circuitos eletrônicos.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Vídeo aula (roteiro;6;0;280;3;AVA;Não prevista;Quiz;;0-10;Ao final do capítulo, feedback via ferramenta de tarefas.
+;1;"Estrutura de cristais semicondutores (Si, Ge, GaAs) & Diodo semicondutor
+";Idem.;1;Idem.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Slide;6;0;0;0;AVA;Não prevista;Não prevista;;Idem;
+;1;"Estrutura de cristais semicondutores (Si, Ge, GaAs) & Diodo semicondutor
+";Idem.;2;"Proporcionar a complementação do conteúdo por meio de encontros síncronos com o tutor,
+permitindo que os alunos esclareçam dúvidas surgidas nas videoaulas do capítulo 7.";Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Plano de Aula;1;180;0;1;Plataforma de videoconferência;Não prevista;Não prevista;;Idem;
+;1;"Estrutura de cristais semicondutores (Si, Ge, GaAs) & Diodo semicondutor
+";Idem.;3;Proporcionar a aplicação prática dos conceitos de diodos por meio da análise de circuitos no software LTSPICE, verificando seu comportamento e características em diferentes condições de operação.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Vídeo aula (roteiro;1;0;60;1;AVA;Não prevista;Atividade Aberta;;Idem;
+;1;"Estrutura de cristais semicondutores (Si, Ge, GaAs) & Diodo semicondutor
+";Idem.;4;Estudar por este eBook permite ao aluno revisar os temas no seu próprio ritmo, consultar explicações detalhadas sempre que necessário e se preparar melhor para quizzes e atividades práticas. Além disso, o conteúdo foi cuidadosamente organizado para promover uma aprendizagem significativa e alinhada com as competências exigidas no campo profissional.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Ebook;1;0;;1;AVA;Não prevista;Não prevista;;Idem;
+;2;Transistores de efeito de campo (FET);"O conteúdo explora os transistores de efeito de campo, detalhando sua estrutura, funcionamento e curvas I-V, com foco no JFET, MOSFETs (depleção e intensificação) e CMOS.
+Além disso, aborda configurações de polarização (fixa, autopolarização e por divisor de tensão) e o uso de FET em amplificadores (modelo para pequenos sinais).";1;Entender a estrutura, funcionamento e curvas I-V dos FETs, incluindo JFET, MOSFETs, CMOS, configurações de polarização e amplificadores.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Vídeo aula (roteiro;5;0;420;3;AVA;Não prevista;Quiz;;0 - 10;Ao final do capítulo, feedback via ferramenta de tarefas.
+;2;Transistores de efeito de campo (FET);Idem.;1;Idem.;Idem.;Idem.;Slide;5;0;0;0;AVA;Não prevista;Não prevista;;Idem;Idem
+;2;Transistores de efeito de campo (FET);Idem.;2;"Proporcionar a complementação do conteúdo por meio de encontros síncronos com o tutor,
+permitindo que os alunos esclareçam dúvidas surgidas nas videoaulas do capítulo 8.";Idem.;Idem.;Plano de Aula;1;180;0;1;Plataforma de videoconferência;Não prevista;Não prevista;;Idem;Idem
+;2;Transistores de efeito de campo (FET);Idem.;3;Aplicar, de forma prática, os princípios de transistores FET através da análise de circuitos no software Proteus, avaliando seu desempenho em diferentes configurações e condições de operação.;Idem.;Idem.;Vídeo aula (roteiro;1;0;180;1;AVA;Não prevista;Atividade Aberta;;Idem;Idem
+;2;Transistores de efeito de campo (FET);Idem.;4;Estudar por este eBook permite ao aluno revisar os temas no seu próprio ritmo, consultar explicações detalhadas sempre que necessário e se preparar melhor para quiz e atividades práticas. Além disso, o conteúdo foi cuidadosamente organizado para promover uma aprendizagem significativa e alinhada com as competências exigidas no campo profissional.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Ebook;1;0;150;;AVA;Não prevista;Não prevista;;Idem.;Idem
+;3;Lógica CMOS;O conteúdo contempla a lógica CMOS, abordando sua evolução histórica, os transistores MOS e os principais circuitos lógicos, como inversores, portas NAND, NOR, e estruturas compostas, além de técnicas com transistores de passagem e multiplexadores.;1;Entender o funcionamento teórico dos transistores MOS, em especial, trabalhando como invesor, NAND e NOR.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Vídeo aula (roteiro;3;0;240;2;AVA;Não prevista;Quiz;;0 - 10;Ao final do capítulo, feedback via ferramenta de tarefas.
+;3;Lógica CMOS;Idem.;1;Idem.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Slide;3;0;0;0;AVA;Não prevista;Não prevista;;Idem;Idem
+;3;Lógica CMOS;Idem.;2;"Proporcionar a complementação do conteúdo por meio de encontros síncronos com o tutor,
+permitindo que os alunos esclareçam dúvidas surgidas nas videoaulas do capítulo 9.";Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Plano de Aula;1;180;0;1;Plataforma de videoconferência;Não prevista;Não prevista;;Idem;Idem
+;3;Lógica CMOS;Idem.;3;Promover a aplicação prática dos conceitos de CMOS por meio do projeto de um inversor no software Proteus, avaliando seu desempenho e características em diferentes condições de operação.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Vídeo aula (roteiro;1;0;180;1;AVA;Não prevista;Atividade Aberta;;Idem;Idem
+;3;Lógica CMOS;Idem.;4;Estudar por este eBook permite ao aluno revisar os temas no seu próprio ritmo, consultar explicações detalhadas sempre que necessário e se preparar melhor para quiz e atividades práticas. Além disso, o conteúdo foi cuidadosamente organizado para promover uma aprendizagem significativa e alinhada com as competências exigidas no campo profissional.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Ebook;1;0;50;;AVA;Não prevista;Não prevista;;Idem.;Idem

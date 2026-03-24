@@ -1,0 +1,73 @@
+﻿;;;;;;;;;;;;;;;;;;
+;[Microeletrônica Geral] Matriz Instrucional;;   CH Total Síncrona (h):;13:48;Atenção: Não é necessário preencher manualmente a tabela ao lado. Todos os valores serão calculados e atualizados automaticamente por meio das fórmulas já configuradas.;;;;;;;;;;;;;
+;;;   CH Total Assíncrona (h):;42:00;;;;;;;;;;;;;;
+;Data de Criação: 09/07/2025;;   CH Atividades (h):;0:00;;;;;;;;;;;;;;
+;Carga Horária do Curso: 320h;;   Carga Horária Total (h):;55:48;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;
+;Nº Capítulo;Nome Capítulo;Conteúdo (resumo);Nº Objetivo Educacional;Objetivo Educacional;Nível (TRB);Papéis e atores;Objetos de Aprendizagem;Nº Objetos de Aprendizagem;CH Síncrona (min);CH Assíncrona  (min);Período (dias);Ferramentas;Atividade Formativa;Atividade Somativa;CH Atividades (min);Atividade Pontuação;Feedback
+;1;Fundamentos e Modelagem de Atraso;"Este capítulo abrange desde a introdução, definições e otimização de timing, até a modelagem do atraso por meio do modelo RC e a determinação da resistência efetiva, incluindo a análise de capacitâncias de gate e difusão e o cálculo do Elmore Delay.
+A abordagem proporciona uma base sólida para entender a influência do layout na capacitância e os primeiros passos para a determinação precisa dos parâmetros de atraso.";1;Capacitar os alunos a compreender os conceitos básicos e os modelos iniciais de atraso em circuitos digitais, possibilitando a análise de parâmetros essenciais e a aplicação prática dos conceitos de resposta transitória e modelo RC.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Vídeo aula (roteiro;4;0;360;3;AVA;Não prevista;Quiz;;0 - 10;Ao final do capítulo, feedback via ferramenta de tarefas.
+;1;Fundamentos e Modelagem de Atraso;idem;1;idem;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Slide;4;0;0;0;AVA;Não prevista;Não prevista;;0 - 10;idem
+;1;Fundamentos e Modelagem de Atraso;idem;2;"Proporcionar a complementação do conteúdo por meio de encontros síncronos com o tutor,
+permitindo que os alunos esclareçam dúvidas surgidas nas videoaulas do capítulo 14.";Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Plano de Aula;1;180;0;1;Plataforma de videoconferência;Não prevista;Não prevista;;0 - 10;idem
+;1;Fundamentos e Modelagem de Atraso;idem;3;Capacitar os alunos a projetar e simular um inversor utilizando o software MicroWind, integrando conceitos teóricos com práticas de design de circuitos para aprimorar habilidades técnicas e analíticas.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Vídeo aula (roteiro;1;0;180;1;AVA;Não prevista;Atividade Aberta;;0 - 10;idem
+;1;Fundamentos e Modelagem de Atraso;Idem.;4;Estudar por este eBook permite ao aluno revisar os temas no seu próprio ritmo, consultar explicações detalhadas sempre que necessário e se preparar melhor para quiz e atividades práticas. Além disso, o conteúdo foi cuidadosamente organizado para promover uma aprendizagem significativa e alinhada com as competências exigidas no campo profissional.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Ebook;1;0;75;;AVA;Não prevista;Não prevista;;Idem.;Idem
+;2;Otimização do processo CMOS: Potência;Este capítulo aborda os principais conceitos relacionados ao consumo de potência em circuitos CMOS, com ênfase na potência dinâmica e estática, além de técnicas de otimização atraso-energia. A discussão inclui fatores como atividade de comutação, capacitância de carga, tensão de alimentação, frequência de operação e corrente de curto-circuito. Também são exploradas as fontes de potência estática, estratégias de desligamento de energia, uso de múltiplos valores de threshold e técnicas como tensões de threshold variáveis e controle de vetor de entrada. Por fim, o capítulo apresenta o processo de otimização visando energia mínima, produto atraso-energia mínimo e energia mínima sob restrições de atraso.;1;Desenvolver a capacidade dos alunos de analisar e aplicar conceitos de potência dinâmica e estática em circuitos CMOS, integrando estratégias de otimização atraso-energia para projetar sistemas digitais energeticamente eficientes e com desempenho equilibrado.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Vídeo aula (roteiro;3;0;400;9;AVA;Não prevista;Quiz;;0 - 10;Ao final do capítulo, feedback via ferramenta de tarefas.
+;2;Otimização do processo CMOS: Potência;idem;1;idem;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Slide;3;0;0;0;AVA;Não prevista;Não prevista;;0 - 10;idem
+;2;Otimização do processo CMOS: Potência;idem;2;"Proporcionar a complementação do conteúdo por meio de encontros síncronos com o tutor,
+permitindo que os alunos esclareçam dúvidas surgidas nas videoaulas do capítulo 18.";Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Plano de Aula;1;180;0;3;Plataforma de videoconferência;Não prevista;Não prevista;;0 - 10;idem
+;2;Otimização do processo CMOS: Potência;idem;3;Desenvolver habilidades práticas na utilização do software MicroWind para o projeto e simulação de uma porta NAND, integrando conceitos teóricos de circuitos digitais com a aplicação prática em ferramentas de design e análise.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Vídeo aula (roteiro;1;0;180;3;AVA;Não prevista;Atividade Aberta;;0 - 10;idem
+;2;Otimização do processo CMOS: Potência;Idem.;4;Estudar por este eBook permite ao aluno revisar os temas no seu próprio ritmo, consultar explicações detalhadas sempre que necessário e se preparar melhor para quiz e atividades práticas. Além disso, o conteúdo foi cuidadosamente organizado para promover uma aprendizagem significativa e alinhada com as competências exigidas no campo profissional.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Ebook;1;0;55;;AVA;Não prevista;Não prevista;;Idem.;Idem
+;3;Otimização do processo CMOS: Interconexões;Este capítulo aborda os efeitos das interconexões em circuitos integrados, com ênfase na modelagem elétrica dos fios, considerando resistência, capacitância, indutância e efeitos como skin effect e dependência térmica. A análise inclui o impacto das interconexões no atraso, consumo de energia, crosstalk e efeitos indutivos, destacando estratégias de engenharia como o uso de repetidores, controle de espaçamento, seleção de camadas, técnicas de sinalização de baixa oscilação e regeneradores para mitigar degradações no desempenho do sinal.;1;Desenvolver a capacidade dos alunos de modelar, analisar e projetar interconexões em circuitos integrados, considerando efeitos elétricos e físicos como resistência, capacitância, indutância e crosstalk, e aplicando técnicas de engenharia para otimizar o desempenho e a integridade do sinal.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Vídeo aula (roteiro;3;0;400;9;AVA;Não prevista;Quiz;;0 - 10;Ao final do capítulo, feedback via ferramenta de tarefas.
+;3;Otimização do processo CMOS: Interconexões;idem;1;idem;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Slide;3;0;0;0;AVA;Não prevista;Não prevista;;0 - 10;idem
+;3;Otimização do processo CMOS: Interconexões;idem;2;"Proporcionar a complementação do conteúdo por meio de encontros síncronos com o tutor,
+permitindo que os alunos esclareçam dúvidas surgidas nas videoaulas do capítulo 19.";Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Plano de Aula;1;180;0;3;Plataforma de videoconferência;Não prevista;Não prevista;;0 - 10;idem
+;3;Otimização do processo CMOS: Interconexões;idem;3;Desenvolver habilidades práticas na utilização do software MicroWind para o projeto e simulação de uma porta NOR, integrando conceitos teóricos de circuitos digitais com a aplicação prática em ferramentas de design e análise.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Vídeo aula (roteiro;1;0;180;3;Plataforma de videoconferência;Não prevista;Atividade Aberta;;0 - 10;idem
+;3;Otimização do processo CMOS: Interconexões;Idem.;4;Estudar por este eBook permite ao aluno revisar os temas no seu próprio ritmo, consultar explicações detalhadas sempre que necessário e se preparar melhor para quiz e atividades práticas. Além disso, o conteúdo foi cuidadosamente organizado para promover uma aprendizagem significativa e alinhada com as competências exigidas no campo profissional.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Ebook;1;105;;;AVA;Não prevista;Não prevista;;Idem.;Idem
+;4;Otimização do processo CMOS: Robustez;Este capítulo aborda os desafios relacionados à robustez em circuitos integrados, com ênfase na variabilidade de parâmetros como tensão de alimentação, temperatura e processo de fabricação, além da análise dos design corners. São discutidos conceitos fundamentais de confiabilidade, incluindo desgaste do óxido e das interconexões, erros suaves, falhas por sobretensão e fenômenos como latchup. O capítulo também explora o escalonamento de transistores e interconexões, considerando diretrizes do Roteiro Tecnológico Internacional para Semicondutores e seus impactos no projeto de sistemas digitais resilientes.;1;Desenvolver a capacidade dos alunos de compreender e aplicar princípios de robustez e confiabilidade no projeto de circuitos integrados, considerando variabilidades de processo, tensão e temperatura, além dos impactos do escalonamento tecnológico e das diretrizes do Roteiro Tecnológico Internacional para Semicondutores.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Vídeo aula (roteiro;3;3;400;9;AVA;Não prevista;Quiz;0 - 10;Ao final do capítulo, feedback via ferramenta de tarefas.;
+;4;Otimização do processo CMOS: Robustez;idem;1;idem;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Slide;3;0;0;0;AVA;Não prevista;Não prevista;0 - 10;idem;
+;4;Otimização do processo CMOS: Robustez;idem;2;"Proporcionar a complementação do conteúdo por meio de encontros síncronos com o tutor,
+permitindo que os alunos esclareçam dúvidas surgidas nas videoaulas do capítulo 3.";Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Plano de Aula;1;180;0;3;Plataforma de videoconferência;Não prevista;Não prevista;0 - 10;idem;
+;4;Otimização do processo CMOS: Robustez;idem;3;Desenvolver a capacidade dos alunos de projetar, simular e validar circuitos CMOS utilizando a ferramenta Microwind, integrando conhecimentos sobre atraso, consumo de potência, interconexões e robustez, com foco na criação de soluções funcionais e otimizadas para aplicações digitais em escala nanométrica.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Vídeo aula (roteiro;1;0;180;3;Plataforma de videoconferência;Não prevista;Atividade Aberta;0 - 10;idem;
+;4;Otimização do processo CMOS: Robustez;Idem.;4;Estudar por este eBook permite ao aluno revisar os temas no seu próprio ritmo, consultar explicações detalhadas sempre que necessário e se preparar melhor para quiz e atividades práticas. Além disso, o conteúdo foi cuidadosamente organizado para promover uma aprendizagem significativa e alinhada com as competências exigidas no campo profissional.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Ebook;1;0;110;;AVA;Não prevista;Não prevista;Idem.;Idem;

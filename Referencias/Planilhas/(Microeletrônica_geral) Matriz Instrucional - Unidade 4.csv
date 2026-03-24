@@ -1,0 +1,75 @@
+﻿;;;;;;;;;;;;;;;;;;
+;[Microeletrônica Geral] Matriz Instrucional;;   CH Total Síncrona (h):;12:00;Atenção: Não é necessário preencher manualmente a tabela ao lado. Todos os valores serão calculados e atualizados automaticamente por meio das fórmulas já configuradas.;;;;;;;;;;;;;
+;;;   CH Total Assíncrona (h):;31:25;;;;;;;;;;;;;;
+;Data de Criação: 09/07/2025;;   CH Atividades (h):;0:00;;;;;;;;;;;;;;
+;Carga Horária do Curso: 320h;;   Carga Horária Total (h):;43:25;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;
+;Nº Capítulo;Nome Capítulo;Conteúdo (resumo);Nº Objetivo Educacional;Objetivo Educacional;Nível (TRB);Papéis e atores;Objetos de Aprendizagem;Nº Objetos de Aprendizagem;CH Síncrona (min);CH Assíncrona  (min);Período (dias);Ferramentas;Atividade Formativa;Atividade Somativa;CH Atividades (min);Atividade Pontuação;Feedback
+;1;Introdução a fabricação e layout CMOS;O conteúdo aborda a fabricação e layout CMOS (incluindo o inversor, processo, regras e layouts) e a divisão do projeto com ênfase em design lógico, hierarquia e linguagens de descrição de hardware.;1;O conteúdo abrange a fabricação e layout CMOS, além da divisão do projeto com design lógico, hierarquia e linguagens de descrição de hardware.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Vídeo aula (roteiro;3;0;240;2;AVA;Não prevista;Quiz;;0 - 10;Ao final do capítulo, feedback via ferramenta de tarefas.
+;1;Introdução a fabricação e layout CMOS;Idem.;1;Idem.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Slide;3;0;0;0;AVA;Não prevista;Não prevista;;Idem;Idem
+;1;Introdução a fabricação e layout CMOS;Idem.;2;Idem.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Plano de Aula;1;180;0;1;Plataforma de videoconferência;Não prevista;Não prevista;;Idem;Idem
+;1;Introdução a fabricação e layout CMOS;Idem.;3;Desenvolver e aplicar conhecimentos práticos na criação de projetos de PCB utilizando o AltiumCad, desde a concepção do layout até a geração dos arquivos para fabricação, integrando teoria e prática em eletrônica. (parte 1);Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Vídeo aula (roteiro;1;;180;1;AVA;Não prevista;Atividade Aberta;;Idem;Idem
+;1;Introdução a fabricação e layout CMOS;Idem.;4;Estudar por este eBook permite ao aluno revisar os temas no seu próprio ritmo, consultar explicações detalhadas sempre que necessário e se preparar melhor para quiz e atividades práticas. Além disso, o conteúdo foi cuidadosamente organizado para promover uma aprendizagem significativa e alinhada com as competências exigidas no campo profissional.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Ebook;1;0;35;;AVA;Não prevista;Não prevista;;Idem.;Idem
+;2;Fabricação e layout CMOS;  ;1;Compreender os processos e etapas críticos na fabricação e layout CMOS, desde a formação do wafer até a passivação final, enfatizando técnicas como fotolitografia, formação de well, isolamento com SiO₂, construção de gate e drain, além de contatos, metalização e metrologia.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Vídeo aula (roteiro;3;0;300;3;AVA;Não prevista;Quiz;;0 - 10;Ao final do capítulo, feedback via ferramenta de tarefas.
+;2;Fabricação e layout CMOS;Idem.;1;Idem.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Slide;3;0;0;0;AVA;Não prevista;Não prevista;;Idem;Idem
+;2;Fabricação e layout CMOS;Idem.;2;"Proporcionar a complementação do conteúdo por meio de encontros síncronos com o tutor,
+permitindo que os alunos esclareçam dúvidas surgidas nas videoaulas do capítulo 1.";Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Plano de Aula;1;180;0;1;Plataforma de videoconferência;Não prevista;Não prevista;;Idem;Idem
+;2;Fabricação e layout CMOS;Idem.;3;Desenvolver e aplicar conhecimentos práticos na criação de projetos de PCB utilizando o AltiumCad, desde a concepção do layout até a geração dos arquivos para fabricação, integrando teoria e prática em eletrônica. (parte 2);Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Vídeo aula (roteiro;1;0;180;1;AVA;Não prevista;Atividade Aberta;;Idem;Idem
+;2;Fabricação e layout CMOS;Idem.;4;Estudar por este eBook permite ao aluno revisar os temas no seu próprio ritmo, consultar explicações detalhadas sempre que necessário e se preparar melhor para quiz e atividades práticas. Além disso, o conteúdo foi cuidadosamente organizado para promover uma aprendizagem significativa e alinhada com as competências exigidas no campo profissional.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Ebook;1;0;70;;AVA;Não prevista;Não prevista;;Idem.;Idem
+;3;Melhorias no processo CMOS e problemas de fabricação;"O conteúdo aborda as principais regras de projeto de layout, iniciando com os fundamentos e evoluindo para detalhes específicos como regras de contato, metalização e vias.
+Inclui a definição de estruturas auxiliares, como a scribe line, e destaca as particularidades dos projetos CMOS escaláveis (λ based - MOSIS) e em micron.
+A síntese dessas regras visa garantir precisão e eficiência na implementação de circuitos integrados avançados.";1;Desenvolver a capacidade de aplicar, de forma prática e teórica, as regras de projeto de layout, explorando desde os fundamentos e o background das regras até os detalhes dos contatos, metalização, vias e estruturas como scribe line. Além disso, aprofundar os conhecimentos em projetos CMOS escaláveis (λ based - MOSIS) e em micron, integrando as normas de projeto para garantir precisão e eficiência em circuitos avançados.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Vídeo aula (roteiro;3;0;240;3;AVA;Não prevista;Quiz;;0 - 10;Ao final do capítulo, feedback via ferramenta de tarefas.
+;3;Melhorias no processo CMOS e problemas de fabricação;idem;1;idem;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Slide;3;0;0;0;AVA;Não prevista;Não prevista;;0 - 10;idem
+;3;Melhorias no processo CMOS e problemas de fabricação;idem;2;"Proporcionar a complementação do conteúdo por meio de encontros síncronos com o tutor,
+permitindo que os alunos esclareçam dúvidas surgidas nas videoaulas do capítulo 12.";Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Plano de Aula;1;180;0;1;AVA;Não prevista;Não prevista;;0 - 10;idem
+;3;Melhorias no processo CMOS e problemas de fabricação;idem;3;Desenvolver habilidades de projeto e simulação de dispositivos NMOS utilizando o software MicroWind, permitindo aos alunos aplicar conceitos teóricos na prática e aprimorar competências em microeletrônica.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Vídeo aula (roteiro;1;;180;1;AVA;Não prevista;Atividade Aberta;;0 - 10;idem
+;3;Melhorias no processo CMOS e problemas de fabricação;Idem.;4;Estudar por este eBook permite ao aluno revisar os temas no seu próprio ritmo, consultar explicações detalhadas sempre que necessário e se preparar melhor para quiz e atividades práticas. Além disso, o conteúdo foi cuidadosamente organizado para promover uma aprendizagem significativa e alinhada com as competências exigidas no campo profissional.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Ebook;1;0;35;;AVA;Não prevista;Não prevista;;Idem.;Idem
+;4;Regras de projeto de layout;"O conteúdo explora melhorias no processo CMOS, abrangendo tecnologias avançadas como SOI, gates high-k, silício tensionado, FINFETs, semicondutores III-V e nanotubos de carbono, além dos desafios de migração para processos de última geração.
+São detalhadas regras e diretrizes de projeto, como regras de antena, densidade de camada, resolução, ranhura de metal, além de estratégias para mitigar efeitos parasitários e otimizar o rendimento.
+Aborda ainda o fluxo completo do design, desde a conclusão do projeto até o tapeout, enfatizando a evolução do layout e o encapsulamento de circuitos integrados.";1;Capacitar os alunos a implementar melhorias no processo CMOS e resolver desafios de fabricação aplicando regras técnicas específicas e inovações além do convencional.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Vídeo aula (roteiro;2;0;200;3;AVA;Não prevista;Quiz;;0 - 10;Ao final do capítulo, feedback via ferramenta de tarefas.
+;4;Regras de projeto de layout;idem;1;idem;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Slide;2;0;0;0;AVA;Não prevista;Não prevista;;0 - 10;idem
+;4;Regras de projeto de layout;idem;2;"Proporcionar a complementação do conteúdo por meio de encontros síncronos com o tutor,
+permitindo que os alunos esclareçam dúvidas surgidas nas videoaulas do capítulo 13.";Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Plano de Aula;1;180;0;1;Plataforma de videoconferência;Não prevista;Não prevista;;0 - 10;idem
+;4;Regras de projeto de layout;idem;3;Desenvolver habilidades de projeto e simulação de dispositivos PMOS utilizando o software MicroWind, capacitando os alunos a aplicar conhecimentos teóricos na prática e aprimorar competências em eletrônica.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Vídeo aula (roteiro;1;0;180;0;AVA;Não prevista;Atividade Aberta;;0 - 10;idem
+;4;Regras de projeto de layout;Idem.;4;Estudar por este eBook permite ao aluno revisar os temas no seu próprio ritmo, consultar explicações detalhadas sempre que necessário e se preparar melhor para quiz e atividades práticas. Além disso, o conteúdo foi cuidadosamente organizado para promover uma aprendizagem significativa e alinhada com as competências exigidas no campo profissional.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Ebook;1;0;45;;AVA;Não prevista;Não prevista;;Idem.;Idem

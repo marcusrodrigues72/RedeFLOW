@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  # ─── Validação de tipos e testes ──────────────────────────────────────────
+  validate:
+    name: Typecheck & Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: redeflow
+          POSTGRES_PASSWORD: redeflow
+          POSTGRES_DB: redeflow_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://redeflow:redeflow@localhost:5432/redeflow_test
+      JWT_ACCESS_SECRET: ci-access-secret-32-chars-minimum-ok
+      JWT_REFRESH_SECRET: ci-refresh-secret-32-chars-minimum-ok
+      NODE_ENV: test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Instalar pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Gerar cliente Prisma
+        run: pnpm db:generate
+
+      - name: Aplicar migrations
+        run: pnpm --filter api exec prisma migrate deploy
+
+      - name: Typecheck — shared
+        run: pnpm --filter shared exec tsc --noEmit
+
+      - name: Typecheck — api
+        run: pnpm --filter api exec tsc --noEmit
+
+      - name: Typecheck — web
+        run: pnpm --filter web exec tsc --noEmit
+
+      - name: Testes — api
+        run: pnpm --filter api test
+
+      - name: Testes — web
+        run: pnpm --filter web test
+
+  # ─── Build ────────────────────────────────────────────────────────────────
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: validate
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Instalar pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Gerar cliente Prisma
+        run: pnpm db:generate
+
+      - name: Build — api
+        run: pnpm --filter api build
+
+      - name: Build — web
+        run: pnpm --filter web build

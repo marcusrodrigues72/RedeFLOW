@@ -1,0 +1,47 @@
+# Variáveis de ambiente
+.env
+.env.local
+.env.*.local
+
+# Diretórios temporários
+.tmp/
+
+# Credenciais Google
+credentials.json
+token.json
+
+# Dependências
+node_modules/
+.pnp
+.pnp.js
+
+# Build
+dist/
+build/
+.vite/
+
+# TypeScript
+*.tsbuildinfo
+
+# Prisma
+apps/api/prisma/migrations/*.sql.bak
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testes
+coverage/
+
+# TanStack Router (gerado automaticamente)
+apps/web/src/routeTree.gen.ts

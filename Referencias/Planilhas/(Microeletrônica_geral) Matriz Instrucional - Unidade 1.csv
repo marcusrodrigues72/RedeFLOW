@@ -1,0 +1,46 @@
+﻿;;;;;;;;;;;;;;;;;;
+;[Microeletrônica Geral] Matriz Instrucional;;   CH Total Síncrona (h):;0:00;Atenção: Não é necessário preencher manualmente a tabela ao lado. Todos os valores serão calculados e atualizados automaticamente por meio das fórmulas já configuradas.;;;;;;;;;;;;;
+;;;   CH Total Assíncrona (h):;22:00;;;;;;;;;;;;;;
+;Data de Criação: 09/07/2025;;   CH Atividades (h):;0:00;;;;;;;;;;;;;;
+;Carga Horária do Curso: 320h;;   Carga Horária Total (h):;22:00;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;
+;Nº Capítulo;Nome Capítulo;Conteúdo (resumo);Nº Objetivo Educacional;Objetivo Educacional;Nível (TRB);Papéis e atores;Objetos de Aprendizagem;Nº Objetos de Aprendizagem;CH Síncrona (min);CH Assíncrona  (min);Período (dias);Ferramentas;Atividade Formativa;Atividade Somativa;CH Atividades (min);Atividade Pontuação;Feedback
+;1;Fundamentos de Linux;Introdução aos fundamentos do sistema operacional Linux, incluindo sua estrutura de diretórios e gerenciamento de permissões. Estudo e prática dos principais comandos do terminal para manipulação de arquivos e processos, uso de editores de texto (vim, nano, gedit) e criação de scripts em Bash. Aplicação de redirecionamento, pipes e técnicas de automação para otimizar tarefas no ambiente Linux.;2;Capacitar o aluno a utilizar o Linux de forma prática, compreendendo sua estrutura, comandos essenciais, edição de arquivos e criação de scripts em Bash para automação de tarefas.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Roteiro de Vídeo;3;;90;;;;;;;
+;1;Fundamentos de Linux;Idem;2;Idem;Idem;Idem;Slide;3;;;;;;;;;
+;1;Fundamentos de Linux;Idem;3;Idem;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Quiz;1;;60;;;Quiz;;;;
+;1;Fundamentos de Linux;Idem;2;Idem;Idem;Idem;Plano de Aula;1;;120;;;;;;;
+;1;Fundamentos de Linux;idem;2;Idem;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Ebook;1;;50;;;;;;;
+;1;Fundamentos de Linux;Idem;3;Idem;Idem;Idem;Tarefa;1;;120;;;;Atividade Aberta;;10;
+;2;Ferramentas de Administração e Versionamento em Linux;Este capítulo apresenta recursos essenciais para administração e produtividade no Linux, incluindo instalação e gerenciamento de pacotes com apt e yum, configuração de variáveis de ambiente e shells, manipulação de arquivos de log e debugging de erros comuns. Também aborda o uso de Makefiles para automação de compilação e introduz o Git para versionamento de projetos em HDL.;2;Capacitar o aluno a administrar e configurar o ambiente Linux de forma eficiente, compreendendo o uso de pacotes, variáveis e logs. Desenvolver habilidades em automação de processos com Makefiles e introduzir boas práticas de controle de versão com Git, aplicadas a projetos de desenvolvimento em HDL.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Roteiro de Vídeo;3;;90;;;;;;;
+;2;Ferramentas de Administração e Versionamento em Linux;Idem;2;Idem;Idem;Idem;Slide;3;;;;;;;;;
+;2;Ferramentas de Administração e Versionamento em Linux;idem;3;Idem;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Quiz;1;;60;;;Quiz;;;;
+;2;Ferramentas de Administração e Versionamento em Linux;Idem;2;Idem;Idem;Idem;Plano de Aula;1;;120;;;;;;;
+;2;Ferramentas de Administração e Versionamento em Linux;idem;2;Idem;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Ebook;1;;50;;;;;;;
+;2;Ferramentas de Administração e Versionamento em Linux;Idem;3;Idem;Idem;Idem;Tarefa;1;;120;;;;Atividade Aberta;;10;
+;3;Desenvolvimento e Customização de Imagens com Yocto;Este capítulo aborda a arquitetura do Yocto, incluindo BitBake, Poky e layers, setup do ambiente de build, criação de camadas customizadas e definição de recipes. Também cobre customização de kernel e rootfs, construção de imagens mínimas para boards de referência e procedimentos de debug e deploy.;3;Capacitar o aluno a compreender a arquitetura do Yocto e a preparar o ambiente de desenvolvimento para criação e customização de imagens Linux embarcadas. Desenvolver habilidades na criação de layers, definição de recipes, customização de kernel e rootfs, bem como na construção, depuração e deployment de imagens em plataformas de referência.;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Roteiro de Vídeo;3;;90;;;;;;;
+;3;Desenvolvimento e Customização de Imagens com Yocto;Idem;2;Idem;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Slide;3;;;;;;;;;
+;3;Desenvolvimento e Customização de Imagens com Yocto;Idem;3;Idem;Idem;Idem;Quiz;1;;60;;;Quiz;;;;
+;3;Desenvolvimento e Customização de Imagens com Yocto;Idem;2;Idem;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Plano de Aula;1;;120;;;;;;;
+;3;Desenvolvimento e Customização de Imagens com Yocto;Idem;2;Idem;Idem;Idem;Ebook;1;;50;;;;;;;
+;3;Desenvolvimento e Customização de Imagens com Yocto;Idem;3;Idem;Compreender (Entendimento) - Descrever, Explicar, Identificar.;"Estudantes: Participação ativa em discussões e atividades práticas.
+
+Mentores: Facilitação das discussões e orientação nas atividades práticas.";Tarefa;1;;120;;;;Atividade Aberta;;10;

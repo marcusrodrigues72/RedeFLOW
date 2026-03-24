@@ -1,0 +1,284 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.app{font-size:13px;color:var(--color-text-primary);background:var(--color-background-tertiary);border-radius:var(--border-radius-lg);overflow:hidden}
+.topbar{background:var(--color-background-primary);border-bottom:0.5px solid var(--color-border-tertiary);padding:10px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.topbar-title{font-size:15px;font-weight:500;flex:1;min-width:160px}
+.breadcrumb{font-size:12px;color:var(--color-text-secondary);display:flex;gap:4px;align-items:center;width:100%;padding-bottom:2px}
+.breadcrumb span{opacity:.5}
+.view-tabs{display:flex;gap:2px;background:var(--color-background-secondary);padding:3px;border-radius:var(--border-radius-md)}
+.tab{padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--color-text-secondary);border:none;background:transparent}
+.tab.active{background:var(--color-background-primary);color:var(--color-text-primary);font-weight:500;border:0.5px solid var(--color-border-tertiary)}
+.btn-primary{background:#185FA5;color:#fff;border:none;padding:6px 12px;border-radius:var(--border-radius-md);font-size:12px;cursor:pointer;font-weight:500}
+.filter-bar{background:var(--color-background-primary);border-bottom:0.5px solid var(--color-border-tertiary);padding:8px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.filter-pill{padding:4px 10px;border:0.5px solid var(--color-border-tertiary);border-radius:20px;font-size:12px;cursor:pointer;background:var(--color-background-primary);color:var(--color-text-secondary)}
+.filter-pill.active{border-color:#185FA5;color:#185FA5;background:#E6F1FB}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px;min-width:900px}
+thead tr{background:var(--color-background-secondary)}
+th{padding:7px 10px;text-align:left;font-weight:500;color:var(--color-text-secondary);border-bottom:0.5px solid var(--color-border-tertiary);white-space:nowrap;font-size:11px;text-transform:uppercase;letter-spacing:.03em}
+td{padding:7px 10px;border-bottom:0.5px solid var(--color-border-tertiary);vertical-align:middle;background:var(--color-background-primary)}
+tr:hover td{background:var(--color-background-secondary)}
+.group-header td{background:var(--color-background-secondary);font-weight:500;font-size:12px;padding:6px 10px;color:var(--color-text-secondary)}
+.code{font-family:var(--font-mono);font-size:11px;color:var(--color-text-secondary)}
+.type-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500;white-space:nowrap}
+.type-v{background:#FAECE7;color:#993C1D}
+.type-s{background:#EEEDFE;color:#3C3489}
+.type-q{background:#FAEEDA;color:#633806}
+.type-p{background:#E1F5EE;color:#085041}
+.type-e{background:#E6F1FB;color:#0C447C}
+.type-t{background:#F1EFE8;color:#444441}
+.status-dot{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:2px 8px;border-radius:4px;white-space:nowrap}
+.s-ok{background:#EAF3DE;color:#3B6D11}
+.s-pend{background:#FAEEDA;color:#854F0B}
+.s-nao{background:#F1EFE8;color:#5F5E5A}
+.s-atras{background:#FCEBEB;color:#A32D2D}
+.avatar{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:500;flex-shrink:0}
+.av-a{background:#CECBF6;color:#3C3489}
+.av-b{background:#9FE1CB;color:#085041}
+.av-c{background:#F5C4B3;color:#712B13}
+.av-d{background:#B5D4F4;color:#0C447C}
+.progress-bar{height:4px;border-radius:2px;background:var(--color-background-secondary);overflow:hidden;width:64px;display:inline-block;vertical-align:middle}
+.progress-fill{height:100%;border-radius:2px;background:#1D9E75}
+.link-cell{color:#185FA5;font-size:11px;text-decoration:none;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+.pct{font-size:11px;color:var(--color-text-secondary);margin-left:4px}
+.col-oa{min-width:130px}
+.col-tipo{min-width:110px}
+.col-resp{min-width:90px}
+.col-status{min-width:100px}
+.col-dl{min-width:82px;white-space:nowrap}
+.col-link{min-width:130px}
+.col-prog{min-width:90px}
+.summary-row{background:var(--color-background-secondary)}
+.summary-row td{font-size:11px;color:var(--color-text-secondary);padding:5px 10px;border-bottom:0.5px solid var(--color-border-tertiary)}
+.kpi-bar{display:flex;gap:8px;padding:10px 16px;background:var(--color-background-primary);border-bottom:0.5px solid var(--color-border-tertiary);flex-wrap:wrap}
+.kpi{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:8px 12px;min-width:90px}
+.kpi-label{font-size:10px;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.04em}
+.kpi-val{font-size:18px;font-weight:500;margin-top:2px}
+.kpi-val.ok{color:#1D9E75}
+.kpi-val.warn{color:#BA7517}
+.kpi-val.danger{color:#E24B4A}
+</style>
+
+<div class="app">
+
+<div class="topbar">
+  <div style="flex:1;min-width:200px">
+    <div class="breadcrumb">Cursos <span>/</span> Microeletrônica Geral <span>/</span> Unidade 2 — Fundamentos de eletrônica digital</div>
+    <div class="topbar-title">Matriz de conteúdo — Unidade 2</div>
+  </div>
+  <div class="view-tabs">
+    <button class="tab active">Lista</button>
+    <button class="tab">Kanban</button>
+    <button class="tab">Gantt</button>
+    <button class="tab">Por responsável</button>
+  </div>
+  <button class="btn-primary">+ Novo OA</button>
+</div>
+
+<div class="kpi-bar">
+  <div class="kpi"><div class="kpi-label">Total OAs</div><div class="kpi-val">21</div></div>
+  <div class="kpi"><div class="kpi-label">Concluídos</div><div class="kpi-val ok">21</div></div>
+  <div class="kpi"><div class="kpi-label">Pendentes</div><div class="kpi-val warn">0</div></div>
+  <div class="kpi"><div class="kpi-label">Atrasados</div><div class="kpi-val danger">0</div></div>
+  <div class="kpi"><div class="kpi-label">CH assíncrona</div><div class="kpi-val">6h35</div></div>
+  <div class="kpi"><div class="kpi-label">CH síncrona</div><div class="kpi-val">4h00</div></div>
+</div>
+
+<div class="filter-bar">
+  <button class="filter-pill active">Todos os tipos</button>
+  <button class="filter-pill">Vídeo</button>
+  <button class="filter-pill">Slide</button>
+  <button class="filter-pill">Quiz</button>
+  <button class="filter-pill">Plano de aula</button>
+  <div style="flex:1"></div>
+  <button class="filter-pill">Conteudista: todos</button>
+  <button class="filter-pill">Status: todos</button>
+</div>
+
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+  <th style="width:28px"></th>
+  <th class="col-oa">Código do OA</th>
+  <th class="col-tipo">Tipo</th>
+  <th class="col-prog">Progresso</th>
+  <th class="col-resp">Conteudista</th>
+  <th class="col-status">Status Content.</th>
+  <th class="col-resp">DI</th>
+  <th class="col-status">Status DI</th>
+  <th class="col-resp">Prof. Ator</th>
+  <th class="col-status">Status Grav.</th>
+  <th class="col-resp">Prof. Técnico</th>
+  <th class="col-status">Rev. Técnica</th>
+  <th class="col-status">Validação final</th>
+  <th class="col-link">Objeto final</th>
+  <th class="col-dl">Deadline final</th>
+</tr>
+</thead>
+<tbody>
+
+<tr class="group-header">
+  <td colspan="15">▾ Capítulo 1 — Fundamentos de eletrônica digital 1 &nbsp;&nbsp;<span style="font-weight:400;font-size:11px">10 OAs</span></td>
+</tr>
+
+<tr onclick="sendPrompt('Me mostre os detalhes do OA U2C1O1V1 do curso Microeletrônica')">
+  <td><input type="checkbox" style="width:13px;height:13px"></td>
+  <td><span class="code">U2C1O1V1</span></td>
+  <td><span class="type-badge type-v">Roteiro/Vídeo</span></td>
+  <td><div style="display:flex;align-items:center"><div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div><span class="pct">100%</span></div></td>
+  <td><div style="display:flex;align-items:center;gap:5px"><div class="avatar av-b">JF</div><span>João F.</span></div></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><div class="avatar av-a">JO</div></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><div class="avatar av-b">JF</div></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><div class="avatar av-c">GO</div></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><a class="link-cell">U2C1O1V1-Vídeo.mp4</a></td>
+  <td>17 set 25</td>
+</tr>
+
+<tr onclick="sendPrompt('Me mostre os detalhes do OA U2C1O1V2')">
+  <td><input type="checkbox" style="width:13px;height:13px"></td>
+  <td><span class="code">U2C1O1V2</span></td>
+  <td><span class="type-badge type-v">Roteiro/Vídeo</span></td>
+  <td><div style="display:flex;align-items:center"><div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div><span class="pct">100%</span></div></td>
+  <td><div style="display:flex;align-items:center;gap:5px"><div class="avatar av-b">JF</div><span>João F.</span></div></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><div class="avatar av-a">JO</div></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><div class="avatar av-b">JF</div></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><div class="avatar av-c">GO</div></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><a class="link-cell">U2C1O1V2-Vídeo.mp4</a></td>
+  <td>17 set 25</td>
+</tr>
+
+<tr onclick="sendPrompt('Me mostre os detalhes do OA U2C1O1S1')">
+  <td><input type="checkbox" style="width:13px;height:13px"></td>
+  <td><span class="code">U2C1O1S1</span></td>
+  <td><span class="type-badge type-s">Slide</span></td>
+  <td><div style="display:flex;align-items:center"><div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div><span class="pct">100%</span></div></td>
+  <td><div style="display:flex;align-items:center;gap:5px"><div class="avatar av-b">JF</div><span>João F.</span></div></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><div class="avatar av-a">JO</div></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><span style="font-size:11px;color:var(--color-text-secondary)">—</span></td>
+  <td><span class="status-dot s-nao">Não há</span></td>
+  <td><div class="avatar av-c">GO</div></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><a class="link-cell">Slide-U2C1O1S1.pdf</a></td>
+  <td>17 set 25</td>
+</tr>
+
+<tr onclick="sendPrompt('Me mostre os detalhes do OA U2C1O1Q1')">
+  <td><input type="checkbox" style="width:13px;height:13px"></td>
+  <td><span class="code">U2C1O1Q1</span></td>
+  <td><span class="type-badge type-q">Quiz</span></td>
+  <td><div style="display:flex;align-items:center"><div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div><span class="pct">100%</span></div></td>
+  <td><div style="display:flex;align-items:center;gap:5px"><div class="avatar av-b">JF</div><span>João F.</span></div></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><div class="avatar av-a">JO</div></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><span style="font-size:11px;color:var(--color-text-secondary)">—</span></td>
+  <td><span class="status-dot s-nao">Não há</span></td>
+  <td><div class="avatar av-c">GO</div></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><a class="link-cell">Quiz-U2C1O1Q1.pdf</a></td>
+  <td>17 set 25</td>
+</tr>
+
+<tr onclick="sendPrompt('Me mostre os detalhes do OA U2C1O1P1')">
+  <td><input type="checkbox" style="width:13px;height:13px"></td>
+  <td><span class="code">U2C1O1P1</span></td>
+  <td><span class="type-badge type-p">Plano de aula</span></td>
+  <td><div style="display:flex;align-items:center"><div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div><span class="pct">100%</span></div></td>
+  <td><div style="display:flex;align-items:center;gap:5px"><div class="avatar av-b">JF</div><span>João F.</span></div></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><div class="avatar av-a">JO</div></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><span style="font-size:11px;color:var(--color-text-secondary)">—</span></td>
+  <td><span class="status-dot s-nao">Não há</span></td>
+  <td><div class="avatar av-c">GO</div></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><a class="link-cell">PlanoAula-U2C1O1P1.pdf</a></td>
+  <td>17 set 25</td>
+</tr>
+
+<tr class="group-header">
+  <td colspan="15">▾ Capítulo 2 — Fundamentos de eletrônica digital 2 &nbsp;&nbsp;<span style="font-weight:400;font-size:11px">11 OAs</span></td>
+</tr>
+
+<tr onclick="sendPrompt('Me mostre os detalhes do OA U2C2O1V1')">
+  <td><input type="checkbox" style="width:13px;height:13px"></td>
+  <td><span class="code">U2C2O1V1</span></td>
+  <td><span class="type-badge type-v">Roteiro/Vídeo</span></td>
+  <td><div style="display:flex;align-items:center"><div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div><span class="pct">100%</span></div></td>
+  <td><div style="display:flex;align-items:center;gap:5px"><div class="avatar av-b">JF</div><span>João F.</span></div></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><div class="avatar av-a">JO</div></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><div class="avatar av-b">JF</div></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><div class="avatar av-c">GO</div></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><a class="link-cell">U2C2O1V1-Vídeo.mp4</a></td>
+  <td>22 set 25</td>
+</tr>
+
+<tr onclick="sendPrompt('Me mostre os detalhes do OA U2C2O1E1')">
+  <td><input type="checkbox" style="width:13px;height:13px"></td>
+  <td><span class="code">U2C2O1E1</span></td>
+  <td><span class="type-badge type-e">Ebook</span></td>
+  <td><div style="display:flex;align-items:center"><div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div><span class="pct">100%</span></div></td>
+  <td><div style="display:flex;align-items:center;gap:5px"><div class="avatar av-b">JF</div><span>João F.</span></div></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><div class="avatar av-a">JO</div></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><span style="font-size:11px;color:var(--color-text-secondary)">—</span></td>
+  <td><span class="status-dot s-nao">Não há</span></td>
+  <td><div class="avatar av-c">GO</div></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><a class="link-cell">Ebook-U2C2O1E1.pdf</a></td>
+  <td>22 set 25</td>
+</tr>
+
+<tr onclick="sendPrompt('Me mostre os detalhes do OA U2C2O3T1')">
+  <td><input type="checkbox" style="width:13px;height:13px"></td>
+  <td><span class="code">U2C2O3T1</span></td>
+  <td><span class="type-badge type-t">Tarefa</span></td>
+  <td><div style="display:flex;align-items:center"><div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div><span class="pct">100%</span></div></td>
+  <td><div style="display:flex;align-items:center;gap:5px"><div class="avatar av-b">JF</div><span>João F.</span></div></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><div class="avatar av-a">JO</div></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><span style="font-size:11px;color:var(--color-text-secondary)">—</span></td>
+  <td><span class="status-dot s-nao">Não há</span></td>
+  <td><div class="avatar av-c">GO</div></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><span class="status-dot s-ok">Concluído</span></td>
+  <td><a class="link-cell">Tarefa-U2C2O3T1.pdf</a></td>
+  <td>22 set 25</td>
+</tr>
+
+<tr class="summary-row">
+  <td colspan="3" style="font-weight:500">Total unidade 2</td>
+  <td colspan="2">21 OAs · 100% concluídos</td>
+  <td colspan="5">CH total: 10h35 &nbsp;|&nbsp; Síncrona: 4h · Assíncrona: 6h35</td>
+  <td colspan="5" style="text-align:right">Validação final: 21/21 concluídas</td>
+</tr>
+
+</tbody>
+</table>
+</div>
+</div>

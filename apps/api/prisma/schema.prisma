@@ -1,0 +1,345 @@
+// RedeFLOW — Schema Prisma completo
+// Cobre todos os domínios: Auth, Cursos, Matriz Instrucional, OAs, Pipeline, Colaboração
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum PapelGlobal {
+  ADMIN
+  COLABORADOR
+  LEITOR
+}
+
+enum StatusCurso {
+  RASCUNHO
+  ATIVO
+  ARQUIVADO
+}
+
+enum TipoOA {
+  VIDEO
+  SLIDE
+  QUIZ
+  EBOOK
+  PLANO_AULA
+  TAREFA
+}
+
+enum StatusOA {
+  PENDENTE
+  EM_ANDAMENTO
+  BLOQUEADO
+  CONCLUIDO
+}
+
+enum StatusEtapa {
+  PENDENTE
+  EM_ANDAMENTO
+  CONCLUIDA
+  BLOQUEADA
+}
+
+enum NivelBloom {
+  LEMBRAR
+  COMPREENDER
+  APLICAR
+  ANALISAR
+  AVALIAR
+  CRIAR
+}
+
+enum PapelEtapa {
+  CONTEUDISTA
+  DESIGNER_INSTRUCIONAL
+  PROFESSOR_ATOR
+  PROFESSOR_TECNICO
+  ACESSIBILIDADE
+  PRODUTOR_FINAL
+  VALIDADOR_FINAL
+}
+
+// ─── Usuário & Autenticação ───────────────────────────────────────────────────
+
+model Usuario {
+  id          String      @id @default(cuid())
+  nome        String
+  email       String      @unique
+  senhaHash   String
+  papelGlobal PapelGlobal @default(COLABORADOR)
+  ativo       Boolean     @default(true)
+  fotoUrl     String?
+  mfaSecret   String?
+  mfaAtivo    Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  refreshTokens    RefreshToken[]
+  membros          CursoMembro[]
+  etapasAtribuidas EtapaOA[]
+  comentarios      Comentario[]
+  arquivos         Arquivo[]
+  notificacoes     Notificacao[]
+  auditLogs        AuditLog[]
+
+  @@map("usuarios")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  usuarioId String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+// ─── Curso ────────────────────────────────────────────────────────────────────
+
+model Curso {
+  id               String      @id @default(cuid())
+  codigo           String      @unique
+  nome             String
+  descricao        String?
+  chTotalPlanejada Int         @default(0)
+  dataInicio       DateTime?
+  dataFim          DateTime?
+  status           StatusCurso @default(RASCUNHO)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  unidades Unidade[]
+  membros  CursoMembro[]
+
+  @@map("cursos")
+}
+
+/// Associação many-to-many entre Usuário e Curso com papel
+model CursoMembro {
+  id        String      @id @default(cuid())
+  cursoId   String
+  usuarioId String
+  papel     PapelGlobal @default(COLABORADOR)
+  createdAt DateTime    @default(now())
+
+  curso   Curso   @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@unique([cursoId, usuarioId])
+  @@map("curso_membros")
+}
+
+// ─── Estrutura Pedagógica (Matriz Instrucional) ───────────────────────────────
+
+model Unidade {
+  id           String   @id @default(cuid())
+  cursoId      String
+  numero       Int
+  nome         String
+  chSincrona   Decimal? @db.Decimal(6, 2)
+  chAssincrona Decimal? @db.Decimal(6, 2)
+  chAtividades Decimal? @db.Decimal(6, 2)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  curso     Curso      @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+  capitulos Capitulo[]
+
+  @@unique([cursoId, numero])
+  @@map("unidades")
+}
+
+model Capitulo {
+  id                 String     @id @default(cuid())
+  unidadeId          String
+  numero             Int
+  nome               String
+  conteudoResumo     String?
+  periodoDias        Int?
+  ferramentas        String?
+  atividadeFormativa String?
+  atividadeSomativa  String?
+  feedback           String?
+  chSincrona         Decimal?   @db.Decimal(6, 2)
+  chAssincrona       Decimal?   @db.Decimal(6, 2)
+  chAtividades       Decimal?   @db.Decimal(6, 2)
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  unidade   Unidade               @relation(fields: [unidadeId], references: [id], onDelete: Cascade)
+  objetivos ObjetivoEducacional[]
+  oas       ObjetoAprendizagem[]
+
+  @@unique([unidadeId, numero])
+  @@map("capitulos")
+}
+
+model ObjetivoEducacional {
+  id           String     @id @default(cuid())
+  capituloId   String
+  numero       Int
+  descricao    String
+  nivelBloom   NivelBloom?
+  papeisAtores String?
+  createdAt    DateTime   @default(now())
+
+  capitulo Capitulo @relation(fields: [capituloId], references: [id], onDelete: Cascade)
+
+  @@map("objetivos_educacionais")
+}
+
+// ─── Pipeline de Produção (configuração) ─────────────────────────────────────
+
+/// Define as etapas de produção configuráveis por tipo de OA.
+/// RF-M3-10 e RNF-M03: pipeline configurável via interface sem deploy.
+model EtapaDefinicao {
+  id          String     @id @default(cuid())
+  nome        String
+  tipoOA      TipoOA?    // null = aplica a todos os tipos de OA
+  papel       PapelEtapa
+  ordem       Int
+  obrigatorio Boolean    @default(true)
+  ativo       Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  etapasOA EtapaOA[]
+
+  @@map("etapas_definicao")
+}
+
+// ─── Objeto de Aprendizagem (Matriz de Conteúdo) ──────────────────────────────
+
+model ObjetoAprendizagem {
+  id              String    @id @default(cuid())
+  capituloId      String
+  codigo          String    @unique // U{u}C{c}O{o}{tipo}{n} — RF-M2-04
+  tipo            TipoOA
+  numero          Int
+  titulo          String?
+  descricao       String?
+  status          StatusOA  @default(PENDENTE)
+  progressoPct    Int       @default(0)
+  linkObjeto      String?
+  linkObjetoFinal String?
+  deadlineFinal   DateTime?
+  pontuacao       Decimal?  @db.Decimal(6, 2)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  capitulo    Capitulo    @relation(fields: [capituloId], references: [id], onDelete: Cascade)
+  etapas      EtapaOA[]
+  arquivos    Arquivo[]
+  comentarios Comentario[]
+
+  @@map("objetos_aprendizagem")
+}
+
+/// Instância de uma etapa de produção para um OA específico
+model EtapaOA {
+  id               String      @id @default(cuid())
+  oaId             String
+  etapaDefId       String
+  responsavelId    String?
+  status           StatusEtapa @default(PENDENTE)
+  deadlinePrevisto DateTime?
+  deadlineReal     DateTime?
+  ordem            Int
+  observacoes      String?
+  bloqueada        Boolean     @default(false)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  oa          ObjetoAprendizagem @relation(fields: [oaId], references: [id], onDelete: Cascade)
+  etapaDef    EtapaDefinicao     @relation(fields: [etapaDefId], references: [id])
+  responsavel Usuario?           @relation(fields: [responsavelId], references: [id])
+  comentarios Comentario[]
+
+  @@map("etapas_oa")
+}
+
+// ─── Colaboração ──────────────────────────────────────────────────────────────
+
+model Arquivo {
+  id        String   @id @default(cuid())
+  oaId      String
+  etapaOaId String?
+  nome      String
+  url       String
+  tipoMime  String?
+  tamanho   Int?
+  autorId   String
+  createdAt DateTime @default(now())
+
+  oa    ObjetoAprendizagem @relation(fields: [oaId], references: [id], onDelete: Cascade)
+  autor Usuario            @relation(fields: [autorId], references: [id])
+
+  @@map("arquivos")
+}
+
+model Comentario {
+  id        String   @id @default(cuid())
+  texto     String
+  autorId   String
+  oaId      String?
+  etapaOaId String?
+  parentId  String?  // thread de respostas
+  mencoes   String[] // array de usuarioId
+  editado   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  autor     Usuario            @relation(fields: [autorId], references: [id])
+  oa        ObjetoAprendizagem? @relation(fields: [oaId], references: [id], onDelete: Cascade)
+  etapaOa   EtapaOA?           @relation(fields: [etapaOaId], references: [id], onDelete: Cascade)
+  parent    Comentario?        @relation("ComentarioThread", fields: [parentId], references: [id])
+  respostas Comentario[]       @relation("ComentarioThread")
+
+  @@map("comentarios")
+}
+
+// ─── Notificações ─────────────────────────────────────────────────────────────
+
+model Notificacao {
+  id           String   @id @default(cuid())
+  usuarioId    String
+  tipo         String   // DEADLINE_VENCIDO | ETAPA_LIBERADA | PRAZO_PROXIMO | MENCAO
+  titulo       String
+  corpo        String?
+  lida         Boolean  @default(false)
+  entidadeTipo String?  // "OA" | "ETAPA" | "CURSO"
+  entidadeId   String?
+  createdAt    DateTime @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@map("notificacoes")
+}
+
+// ─── Auditoria ────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  usuarioId    String?
+  acao         String   // ex: "curso.criado", "oa.status_atualizado"
+  entidadeTipo String
+  entidadeId   String
+  payloadAntes Json?
+  payloadDepois Json?
+  ip           String?
+  createdAt    DateTime @default(now())
+
+  usuario Usuario? @relation(fields: [usuarioId], references: [id])
+
+  @@map("audit_logs")
+}
