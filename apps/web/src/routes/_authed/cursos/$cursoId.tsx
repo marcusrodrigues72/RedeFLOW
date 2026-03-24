@@ -23,7 +23,7 @@ import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import { useCurso, useAdicionarMembro, useRemoverMembro, useAtualizarCurso, useExcluirCurso, useAtribuicaoPreview, useAtribuirResponsaveis, useExportarMC } from "@/lib/api/cursos";
 import { useUsuarios } from "@/lib/api/usuarios";
 import { useAuthStore } from "@/stores/auth.store";
-import type { StatusOA, TipoOA, PapelEtapa } from "shared";
+import type { PapelEtapa } from "shared";
 
 export const Route = createFileRoute("/_authed/cursos/$cursoId")({
   component: CursoDetalhePage,
