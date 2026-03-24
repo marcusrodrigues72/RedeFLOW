@@ -9,7 +9,6 @@ services:
     region: oregon          # mais próximo do Brasil disponível no free tier
 
     buildCommand: |
-      corepack enable
       pnpm install --frozen-lockfile
       pnpm --filter api build
 
