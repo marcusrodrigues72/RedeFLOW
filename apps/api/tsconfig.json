@@ -12,7 +12,6 @@
     "declarationMap": false,
     "esModuleInterop": true,
     "resolveJsonModule": true,
-    "declaration": true,
     "sourceMap": true
   },
   "include": ["src"],

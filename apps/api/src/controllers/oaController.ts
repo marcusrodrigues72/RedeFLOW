@@ -6,7 +6,7 @@ export class OAController {
   listarByCurso = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { status, tipo } = req.query as Record<string, string>;
-      const oas = await oaRepository.findByCurso(req.params["id"]!, { status, tipo });
+      const oas = await oaRepository.findByCurso(req.params["id"] as string, { status, tipo });
       res.json(oas);
     } catch (err) { next(err); }
   };
@@ -14,7 +14,7 @@ export class OAController {
   // GET /oas/:id
   buscar = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const oa = await oaRepository.findById(req.params["id"]!);
+      const oa = await oaRepository.findById(req.params["id"] as string);
       if (!oa) { res.status(404).json({ message: "OA não encontrado." }); return; }
       res.json(oa);
     } catch (err) { next(err); }
@@ -46,7 +46,7 @@ export class OAController {
         if (usuario?.papelGlobal !== "ADMIN") {
           // Verifica se é ADMIN do curso ao qual o OA pertence
           const oaParaCheck = await db.objetoAprendizagem.findUnique({
-            where: { id: req.params["id"]! },
+            where: { id: req.params["id"] as string },
             select: { capitulo: { select: { unidade: { select: { cursoId: true } } } } },
           });
           const cursoId = oaParaCheck?.capitulo?.unidade?.cursoId;
@@ -65,13 +65,13 @@ export class OAController {
       if (recalcularSequencia && deadlinePrevisto) {
         const { prisma: db } = await import("../lib/prisma.js");
         todasEtapasAntes = await db.etapaOA.findMany({
-          where:   { oaId: req.params["id"]! },
+          where:   { oaId: req.params["id"] as string },
           orderBy: { ordem: "asc" },
           select:  { id: true, ordem: true, deadlinePrevisto: true },
         });
       }
 
-      const etapa = await oaRepository.updateEtapa(req.params["etapaId"]!, {
+      const etapa = await oaRepository.updateEtapa(req.params["etapaId"] as string, {
         status,
         responsavelId,
         deadlineReal:     deadlineReal     ? new Date(deadlineReal)     : deadlineReal     === null ? null : undefined,
@@ -81,7 +81,7 @@ export class OAController {
       // Recalcula etapas subsequentes deslocando pelo mesmo delta
       if (recalcularSequencia && deadlinePrevisto && todasEtapasAntes.length > 0) {
         const { prisma: db } = await import("../lib/prisma.js");
-        const etapaEditada = todasEtapasAntes.find((e) => e.id === req.params["etapaId"]!);
+        const etapaEditada = todasEtapasAntes.find((e) => e.id === req.params["etapaId"] as string);
         if (etapaEditada?.deadlinePrevisto) {
           const novaData     = new Date(deadlinePrevisto);
           const deltaMs      = novaData.getTime() - etapaEditada.deadlinePrevisto.getTime();
@@ -101,14 +101,14 @@ export class OAController {
                 ? new Date(ultima.deadlinePrevisto.getTime() + (ultima.ordem > etapaEditada.ordem ? deltaMs : 0))
                 : null;
             if (novoFinal) {
-              await db.objetoAprendizagem.update({ where: { id: req.params["id"]! }, data: { deadlineFinal: novoFinal } });
+              await db.objetoAprendizagem.update({ where: { id: req.params["id"] as string }, data: { deadlineFinal: novoFinal } });
             }
           }
         }
       }
 
       // Recalcula progressoPct do OA
-      const oa = await oaRepository.findById(req.params["id"]!);
+      const oa = await oaRepository.findById(req.params["id"] as string);
       if (oa) {
         const total      = oa.etapas.length;
         const concluidas  = oa.etapas.filter((e) => e.status === "CONCLUIDA").length;

@@ -30,7 +30,7 @@ router.get("/:id/oas", oaCtrl.listarByCurso);
 // Exportação da Matriz de Conteúdo
 router.get("/:id/exportar-mc", async (req, res, next) => {
   try {
-    const cursoId = req.params["id"]!;
+    const cursoId = req.params["id"] as string;
     const curso   = await prisma.curso.findUnique({ where: { id: cursoId }, select: { codigo: true } });
     if (!curso) { res.status(404).json({ message: "Curso não encontrado." }); return; }
 
@@ -61,7 +61,7 @@ const atribuicaoSchema = z.object({
 router.get("/:id/atribuicao-preview", async (req, res, next) => {
   try {
     const { papelEtapa, sobrescrever } = req.query as Record<string, string>;
-    const cursoId = req.params["id"]!;
+    const cursoId = req.params["id"] as string;
     const apenasVazios = !sobrescrever || sobrescrever === "false";
 
     const total = await prisma.etapaOA.count({
@@ -77,7 +77,7 @@ router.get("/:id/atribuicao-preview", async (req, res, next) => {
 
 router.post("/:id/atribuir-responsaveis", async (req, res, next) => {
   try {
-    const cursoId = req.params["id"]!;
+    const cursoId = req.params["id"] as string;
 
     // ADMIN guard
     const usuario = await prisma.usuario.findUnique({ where: { id: req.usuario!.sub }, select: { papelGlobal: true } });
@@ -133,8 +133,8 @@ router.post("/:id/membros", async (req, res, next) => {
   try {
     const { usuarioId, papel } = membroSchema.parse(req.body);
     const membro = await prisma.cursoMembro.upsert({
-      where:  { cursoId_usuarioId: { cursoId: req.params["id"]!, usuarioId } },
-      create: { cursoId: req.params["id"]!, usuarioId, papel },
+      where:  { cursoId_usuarioId: { cursoId: req.params["id"] as string, usuarioId } },
+      create: { cursoId: req.params["id"] as string, usuarioId, papel },
       update: { papel },
       include: { usuario: { select: { id: true, nome: true, email: true, fotoUrl: true, papelGlobal: true } } },
     });
@@ -145,7 +145,7 @@ router.post("/:id/membros", async (req, res, next) => {
 router.delete("/:id/membros/:usuarioId", async (req, res, next) => {
   try {
     await prisma.cursoMembro.delete({
-      where: { cursoId_usuarioId: { cursoId: req.params["id"]!, usuarioId: req.params["usuarioId"]! } },
+      where: { cursoId_usuarioId: { cursoId: req.params["id"] as string, usuarioId: req.params["usuarioId"] as string } },
     });
     res.status(204).send();
   } catch (err) { next(err); }

@@ -42,7 +42,7 @@ router.patch("/ler-todas", async (req, res, next) => {
 router.patch("/:id/ler", async (req, res, next) => {
   try {
     await prisma.notificacao.updateMany({
-      where: { id: req.params["id"]!, usuarioId: req.usuario!.sub },
+      where: { id: req.params["id"] as string, usuarioId: req.usuario!.sub },
       data:  { lida: true },
     });
     res.status(204).send();

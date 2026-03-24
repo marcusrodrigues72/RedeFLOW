@@ -23,7 +23,7 @@ const comentarioSchema = z.object({
 router.get("/:id/comentarios", async (req, res, next) => {
   try {
     const comentarios = await prisma.comentario.findMany({
-      where:   { oaId: req.params["id"]! },
+      where:   { oaId: req.params["id"] as string },
       include: { autor: { select: { id: true, nome: true, fotoUrl: true } } },
       orderBy: { createdAt: "asc" },
     });
@@ -37,7 +37,7 @@ router.post("/:id/comentarios", async (req, res, next) => {
     const comentario = await prisma.comentario.create({
       data: {
         texto,
-        oaId:      req.params["id"]!,
+        oaId:      req.params["id"] as string,
         etapaOaId: etapaOaId ?? null,
         autorId:   req.usuario!.sub,
       },
@@ -49,7 +49,7 @@ router.post("/:id/comentarios", async (req, res, next) => {
 
 router.delete("/:id/comentarios/:comentarioId", async (req, res, next) => {
   try {
-    const c = await prisma.comentario.findUnique({ where: { id: req.params["comentarioId"]! } });
+    const c = await prisma.comentario.findUnique({ where: { id: req.params["comentarioId"] as string } });
     if (!c || c.autorId !== req.usuario!.sub) {
       res.status(403).json({ message: "Sem permissão para excluir este comentário." }); return;
     }

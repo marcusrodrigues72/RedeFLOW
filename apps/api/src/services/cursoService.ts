@@ -28,7 +28,7 @@ export class CursoService {
   }
 
   async criar(
-    data: { codigo: string; nome: string; descricao?: string; chTotalPlanejada?: number },
+    data: { codigo: string; nome: string; descricao?: string | undefined; chTotalPlanejada?: number | undefined },
     criadorId: string
   ) {
     const curso = await this.repo.create({

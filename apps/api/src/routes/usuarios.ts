@@ -62,7 +62,7 @@ router.patch("/:id", adminOnly, async (req, res, next) => {
   try {
     const data    = atualizarSchema.parse(req.body);
     const usuario = await prisma.usuario.update({
-      where: { id: req.params["id"]! },
+      where: { id: req.params["id"] as string },
       data:  data as Parameters<typeof prisma.usuario.update>[0]["data"],
       select,
     });
@@ -73,7 +73,7 @@ router.patch("/:id", adminOnly, async (req, res, next) => {
 // DELETE /usuarios/:id — desativa e anonimiza (soft delete, LGPD-safe)
 router.delete("/:id", adminOnly, async (req, res, next) => {
   try {
-    const id = req.params["id"]!;
+    const id = req.params["id"] as string;
     // Impede auto-exclusão
     if (id === req.usuario!.sub) {
       res.status(400).json({ message: "Você não pode excluir sua própria conta." }); return;

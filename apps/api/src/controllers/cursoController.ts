@@ -29,7 +29,7 @@ export class CursoController {
 
   buscar = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const curso = await this.service.buscarPorId(req.params["id"]!, req.usuario!.sub);
+      const curso = await this.service.buscarPorId(req.params["id"] as string, req.usuario!.sub);
       if (!curso) { res.status(404).json({ message: "Curso não encontrado." }); return; }
       res.json(curso);
     } catch (err) { next(err); }
@@ -46,21 +46,21 @@ export class CursoController {
   atualizar = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const data  = atualizarCursoSchema.parse(req.body);
-      const curso = await this.service.atualizar(req.params["id"]!, data);
+      const curso = await this.service.atualizar(req.params["id"] as string, data);
       res.json(curso);
     } catch (err) { next(err); }
   };
 
   arquivar = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await this.service.arquivar(req.params["id"]!);
+      await this.service.arquivar(req.params["id"] as string);
       res.status(204).send();
     } catch (err) { next(err); }
   };
 
   excluir = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await this.service.excluir(req.params["id"]!);
+      await this.service.excluir(req.params["id"] as string);
       res.status(204).send();
     } catch (err) { next(err); }
   };
@@ -94,7 +94,7 @@ export class CursoController {
   importarMIConfirmar = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.file) { res.status(400).json({ message: "Nenhum arquivo enviado." }); return; }
-      const cursoId = req.params["id"]!;
+      const cursoId = req.params["id"] as string;
       const curso   = await this.service.buscarPorId(cursoId, req.usuario!.sub);
       if (!curso) { res.status(404).json({ message: "Curso não encontrado." }); return; }
       const caps   = parseMI(req.file.buffer, req.file.originalname);
@@ -160,7 +160,7 @@ export class CursoController {
     try {
       if (!req.file) { res.status(400).json({ message: "Nenhum arquivo enviado." }); return; }
 
-      const cursoId = req.params["id"]!;
+      const cursoId = req.params["id"] as string;
 
       // Verifica acesso
       const curso = await this.service.buscarPorId(cursoId, req.usuario!.sub);
