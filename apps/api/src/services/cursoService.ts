@@ -45,7 +45,7 @@ export class CursoService {
     return curso;
   }
 
-  atualizar(id: string, data: { nome?: string; descricao?: string; status?: any }) {
+  atualizar(id: string, data: { nome?: string | undefined; descricao?: string | undefined; status?: any }) {
     return this.repo.update(id, data);
   }
 

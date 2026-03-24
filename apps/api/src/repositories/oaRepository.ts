@@ -1,7 +1,7 @@
 import { prisma } from "../lib/prisma.js";
 
 export const oaRepository = {
-  findByCurso(cursoId: string, filters: { status?: string; tipo?: string }) {
+  findByCurso(cursoId: string, filters: { status?: string | undefined; tipo?: string | undefined }) {
     return prisma.objetoAprendizagem.findMany({
       where: {
         capitulo: { unidade: { cursoId } },
@@ -74,7 +74,7 @@ export const oaRepository = {
     });
   },
 
-  updateEtapa(etapaId: string, data: { status?: string; responsavelId?: string | null; deadlineReal?: Date | null; deadlinePrevisto?: Date | null }) {
+  updateEtapa(etapaId: string, data: { status?: string | undefined; responsavelId?: string | null | undefined; deadlineReal?: Date | null | undefined; deadlinePrevisto?: Date | null | undefined }) {
     return prisma.etapaOA.update({
       where: { id: etapaId },
       data: {
