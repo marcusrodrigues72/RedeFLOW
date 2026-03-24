@@ -142,7 +142,7 @@ export class CursoController {
       });
 
       const caps   = parseMI(req.file.buffer, req.file.originalname);
-      const result = await persistMI(caps, curso.id, { dataInicio: dataInicioDate });
+      const result = await persistMI(caps, curso.id, dataInicioDate ? { dataInicio: dataInicioDate } : {});
 
       res.status(201).json({
         message:              `Curso criado e MI importada: ${result.capitulosAtualizados} capítulos, ${result.oasCriados} OAs gerados.`,
