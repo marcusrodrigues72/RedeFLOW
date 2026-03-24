@@ -1,0 +1,44 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# Deploy: conecte este repositório no Render e ele detecta este arquivo automaticamente.
+
+services:
+  - type: web
+    name: redeflow-api
+    runtime: node
+    plan: free
+    region: oregon          # mais próximo do Brasil disponível no free tier
+
+    buildCommand: |
+      corepack enable
+      pnpm install --frozen-lockfile
+      pnpm --filter api build
+
+    startCommand: pnpm --filter api run start:prod
+
+    healthCheckPath: /api/health
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      - key: PORT
+        value: 10000         # porta padrão do Render
+
+      # ── Banco de dados (Supabase) ─────────────────────────────────────────
+      # Cole aqui a connection string do Supabase (modo "Transaction Pooler"):
+      # postgresql://postgres.[ref]:[senha]@aws-0-[região].pooler.supabase.com:6543/postgres?pgbouncer=true
+      - key: DATABASE_URL
+        sync: false          # preencher manualmente no dashboard do Render
+
+      # ── JWT ───────────────────────────────────────────────────────────────
+      - key: JWT_SECRET
+        generateValue: true  # Render gera automaticamente
+
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+
+      # ── CORS ──────────────────────────────────────────────────────────────
+      # URL do frontend no Vercel (ex: https://redeflow.vercel.app)
+      # Múltiplas origens separadas por vírgula são suportadas.
+      - key: CORS_ORIGIN
+        sync: false

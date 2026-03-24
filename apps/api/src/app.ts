@@ -9,12 +9,30 @@ export function createApp() {
 
   // ─── Segurança ────────────────────────────────────────────────────────────
   app.use(helmet());
+
+  const allowedOrigins = (process.env["CORS_ORIGIN"] ?? "http://localhost:5173")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
+
   app.use(
     cors({
-      origin: process.env["CORS_ORIGIN"] ?? "http://localhost:5173",
+      origin: (origin, callback) => {
+        // Permite requisições sem origin (ex: curl, apps mobile) e origens listadas
+        if (!origin || allowedOrigins.includes(origin)) {
+          callback(null, true);
+        } else {
+          callback(new Error(`Origin ${origin} not allowed by CORS`));
+        }
+      },
       credentials: true,
     })
   );
+
+  // ─── Health check (usado pelo Render) ────────────────────────────────────
+  app.get("/api/health", (_req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
 
   // ─── Parsing ──────────────────────────────────────────────────────────────
   app.use(express.json({ limit: "2mb" }));

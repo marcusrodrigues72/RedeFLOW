@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { RelatorioCurso, RelatorioPipelineStatus, RelatorioAtrasoResponsavel } from "shared";
+import type { RelatorioCurso, RelatorioPipelineStatus, RelatorioAtrasoResponsavel, RelatorioAlocacao } from "shared";
 
 export const relatorioKeys = {
   progressoCursos:    () => ["relatorios", "progresso-cursos"]    as const,
   pipelineStatus:     () => ["relatorios", "pipeline-status"]     as const,
   atrasosResponsavel: () => ["relatorios", "atrasos-responsavel"] as const,
+  alocacao:           () => ["relatorios", "alocacao"]            as const,
 };
 
 export function useProgressoCursos() {
@@ -26,5 +27,12 @@ export function useAtrasosResponsavel() {
   return useQuery({
     queryKey: relatorioKeys.atrasosResponsavel(),
     queryFn:  () => api.get<RelatorioAtrasoResponsavel[]>("/relatorios/atrasos-responsavel").then((r) => r.data),
+  });
+}
+
+export function useAlocacao() {
+  return useQuery({
+    queryKey: relatorioKeys.alocacao(),
+    queryFn:  () => api.get<RelatorioAlocacao>("/relatorios/alocacao").then((r) => r.data),
   });
 }

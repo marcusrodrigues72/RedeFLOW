@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch --clear-screen=false src/server.ts",
-    "build": "tsc",
+    "build": "prisma generate && tsc",
     "start": "node dist/server.js",
+    "start:prod": "prisma migrate deploy && node dist/server.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "echo 'lint ok'"

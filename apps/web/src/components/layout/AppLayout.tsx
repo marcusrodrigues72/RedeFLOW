@@ -11,6 +11,7 @@ import SchoolOutlinedIcon         from "@mui/icons-material/SchoolOutlined";
 import AssignmentOutlinedIcon     from "@mui/icons-material/AssignmentOutlined";
 import BarChartOutlinedIcon       from "@mui/icons-material/BarChartOutlined";
 import PeopleOutlinedIcon         from "@mui/icons-material/PeopleOutlined";
+import CalendarMonthOutlinedIcon  from "@mui/icons-material/CalendarMonthOutlined";
 import NotificationsNoneIcon      from "@mui/icons-material/NotificationsNone";
 import CheckCircleOutlineIcon     from "@mui/icons-material/CheckCircleOutline";
 import LogoutOutlinedIcon         from "@mui/icons-material/LogoutOutlined";
@@ -28,6 +29,7 @@ const NAV: NavItem[] = [
   { label: "Cursos",       to: "/cursos",       icon: <SchoolOutlinedIcon fontSize="small" /> },
   { label: "Meu Trabalho", to: "/meu-trabalho", icon: <AssignmentOutlinedIcon fontSize="small" /> },
   { label: "Relatórios",   to: "/relatorios",   icon: <BarChartOutlinedIcon fontSize="small" /> },
+  { label: "Alocação",     to: "/alocacao",     icon: <CalendarMonthOutlinedIcon fontSize="small" /> },
   { label: "Equipe",       to: "/admin/usuarios", icon: <PeopleOutlinedIcon fontSize="small" />, adminOnly: true },
 ];
 
@@ -289,6 +291,7 @@ function getBreadcrumb(path: string): string {
   if (path.startsWith("/cursos"))          return "REDEFLOW · CURSOS";
   if (path.startsWith("/meu-trabalho"))    return "REDEFLOW · MEU TRABALHO";
   if (path.startsWith("/relatorios"))      return "REDEFLOW · RELATÓRIOS";
+  if (path.startsWith("/alocacao"))        return "REDEFLOW · ALOCAÇÃO DO TIME";
   if (path.startsWith("/oas/"))            return "REDEFLOW · OAs · DETALHE";
   if (path.startsWith("/admin/usuarios"))  return "REDEFLOW · EQUIPE";
   return "REDEFLOW";

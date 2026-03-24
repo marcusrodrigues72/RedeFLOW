@@ -1,8 +1,13 @@
 import axios from "axios";
 import { useAuthStore } from "@/stores/auth.store";
 
+// Em desenvolvimento usa o proxy do Vite ("/api").
+// Em produção, VITE_API_BASE_URL deve apontar para a URL completa da API + /api
+// ex: https://redeflow-api.onrender.com/api
+const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) || "/api";
+
 export const api = axios.create({
-  baseURL: "/api",
+  baseURL: API_BASE,
   headers: { "Content-Type": "application/json" },
   withCredentials: true,
 });
@@ -43,7 +48,7 @@ api.interceptors.response.use(
 
         refreshPromise = axios
           .post<{ accessToken: string; refreshToken: string }>(
-            "/api/auth/refresh",
+            `${API_BASE}/auth/refresh`,
             { refreshToken }
           )
           .then((res) => {

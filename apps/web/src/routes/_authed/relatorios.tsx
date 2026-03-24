@@ -1,30 +1,59 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Box, Typography, Card, CardContent, LinearProgress,
   Chip, Skeleton, Alert, Table, TableHead, TableRow,
-  TableCell, TableBody, Divider,
+  TableCell, TableBody, Divider, Collapse, IconButton,
+  Tooltip,
 } from "@mui/material";
-import TrendingUpIcon    from "@mui/icons-material/TrendingUp";
-import WarningAmberIcon  from "@mui/icons-material/WarningAmber";
+import TrendingUpIcon       from "@mui/icons-material/TrendingUp";
+import WarningAmberIcon     from "@mui/icons-material/WarningAmber";
+import AccountTreeIcon      from "@mui/icons-material/AccountTree";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import KeyboardArrowUpIcon   from "@mui/icons-material/KeyboardArrowUp";
+import OpenInNewIcon         from "@mui/icons-material/OpenInNew";
+import CheckCircleIcon       from "@mui/icons-material/CheckCircle";
+import { useState }          from "react";
+import type { ReactNode }    from "react";
 import { useProgressoCursos, usePipelineStatus, useAtrasosResponsavel } from "@/lib/api/relatorios";
-import type { StatusEtapa } from "shared";
-import type { ReactNode } from "react";
+import type { StatusOA }     from "shared";
 
 export const Route = createFileRoute("/_authed/relatorios")({
   component: RelatoriosPage,
 });
 
-const STATUS_CONFIG: Record<StatusEtapa, { label: string; color: string; bg: string }> = {
+// ─── Config visual ────────────────────────────────────────────────────────────
+
+const STATUS_OA_CONFIG: Record<StatusOA, { label: string; color: string; bg: string }> = {
   PENDENTE:     { label: "Pendente",     color: "#64748b", bg: "#f8fafc" },
-  EM_ANDAMENTO: { label: "Em Andamento", color: "#f59e0b", bg: "#fffbeb" },
-  CONCLUIDA:    { label: "Concluída",    color: "#10b981", bg: "#f0fdf4" },
-  BLOQUEADA:    { label: "Bloqueada",    color: "#ef4444", bg: "#fff5f5" },
+  EM_ANDAMENTO: { label: "Em Produção",  color: "#2b7cee", bg: "#eff6ff" },
+  BLOQUEADO:    { label: "Bloqueado",    color: "#ef4444", bg: "#fff5f5" },
+  CONCLUIDO:    { label: "Concluído",    color: "#10b981", bg: "#f0fdf4" },
 };
+
+const STATUS_CURSO_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  ATIVO:     { label: "Ativo",     color: "#10b981", bg: "#f0fdf4" },
+  RASCUNHO:  { label: "Rascunho",  color: "#64748b", bg: "#f8fafc" },
+  ARQUIVADO: { label: "Arquivado", color: "#94a3b8", bg: "#f1f5f9" },
+};
+
+function fmtData(iso: string | null | undefined) {
+  if (!iso) return null;
+  return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+// ─── Página ───────────────────────────────────────────────────────────────────
 
 function RelatoriosPage() {
   const { data: cursos   = [], isLoading: loadCursos,   isError: errCursos   } = useProgressoCursos();
   const { data: pipeline,      isLoading: loadPipeline, isError: errPipeline } = usePipelineStatus();
   const { data: atrasos  = [], isLoading: loadAtrasos,  isError: errAtrasos  } = useAtrasosResponsavel();
+
+  // KPIs do pipeline (status dos OAs)
+  const totalOAs    = pipeline?.porStatusOA.reduce((s, e) => s + e.total, 0) ?? 0;
+  const emProducao  = pipeline?.porStatusOA.find((e) => e.status === "EM_ANDAMENTO")?.total ?? 0;
+  const concluidos  = pipeline?.porStatusOA.find((e) => e.status === "CONCLUIDO")?.total ?? 0;
+  const bloqueados  = pipeline?.porStatusOA.find((e) => e.status === "BLOQUEADO")?.total ?? 0;
+  const totalAtrasos = atrasos.reduce((s, r) => s + r.total, 0);
 
   return (
     <Box>
@@ -33,8 +62,22 @@ function RelatoriosPage() {
         Visão gerencial da produção de conteúdo
       </Typography>
 
-      {/* ── Progresso por Curso ──────────────────────────────────────────────── */}
-      <Section title="Progresso por Curso" icon={<TrendingUpIcon sx={{ fontSize: 18 }} />}>
+      {/* ── KPIs ──────────────────────────────────────────────────────────────── */}
+      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2, mb: 3 }}>
+        {loadPipeline ? (
+          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} height={90} sx={{ borderRadius: 2 }} />)
+        ) : (
+          <>
+            <KpiCard label="Total de OAs"  value={totalOAs}   color="#2b7cee" />
+            <KpiCard label="Em Produção"   value={emProducao} color="#f59e0b" />
+            <KpiCard label="Concluídos"    value={concluidos} color="#10b981" />
+            <KpiCard label="Com Atraso"    value={totalAtrasos} color="#ef4444" sub="etapas atrasadas" />
+          </>
+        )}
+      </Box>
+
+      {/* ── Progresso por Curso ───────────────────────────────────────────────── */}
+      <Section title="Progresso por Curso" icon={<TrendingUpIcon sx={{ fontSize: 18 }} />} mb>
         {errCursos ? (
           <Alert severity="error" sx={{ m: 2 }}>Erro ao carregar dados.</Alert>
         ) : loadCursos ? (
@@ -43,148 +86,201 @@ function RelatoriosPage() {
           <Empty msg="Nenhum curso encontrado." />
         ) : (
           <Box sx={{ display: "flex", flexDirection: "column" }}>
-            {cursos.map((curso, i) => (
-              <Box key={curso.id}>
-                <Box sx={{ px: 3, py: 2 }}>
-                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                      <Typography variant="body2" fontWeight={700}>{curso.nome}</Typography>
-                      <Typography variant="caption" sx={{ fontFamily: "monospace", color: "text.disabled" }}>
-                        {curso.codigo}
-                      </Typography>
-                      {curso.oasAtrasados > 0 && (
+            {cursos.map((curso, i) => {
+              const sc = STATUS_CURSO_CONFIG[curso.status] ?? STATUS_CURSO_CONFIG["RASCUNHO"]!;
+              const barColor = curso.progressoPct >= 80 ? "#10b981" : curso.progressoPct >= 40 ? "#f59e0b" : "#2b7cee";
+              return (
+                <Box key={curso.id}>
+                  <Box sx={{ px: 3, py: 2.5 }}>
+                    {/* Linha 1: nome, badges, link, progresso */}
+                    <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", mb: 1.5 }}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
                         <Chip
-                          label={`${curso.oasAtrasados} atraso${curso.oasAtrasados > 1 ? "s" : ""}`}
-                          size="small"
-                          sx={{ height: 18, fontSize: "0.65rem", bgcolor: "#fff5f5", color: "#ef4444", fontWeight: 700 }}
+                          label={sc.label} size="small"
+                          sx={{ height: 18, fontSize: "0.65rem", fontWeight: 700, bgcolor: sc.bg, color: sc.color }}
                         />
-                      )}
+                        <Typography variant="body2" fontWeight={700}>{curso.nome}</Typography>
+                        <Typography variant="caption" sx={{ fontFamily: "monospace", color: "text.disabled" }}>
+                          {curso.codigo}
+                        </Typography>
+                        {curso.oasAtrasados > 0 && (
+                          <Chip
+                            icon={<WarningAmberIcon sx={{ fontSize: "0.75rem !important" }} />}
+                            label={`${curso.oasAtrasados} atraso${curso.oasAtrasados > 1 ? "s" : ""}`}
+                            size="small"
+                            sx={{ height: 18, fontSize: "0.65rem", bgcolor: "#fff5f5", color: "#ef4444", fontWeight: 700 }}
+                          />
+                        )}
+                      </Box>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
+                        <Box sx={{ textAlign: "right" }}>
+                          <Typography variant="body2" fontWeight={800} sx={{ color: barColor, fontSize: "1.1rem" }}>
+                            {curso.progressoPct}%
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {curso.oasConcluidos}/{curso.totalOAs} OAs
+                          </Typography>
+                        </Box>
+                        <Tooltip title="Ver curso">
+                          <IconButton
+                            size="small" component={Link} to={`/cursos/${curso.id}`}
+                            sx={{ color: "text.disabled", "&:hover": { color: "primary.main" } }}
+                          >
+                            <OpenInNewIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
                     </Box>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                      <Typography variant="caption" color="text.secondary">
-                        {curso.oasConcluidos}/{curso.totalOAs} OAs
-                      </Typography>
-                      <Typography
-                        variant="body2" fontWeight={800}
-                        sx={{ minWidth: 36, textAlign: "right",
-                          color: curso.progressoPct >= 80 ? "#10b981" : curso.progressoPct >= 40 ? "#f59e0b" : "text.primary" }}
-                      >
-                        {curso.progressoPct}%
-                      </Typography>
-                    </Box>
+
+                    {/* Barra de progresso */}
+                    <LinearProgress
+                      variant="determinate" value={curso.progressoPct}
+                      sx={{
+                        height: 8, borderRadius: 4, bgcolor: "#f1f5f9", mb: 1,
+                        "& .MuiLinearProgress-bar": { bgcolor: barColor, borderRadius: 4 },
+                      }}
+                    />
+
+                    {/* Linha 3: datas estimadas */}
+                    {(curso.dataInicioEstimada || curso.dataFimEstimada) && (
+                      <Box sx={{ display: "flex", gap: 3 }}>
+                        {curso.dataInicioEstimada && (
+                          <Typography variant="caption" color="text.disabled">
+                            Início: <strong>{fmtData(curso.dataInicioEstimada)}</strong>
+                          </Typography>
+                        )}
+                        {curso.dataFimEstimada && (
+                          <Typography variant="caption" color="text.disabled">
+                            Fim estimado: <strong>{fmtData(curso.dataFimEstimada)}</strong>
+                          </Typography>
+                        )}
+                      </Box>
+                    )}
                   </Box>
-                  <LinearProgress
-                    variant="determinate" value={curso.progressoPct}
-                    sx={{
-                      height: 8, borderRadius: 4, bgcolor: "#f1f5f9",
-                      "& .MuiLinearProgress-bar": {
-                        bgcolor: curso.progressoPct >= 80 ? "#10b981" : curso.progressoPct >= 40 ? "#f59e0b" : "#2b7cee",
-                        borderRadius: 4,
-                      },
-                    }}
-                  />
+                  {i < cursos.length - 1 && <Divider />}
                 </Box>
-                {i < cursos.length - 1 && <Divider />}
-              </Box>
-            ))}
+              );
+            })}
           </Box>
         )}
       </Section>
 
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 3, mt: 3 }}>
+      {/* ── Grid inferior ─────────────────────────────────────────────────────── */}
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "3fr 2fr" }, gap: 3 }}>
 
-        {/* ── Status do Pipeline ──────────────────────────────────────────────── */}
-        <Section title="Status do Pipeline">
+        {/* ── Pipeline por Etapa ──────────────────────────────────────────────── */}
+        <Section title="Pipeline por Etapa" icon={<AccountTreeIcon sx={{ fontSize: 18 }} />}>
           {errPipeline ? (
             <Alert severity="error" sx={{ m: 2 }}>Erro ao carregar dados.</Alert>
           ) : loadPipeline ? (
-            <LoadingRows n={4} />
-          ) : !pipeline ? null : (
+            <LoadingRows n={7} />
+          ) : !pipeline || pipeline.porEtapa.length === 0 ? (
+            <Empty msg="Nenhuma etapa encontrada." />
+          ) : (
             <Box>
-              <Typography variant="caption" sx={{ px: 3, pt: 2, pb: 1, display: "block", color: "text.disabled", letterSpacing: "0.06em", fontWeight: 700 }}>
-                POR STATUS
-              </Typography>
-              <Box sx={{ px: 3, pb: 2, display: "flex", flexWrap: "wrap", gap: 1 }}>
-                {pipeline.porStatus.map((s) => {
-                  const cfg = STATUS_CONFIG[s.status as StatusEtapa] ?? STATUS_CONFIG.PENDENTE;
-                  return (
-                    <Box key={s.status} sx={{ display: "flex", alignItems: "center", gap: 1.5,
-                      bgcolor: cfg.bg, px: 2, py: 1.25, borderRadius: 2, minWidth: 130 }}>
-                      <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: cfg.color, flexShrink: 0 }} />
-                      <Box>
-                        <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>{cfg.label}</Typography>
-                        <Typography sx={{ fontWeight: 800, fontSize: "1.375rem", lineHeight: 1, color: cfg.color }}>
-                          {s.total}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  );
-                })}
+              {/* Legenda */}
+              <Box sx={{ px: 3, pt: 2, pb: 1, display: "flex", gap: 2, flexWrap: "wrap" }}>
+                {[
+                  { label: "Em andamento", color: "#2b7cee" },
+                  { label: "Pendente",     color: "#94a3b8" },
+                  { label: "Bloqueada",    color: "#ef4444" },
+                  { label: "Concluída",    color: "#10b981" },
+                ].map((l) => (
+                  <Box key={l.label} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                    <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: l.color }} />
+                    <Typography variant="caption" color="text.secondary">{l.label}</Typography>
+                  </Box>
+                ))}
               </Box>
-
               <Divider />
+              <Table size="small">
+                <TableHead>
+                  <TableRow sx={{ bgcolor: "#f8fafc" }}>
+                    {["Etapa", "Em Andamento", "Pendente", "Bloqueada", "Concluída", "Progresso"].map((h) => (
+                      <TableCell key={h} sx={{ fontWeight: 700, fontSize: "0.72rem", color: "text.secondary", py: 1.25, whiteSpace: "nowrap" }}>{h}</TableCell>
+                    ))}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {pipeline.porEtapa.map((e) => {
+                    const pct = e.total > 0 ? Math.round((e.concluida / e.total) * 100) : 0;
+                    return (
+                      <TableRow key={e.etapa} sx={{ "&:hover": { bgcolor: "action.hover" } }}>
+                        <TableCell sx={{ py: 1.5, fontWeight: 600, fontSize: "0.82rem" }}>{e.etapa}</TableCell>
+                        <TableCell align="center">
+                          {e.emAndamento > 0 ? (
+                            <Chip label={e.emAndamento} size="small"
+                              sx={{ height: 20, fontSize: "0.72rem", fontWeight: 700, bgcolor: "#eff6ff", color: "#2b7cee" }} />
+                          ) : <Typography variant="caption" color="text.disabled">—</Typography>}
+                        </TableCell>
+                        <TableCell align="center">
+                          {e.pendente > 0 ? (
+                            <Chip label={e.pendente} size="small"
+                              sx={{ height: 20, fontSize: "0.72rem", fontWeight: 700, bgcolor: "#f8fafc", color: "#64748b" }} />
+                          ) : <Typography variant="caption" color="text.disabled">—</Typography>}
+                        </TableCell>
+                        <TableCell align="center">
+                          {e.bloqueada > 0 ? (
+                            <Chip label={e.bloqueada} size="small"
+                              sx={{ height: 20, fontSize: "0.72rem", fontWeight: 700, bgcolor: "#fff5f5", color: "#ef4444" }} />
+                          ) : <Typography variant="caption" color="text.disabled">—</Typography>}
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip label={e.concluida} size="small"
+                            sx={{ height: 20, fontSize: "0.72rem", fontWeight: 700, bgcolor: "#f0fdf4", color: "#10b981" }} />
+                        </TableCell>
+                        <TableCell sx={{ minWidth: 120 }}>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                            <Box sx={{ flex: 1, height: 6, borderRadius: 3, bgcolor: "#f1f5f9", overflow: "hidden", display: "flex" }}>
+                              <Box sx={{ width: `${pct}%`, bgcolor: "#10b981", transition: "width 0.4s" }} />
+                              <Box sx={{ width: `${e.total > 0 ? (e.emAndamento / e.total) * 100 : 0}%`, bgcolor: "#2b7cee" }} />
+                              <Box sx={{ width: `${e.total > 0 ? (e.bloqueada / e.total) * 100 : 0}%`, bgcolor: "#ef4444" }} />
+                            </Box>
+                            <Typography variant="caption" fontWeight={700} sx={{ minWidth: 28, color: pct >= 80 ? "#10b981" : "text.secondary" }}>
+                              {pct}%
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
 
-              <Typography variant="caption" sx={{ px: 3, pt: 2, pb: 1, display: "block", color: "text.disabled", letterSpacing: "0.06em", fontWeight: 700 }}>
-                POR ETAPA
-              </Typography>
-              <Box sx={{ px: 3, pb: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
-                {pipeline.porEtapa.map((e) => {
-                  const max = Math.max(...pipeline.porEtapa.map((x) => x.total), 1);
-                  return (
-                    <Box key={e.etapa}>
-                      <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
-                        <Typography variant="caption" color="text.secondary">{e.etapa}</Typography>
-                        <Typography variant="caption" fontWeight={700}>{e.total}</Typography>
+              {/* Resumo do status dos OAs */}
+              <Divider />
+              <Box sx={{ px: 3, py: 2 }}>
+                <Typography variant="caption" color="text.disabled" sx={{ letterSpacing: "0.06em", fontWeight: 700 }}>
+                  STATUS DOS OAs
+                </Typography>
+                <Box sx={{ display: "flex", gap: 1.5, mt: 1, flexWrap: "wrap" }}>
+                  {pipeline.porStatusOA.map((s) => {
+                    const cfg = STATUS_OA_CONFIG[s.status as StatusOA] ?? STATUS_OA_CONFIG.PENDENTE;
+                    return (
+                      <Box key={s.status} sx={{ display: "flex", alignItems: "center", gap: 1,
+                        bgcolor: cfg.bg, px: 1.5, py: 0.75, borderRadius: 1.5 }}>
+                        <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: cfg.color }} />
+                        <Typography variant="caption" color="text.secondary">{cfg.label}</Typography>
+                        <Typography variant="caption" fontWeight={800} sx={{ color: cfg.color }}>{s.total}</Typography>
                       </Box>
-                      <LinearProgress variant="determinate" value={(e.total / max) * 100}
-                        sx={{ height: 6, borderRadius: 3, bgcolor: "#f1f5f9",
-                          "& .MuiLinearProgress-bar": { bgcolor: "#2b7cee", borderRadius: 3 } }} />
-                    </Box>
-                  );
-                })}
+                    );
+                  })}
+                </Box>
               </Box>
             </Box>
           )}
         </Section>
 
-        {/* ── Atrasos por Responsável ─────────────────────────────────────────── */}
+        {/* ── Atrasos por Responsável ──────────────────────────────────────────── */}
         <Section title="Atrasos por Responsável" icon={<WarningAmberIcon sx={{ fontSize: 18, color: "#ef4444" }} />}>
           {errAtrasos ? (
             <Alert severity="error" sx={{ m: 2 }}>Erro ao carregar dados.</Alert>
           ) : loadAtrasos ? (
             <LoadingRows n={4} />
           ) : atrasos.length === 0 ? (
-            <Empty msg="Nenhum atraso registrado." ok />
+            <Empty msg="Nenhuma etapa em atraso." ok />
           ) : (
-            <Table size="small">
-              <TableHead>
-                <TableRow sx={{ bgcolor: "#f8fafc" }}>
-                  {["Responsável", "OAs atrasados", "Pior atraso"].map((h) => (
-                    <TableCell key={h} sx={{ fontWeight: 700, fontSize: "0.75rem", color: "text.secondary", py: 1.5 }}>{h}</TableCell>
-                  ))}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {atrasos.map((r) => {
-                  const piorAtraso = Math.max(...r.detalhes.map((d) => d.diasAtraso));
-                  return (
-                    <TableRow key={r.email} sx={{ "&:hover": { bgcolor: "action.hover" } }}>
-                      <TableCell sx={{ py: 1.5 }}>
-                        <Typography variant="body2" fontWeight={600}>{r.nome}</Typography>
-                        <Typography variant="caption" color="text.disabled">{r.email}</Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Chip label={r.total} size="small"
-                          sx={{ bgcolor: "#fff5f5", color: "#ef4444", fontWeight: 700, fontSize: "0.75rem" }} />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" color="error" fontWeight={600}>{piorAtraso}d</Typography>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+            <AtrasosTable atrasos={atrasos} />
           )}
         </Section>
       </Box>
@@ -192,11 +288,114 @@ function RelatoriosPage() {
   );
 }
 
+// ─── Tabela de Atrasos com linhas expansíveis ─────────────────────────────────
+
+function AtrasosTable({ atrasos }: { atrasos: { nome: string; email: string; total: number; detalhes: { oa: string; etapa: string; diasAtraso: number }[] }[] }) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  return (
+    <Table size="small">
+      <TableHead>
+        <TableRow sx={{ bgcolor: "#f8fafc" }}>
+          {["", "Responsável", "Atrasos", "Pior atraso"].map((h) => (
+            <TableCell key={h} sx={{ fontWeight: 700, fontSize: "0.72rem", color: "text.secondary", py: 1.25 }}>{h}</TableCell>
+          ))}
+        </TableRow>
+      </TableHead>
+      <TableBody>
+        {atrasos.map((r) => {
+          const piorAtraso = Math.max(...r.detalhes.map((d) => d.diasAtraso));
+          const isOpen = expanded === r.email;
+          return (
+            <>
+              <TableRow
+                key={r.email}
+                sx={{ "&:hover": { bgcolor: "action.hover" }, cursor: "pointer" }}
+                onClick={() => setExpanded(isOpen ? null : r.email)}
+              >
+                <TableCell sx={{ py: 1, width: 32, pr: 0 }}>
+                  <IconButton size="small" sx={{ p: 0.25 }}>
+                    {isOpen ? <KeyboardArrowUpIcon fontSize="small" /> : <KeyboardArrowDownIcon fontSize="small" />}
+                  </IconButton>
+                </TableCell>
+                <TableCell sx={{ py: 1.5 }}>
+                  <Typography variant="body2" fontWeight={600}>{r.nome}</Typography>
+                  <Typography variant="caption" color="text.disabled">{r.email}</Typography>
+                </TableCell>
+                <TableCell>
+                  <Chip label={r.total} size="small"
+                    sx={{ height: 20, fontSize: "0.72rem", bgcolor: "#fff5f5", color: "#ef4444", fontWeight: 700 }} />
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" fontWeight={700}
+                    sx={{ color: piorAtraso >= 14 ? "#ef4444" : piorAtraso >= 7 ? "#f59e0b" : "#64748b" }}>
+                    {piorAtraso}d
+                  </Typography>
+                </TableCell>
+              </TableRow>
+
+              {/* Detalhe expandido */}
+              <TableRow key={`${r.email}-detail`}>
+                <TableCell colSpan={4} sx={{ py: 0, border: 0 }}>
+                  <Collapse in={isOpen} unmountOnExit>
+                    <Box sx={{ bgcolor: "#fafafa", borderLeft: "3px solid #ef4444", ml: 4, mb: 1, borderRadius: "0 4px 4px 0" }}>
+                      <Table size="small">
+                        <TableBody>
+                          {r.detalhes
+                            .sort((a, b) => b.diasAtraso - a.diasAtraso)
+                            .map((d, idx) => (
+                              <TableRow key={idx} sx={{ "&:last-child td": { border: 0 } }}>
+                                <TableCell sx={{ py: 0.75, pl: 2 }}>
+                                  <Typography variant="caption" sx={{ fontFamily: "monospace", color: "text.secondary" }}>
+                                    {d.oa}
+                                  </Typography>
+                                </TableCell>
+                                <TableCell sx={{ py: 0.75 }}>
+                                  <Typography variant="caption" color="text.secondary">{d.etapa}</Typography>
+                                </TableCell>
+                                <TableCell sx={{ py: 0.75 }} align="right">
+                                  <Chip
+                                    label={`${d.diasAtraso}d`} size="small"
+                                    sx={{
+                                      height: 18, fontSize: "0.65rem", fontWeight: 700,
+                                      bgcolor: d.diasAtraso >= 14 ? "#fff5f5" : d.diasAtraso >= 7 ? "#fffbeb" : "#f8fafc",
+                                      color:   d.diasAtraso >= 14 ? "#ef4444" : d.diasAtraso >= 7 ? "#f59e0b" : "#64748b",
+                                    }}
+                                  />
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                        </TableBody>
+                      </Table>
+                    </Box>
+                  </Collapse>
+                </TableCell>
+              </TableRow>
+            </>
+          );
+        })}
+      </TableBody>
+    </Table>
+  );
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function Section({ title, icon, children }: { title: string; icon?: ReactNode; children: ReactNode }) {
+function KpiCard({ label, value, color, sub }: { label: string; value: number; color: string; sub?: string }) {
   return (
     <Card>
+      <CardContent sx={{ p: 2.5, pb: "12px !important" }}>
+        <Typography sx={{ fontSize: "2rem", fontWeight: 900, color, lineHeight: 1 }}>{value}</Typography>
+        <Typography variant="body2" fontWeight={600} sx={{ mt: 0.5 }}>{label}</Typography>
+        {sub && <Typography variant="caption" color="text.disabled">{sub}</Typography>}
+      </CardContent>
+    </Card>
+  );
+}
+
+function Section({ title, icon, children, mb }: { title: string; icon?: ReactNode; children: ReactNode; mb?: boolean }) {
+  return (
+    <Card sx={{ mb: mb ? 3 : 0 }}>
       <CardContent sx={{ p: 0, pb: "0 !important" }}>
         <Box sx={{ px: 3, py: 2, display: "flex", alignItems: "center", gap: 1,
           borderBottom: "1px solid", borderColor: "divider" }}>
@@ -221,7 +420,8 @@ function LoadingRows({ n = 3 }: { n?: number }) {
 
 function Empty({ msg, ok }: { msg: string; ok?: boolean }) {
   return (
-    <Box sx={{ p: 4, textAlign: "center" }}>
+    <Box sx={{ p: 4, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
+      {ok && <CheckCircleIcon sx={{ color: "#10b981", fontSize: 32 }} />}
       <Typography color={ok ? "#10b981" : "text.secondary"} variant="body2">{msg}</Typography>
     </Box>
   );

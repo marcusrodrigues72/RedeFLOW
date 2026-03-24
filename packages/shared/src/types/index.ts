@@ -177,8 +177,17 @@ export interface RelatorioCurso {
 }
 
 export interface RelatorioPipelineStatus {
-  porStatus: { status: StatusEtapa; total: number }[];
-  porEtapa:  { etapa: string; ordem: number; total: number }[];
+  porStatusOA: { status: StatusOA;    total: number }[];
+  porEtapa:    {
+    etapa:        string;
+    papel:        string;
+    ordem:        number;
+    pendente:     number;
+    emAndamento:  number;
+    concluida:    number;
+    bloqueada:    number;
+    total:        number;
+  }[];
 }
 
 export interface RelatorioAtrasoResponsavel {
@@ -240,6 +249,35 @@ export interface DashboardDetalheAtraso {
   curso: { id: string; nome: string };
   unidade: { nome: string };
   capitulo: { nome: string };
+}
+
+// ─── Alocação ─────────────────────────────────────────────────────────────────
+
+export interface EtapaAlocacao {
+  etapaId:          string;
+  oaId:             string;
+  oaCodigo:         string;
+  etapaNome:        string;
+  papel:            string;
+  deadlinePrevisto: string | null;
+  deadlineInicio:   string | null;   // deadline da etapa anterior (estimativa de início)
+  status:           StatusEtapa;
+  cursoCodigo:      string;
+}
+
+export interface ResponsavelAlocacao {
+  usuarioId:   string;
+  nome:        string;
+  email:       string;
+  fotoUrl:     string | null;
+  emAndamento: number;
+  pendente:    number;
+  etapas:      EtapaAlocacao[];
+}
+
+export interface RelatorioAlocacao {
+  porPapel:        { papel: string; label: string; emAndamento: number; pendente: number }[];
+  porResponsavel:  ResponsavelAlocacao[];
 }
 
 // ─── Import ───────────────────────────────────────────────────────────────────
