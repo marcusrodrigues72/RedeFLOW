@@ -1,6 +1,6 @@
 {
   "installCommand": "pnpm install --no-frozen-lockfile",
-  "buildCommand": "pnpm --filter web build && cp -r apps/web/dist dist",
+  "buildCommand": "pnpm --filter shared build && pnpm --filter web build && cp -r apps/web/dist dist",
   "outputDirectory": "dist",
   "framework": null,
   "rewrites": [
