@@ -10,7 +10,7 @@ import SearchIcon        from "@mui/icons-material/Search";
 import TableRowsIcon     from "@mui/icons-material/TableRows";
 import ViewKanbanIcon    from "@mui/icons-material/ViewKanban";
 import ViewTimelineIcon  from "@mui/icons-material/ViewTimeline";
-import { useState }      from "react";
+import { useState, useCallback } from "react";
 import { useOAsByCurso, useCurso, useAtualizarEtapaGeral } from "@/lib/api/cursos";
 import type { StatusOA, TipoOA, StatusEtapa } from "shared";
 
@@ -89,11 +89,11 @@ function OAsPage() {
     return acc;
   }, {});
 
-  const handleStatusChange = (oa: (typeof oas)[0], novoStatus: StatusOA) => {
+  const handleStatusChange = useCallback((oa: (typeof oas)[0], novoStatus: StatusOA) => {
     const etapaAtual = oa.etapas.find((e) => e.status !== "CONCLUIDA");
     if (!etapaAtual) return;
     atualizarEtapa({ oaId: oa.id, etapaId: etapaAtual.id, data: { status: OA_TO_ETAPA[novoStatus] } });
-  };
+  }, [atualizarEtapa]);
 
   return (
     <Box>
@@ -173,7 +173,7 @@ function OAsPage() {
       ) : visao === "lista" ? (
         <ListaView grupos={grupos} onStatusChange={handleStatusChange} />
       ) : visao === "kanban" ? (
-        <KanbanView oas={oasFiltrados} onStatusChange={handleStatusChange} />
+        <KanbanView oas={oasFiltrados} />
       ) : (
         <GanttView oas={oasFiltrados} />
       )}
@@ -323,19 +323,44 @@ function effectiveStatus(oa: NonNullable<ReturnType<typeof useOAsByCurso>["data"
   return "PENDENTE";
 }
 
-function KanbanView({
-  oas,
-  onStatusChange,
-}: {
-  oas: ReturnType<typeof useOAsByCurso>["data"];
-  onStatusChange: (oa: any, status: StatusOA) => void;
-}) {
-  const [overCol, setOverCol] = useState<StatusOA | null>(null);
+type OAKanban = NonNullable<ReturnType<typeof useOAsByCurso>["data"]>[0];
+
+function KanbanView({ oas }: { oas: OAKanban[] }) {
+  const { mutate: atualizarEtapa } = useAtualizarEtapaGeral();
+  const [overCol,    setOverCol]    = useState<StatusOA | null>(null);
+  // mapa oaId → status otimista; limpo após refetch ou revertido em erro
+  const [optimistic, setOptimistic] = useState<Record<string, StatusOA>>({});
+
+  const resolvedStatus = (oa: OAKanban): StatusOA =>
+    optimistic[oa.id] ?? effectiveStatus(oa);
+
+  const handleDrop = (targetStatus: StatusOA, oaId: string) => {
+    const oa = oas.find((o) => o.id === oaId);
+    if (!oa) return;
+    const anterior = resolvedStatus(oa);
+    if (anterior === targetStatus) return;
+
+    const etapaAtual = oa.etapas.find((e) => e.status !== "CONCLUIDA");
+    if (!etapaAtual) return;
+
+    // Move o card imediatamente na UI
+    setOptimistic((p) => ({ ...p, [oaId]: targetStatus }));
+
+    atualizarEtapa(
+      { oaId: oa.id, etapaId: etapaAtual.id, data: { status: OA_TO_ETAPA[targetStatus] } },
+      {
+        // Após refetch os dados reais chegam; limpa o override otimista
+        onSuccess: () => setOptimistic((p) => { const n = { ...p }; delete n[oaId]; return n; }),
+        // Em caso de falha, reverte para o status anterior
+        onError:   () => setOptimistic((p) => ({ ...p, [oaId]: anterior })),
+      },
+    );
+  };
 
   return (
     <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2, alignItems: "start" }}>
       {KANBAN_COLS.map((col) => {
-        const colOAs = oas!.filter((oa) => effectiveStatus(oa) === col.status);
+        const colOAs = oas.filter((oa) => resolvedStatus(oa) === col.status);
         const isOver = overCol === col.status;
         return (
           <Box
@@ -347,9 +372,7 @@ function KanbanView({
             onDrop={(e) => {
               e.preventDefault();
               setOverCol(null);
-              const oaId = e.dataTransfer.getData("text/plain");
-              const oa   = oas!.find((o) => o.id === oaId);
-              if (oa && effectiveStatus(oa) !== col.status) onStatusChange(oa, col.status);
+              handleDrop(col.status, e.dataTransfer.getData("text/plain"));
             }}
             sx={{
               borderRadius: 3, border: "2px dashed",
