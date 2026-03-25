@@ -150,10 +150,14 @@ function OADetalhePage() {
                             </Select>
                           </FormControl>
                           <FormControl size="small" sx={{ minWidth: 180 }}>
-                            <InputLabel>Responsável</InputLabel>
+                            <InputLabel>
+                              {etapa.etapaDef.papel === "PROFESSOR_ATOR" && oa.tipo === "VIDEO"
+                                ? "Professor Ator" : "Responsável"}
+                            </InputLabel>
                             <Select
                               value={etapa.responsavelId ?? ""}
-                              label="Responsável"
+                              label={etapa.etapaDef.papel === "PROFESSOR_ATOR" && oa.tipo === "VIDEO"
+                                ? "Professor Ator" : "Responsável"}
                               onChange={(e) => atualizarEtapa({
                                 etapaId: etapa.id,
                                 data: { responsavelId: e.target.value || null },
@@ -166,6 +170,26 @@ function OADetalhePage() {
                               ))}
                             </Select>
                           </FormControl>
+                          {/* Videomaker — apenas para etapa de Gravação (VIDEO + PROFESSOR_ATOR) */}
+                          {etapa.etapaDef.papel === "PROFESSOR_ATOR" && oa.tipo === "VIDEO" && (
+                            <FormControl size="small" sx={{ minWidth: 180 }}>
+                              <InputLabel>Videomaker</InputLabel>
+                              <Select
+                                value={etapa.responsavelSecundarioId ?? ""}
+                                label="Videomaker"
+                                onChange={(e) => atualizarEtapa({
+                                  etapaId: etapa.id,
+                                  data: { responsavelSecundarioId: e.target.value || null },
+                                })}
+                                disabled={isPending}
+                              >
+                                <MenuItem value=""><em>Sem videomaker</em></MenuItem>
+                                {curso.membros.map((m) => (
+                                  <MenuItem key={m.usuarioId} value={m.usuarioId}>{m.usuario.nome}</MenuItem>
+                                ))}
+                              </Select>
+                            </FormControl>
+                          )}
                           {etapa.status !== "CONCLUIDA" && (
                             <Button
                               variant="contained" size="small"

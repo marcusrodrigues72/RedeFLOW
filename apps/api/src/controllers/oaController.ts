@@ -31,9 +31,10 @@ export class OAController {
   // PATCH /oas/:id/etapas/:etapaId
   atualizarEtapa = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { status, responsavelId, deadlineReal, deadlinePrevisto, recalcularSequencia } = req.body as {
+      const { status, responsavelId, responsavelSecundarioId, deadlineReal, deadlinePrevisto, recalcularSequencia } = req.body as {
         status?: string;
         responsavelId?: string | null;
+        responsavelSecundarioId?: string | null;
         deadlineReal?: string | null;
         deadlinePrevisto?: string | null;
         recalcularSequencia?: boolean;
@@ -71,9 +72,31 @@ export class OAController {
         });
       }
 
+      // Valida predecessora: status só pode mudar se a etapa anterior estiver CONCLUIDA
+      if (status !== undefined) {
+        const { prisma: db } = await import("../lib/prisma.js");
+        const etapaAtual = await db.etapaOA.findUnique({
+          where: { id: req.params["etapaId"] as string },
+          select: { ordem: true, oaId: true, status: true },
+        });
+        if (etapaAtual && etapaAtual.ordem > 1 && status !== etapaAtual.status) {
+          const predecessora = await db.etapaOA.findFirst({
+            where: { oaId: etapaAtual.oaId, ordem: etapaAtual.ordem - 1 },
+            select: { status: true, etapaDef: { select: { nome: true } } },
+          });
+          if (predecessora && predecessora.status !== "CONCLUIDA") {
+            res.status(422).json({
+              message: `A etapa anterior ("${predecessora.etapaDef.nome}") ainda não foi concluída.`,
+            });
+            return;
+          }
+        }
+      }
+
       const etapa = await oaRepository.updateEtapa(req.params["etapaId"] as string, {
         status,
         responsavelId,
+        responsavelSecundarioId,
         deadlineReal:     deadlineReal     ? new Date(deadlineReal)     : deadlineReal     === null ? null : undefined,
         deadlinePrevisto: deadlinePrevisto ? new Date(deadlinePrevisto) : deadlinePrevisto === null ? null : undefined,
       });

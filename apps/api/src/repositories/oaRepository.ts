@@ -1,5 +1,11 @@
 import { prisma } from "../lib/prisma.js";
 
+const etapasInclude = {
+  etapaDef: true,
+  responsavel: true,
+  responsavelSecundario: true,
+} as const;
+
 export const oaRepository = {
   findByCurso(cursoId: string, filters: { status?: string | undefined; tipo?: string | undefined }) {
     return prisma.objetoAprendizagem.findMany({
@@ -10,10 +16,7 @@ export const oaRepository = {
       },
       include: {
         capitulo: { include: { unidade: true } },
-        etapas: {
-          include: { etapaDef: true, responsavel: true },
-          orderBy: { ordem: "asc" },
-        },
+        etapas: { include: etapasInclude, orderBy: { ordem: "asc" } },
       },
       orderBy: [
         { capitulo: { unidade: { numero: "asc" } } },
@@ -44,10 +47,7 @@ export const oaRepository = {
             },
           },
         },
-        etapas: {
-          include: { etapaDef: true, responsavel: true },
-          orderBy: { ordem: "asc" },
-        },
+        etapas: { include: etapasInclude, orderBy: { ordem: "asc" } },
       },
     });
   },
@@ -57,7 +57,10 @@ export const oaRepository = {
       where: {
         etapas: {
           some: {
-            responsavelId: usuarioId,
+            OR: [
+              { responsavelId: usuarioId },
+              { responsavelSecundarioId: usuarioId },
+            ],
             status: { not: "CONCLUIDA" },
           },
         },
@@ -65,8 +68,14 @@ export const oaRepository = {
       include: {
         capitulo: { include: { unidade: { include: { curso: true } } } },
         etapas: {
-          where: { responsavelId: usuarioId, status: { not: "CONCLUIDA" } },
-          include: { etapaDef: true },
+          where: {
+            OR: [
+              { responsavelId: usuarioId },
+              { responsavelSecundarioId: usuarioId },
+            ],
+            status: { not: "CONCLUIDA" },
+          },
+          include: { etapaDef: true, responsavel: true, responsavelSecundario: true },
           orderBy: { ordem: "asc" },
         },
       },
@@ -74,16 +83,23 @@ export const oaRepository = {
     });
   },
 
-  updateEtapa(etapaId: string, data: { status?: string | undefined; responsavelId?: string | null | undefined; deadlineReal?: Date | null | undefined; deadlinePrevisto?: Date | null | undefined }) {
+  updateEtapa(etapaId: string, data: {
+    status?: string | undefined;
+    responsavelId?: string | null | undefined;
+    responsavelSecundarioId?: string | null | undefined;
+    deadlineReal?: Date | null | undefined;
+    deadlinePrevisto?: Date | null | undefined;
+  }) {
     return prisma.etapaOA.update({
       where: { id: etapaId },
       data: {
-        ...(data.status            !== undefined ? { status:            data.status as any       } : {}),
-        ...(data.responsavelId     !== undefined ? { responsavelId:     data.responsavelId       } : {}),
-        ...(data.deadlineReal      !== undefined ? { deadlineReal:      data.deadlineReal        } : {}),
-        ...(data.deadlinePrevisto  !== undefined ? { deadlinePrevisto:  data.deadlinePrevisto    } : {}),
+        ...(data.status                    !== undefined ? { status:                    data.status as any               } : {}),
+        ...(data.responsavelId             !== undefined ? { responsavelId:             data.responsavelId               } : {}),
+        ...(data.responsavelSecundarioId   !== undefined ? { responsavelSecundarioId:   data.responsavelSecundarioId     } : {}),
+        ...(data.deadlineReal              !== undefined ? { deadlineReal:              data.deadlineReal                } : {}),
+        ...(data.deadlinePrevisto          !== undefined ? { deadlinePrevisto:          data.deadlinePrevisto            } : {}),
       },
-      include: { etapaDef: true, responsavel: true },
+      include: etapasInclude,
     });
   },
 };

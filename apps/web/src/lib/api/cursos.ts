@@ -128,7 +128,7 @@ export function useMeuTrabalho() {
 export function useAtualizarEtapa(oaId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ etapaId, data }: { etapaId: string; data: Partial<EtapaOADetalhe> & { deadlineReal?: string | null; deadlinePrevisto?: string | null; recalcularSequencia?: boolean } }) =>
+    mutationFn: ({ etapaId, data }: { etapaId: string; data: Partial<EtapaOADetalhe> & { deadlineReal?: string | null; deadlinePrevisto?: string | null; recalcularSequencia?: boolean; responsavelSecundarioId?: string | null } }) =>
       api.patch<EtapaOADetalhe>(`/oas/${oaId}/etapas/${etapaId}`, data).then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: oaKeys.detail(oaId) });
@@ -208,7 +208,7 @@ export function useAtualizarEtapaGeral() {
     mutationFn: ({ oaId, etapaId, data }: {
       oaId: string;
       etapaId: string;
-      data: Partial<EtapaOADetalhe> & { deadlineReal?: string | null };
+      data: Partial<EtapaOADetalhe> & { deadlineReal?: string | null; responsavelSecundarioId?: string | null };
     }) => api.patch<EtapaOADetalhe>(`/oas/${oaId}/etapas/${etapaId}`, data).then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["cursos"] });

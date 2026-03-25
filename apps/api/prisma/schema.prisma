@@ -81,13 +81,14 @@ model Usuario {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  refreshTokens    RefreshToken[]
-  membros          CursoMembro[]
-  etapasAtribuidas EtapaOA[]
-  comentarios      Comentario[]
-  arquivos         Arquivo[]
-  notificacoes     Notificacao[]
-  auditLogs        AuditLog[]
+  refreshTokens              RefreshToken[]
+  membros                    CursoMembro[]
+  etapasAtribuidas           EtapaOA[]  @relation("EtapaResponsavelPrincipal")
+  etapasAtribuidasSecundario EtapaOA[]  @relation("EtapaResponsavelSecundario")
+  comentarios                Comentario[]
+  arquivos                   Arquivo[]
+  notificacoes               Notificacao[]
+  auditLogs                  AuditLog[]
 
   @@map("usuarios")
 }
@@ -247,23 +248,25 @@ model ObjetoAprendizagem {
 
 /// Instância de uma etapa de produção para um OA específico
 model EtapaOA {
-  id               String      @id @default(cuid())
-  oaId             String
-  etapaDefId       String
-  responsavelId    String?
-  status           StatusEtapa @default(PENDENTE)
-  deadlinePrevisto DateTime?
-  deadlineReal     DateTime?
-  ordem            Int
-  observacoes      String?
-  bloqueada        Boolean     @default(false)
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  id                      String      @id @default(cuid())
+  oaId                    String
+  etapaDefId              String
+  responsavelId           String?
+  responsavelSecundarioId String?
+  status                  StatusEtapa @default(PENDENTE)
+  deadlinePrevisto        DateTime?
+  deadlineReal            DateTime?
+  ordem                   Int
+  observacoes             String?
+  bloqueada               Boolean     @default(false)
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
 
-  oa          ObjetoAprendizagem @relation(fields: [oaId], references: [id], onDelete: Cascade)
-  etapaDef    EtapaDefinicao     @relation(fields: [etapaDefId], references: [id])
-  responsavel Usuario?           @relation(fields: [responsavelId], references: [id])
-  comentarios Comentario[]
+  oa                    ObjetoAprendizagem @relation(fields: [oaId], references: [id], onDelete: Cascade)
+  etapaDef              EtapaDefinicao     @relation(fields: [etapaDefId], references: [id])
+  responsavel           Usuario?           @relation("EtapaResponsavelPrincipal",  fields: [responsavelId],           references: [id])
+  responsavelSecundario Usuario?           @relation("EtapaResponsavelSecundario", fields: [responsavelSecundarioId], references: [id])
+  comentarios           Comentario[]
 
   @@map("etapas_oa")
 }

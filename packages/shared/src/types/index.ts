@@ -116,6 +116,8 @@ export interface EtapaOADetalhe {
   bloqueada: boolean;
   responsavel: UsuarioPublico | null;
   responsavelId: string | null;
+  responsavelSecundario: UsuarioPublico | null;
+  responsavelSecundarioId: string | null;
   etapaDef: { id: string; nome: string; papel: string };
 }
 
