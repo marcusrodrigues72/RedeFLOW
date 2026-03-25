@@ -91,7 +91,8 @@ function MeuTrabalhoPage() {
       onError: (err: any) => {
         const msg = err?.response?.data?.message ?? "Erro ao atualizar etapa.";
         setErrMsg(msg);
-        opts?.onError?.(err, vars, undefined);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (opts?.onError as any)?.(err, vars, undefined);
       },
     });
   };
