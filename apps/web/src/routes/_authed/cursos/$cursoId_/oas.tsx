@@ -57,16 +57,44 @@ const OA_TO_ETAPA: Record<StatusOA, StatusEtapa> = {
 };
 
 type Visao = "lista" | "kanban" | "gantt";
+type FiltroDeadline = "" | "vencido" | "semana" | "mes";
+
+// ── helpers de intervalo ──────────────────────────────────────────────────────
+const inicioHoje = (() => { const d = new Date(); d.setHours(0,0,0,0); return d; })();
+const fimSemana  = (() => { const d = new Date(inicioHoje); d.setDate(d.getDate() + 7);  return d; })();
+const fimMes     = (() => { const d = new Date(inicioHoje); d.setDate(d.getDate() + 30); return d; })();
+
+function deadlineEfetivo(oa: { deadlineFinal?: string | null; etapas: { status: string; deadlinePrevisto?: string | null }[] }): Date | null {
+  // Usa o deadline da etapa ativa, ou o deadlineFinal do OA
+  const etapaAtiva = oa.etapas.find((e) => e.status !== "CONCLUIDA");
+  const iso = etapaAtiva?.deadlinePrevisto ?? oa.deadlineFinal;
+  if (!iso) return null;
+  const d = new Date(iso);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function matchDeadline(oa: Parameters<typeof deadlineEfetivo>[0], filtro: FiltroDeadline): boolean {
+  if (!filtro) return true;
+  if (oa.etapas.every((e) => e.status === "CONCLUIDA")) return false; // concluídos ignorados
+  const dl = deadlineEfetivo(oa);
+  if (!dl) return false;
+  if (filtro === "vencido") return dl < inicioHoje;
+  if (filtro === "semana")  return dl >= inicioHoje && dl < fimSemana;
+  if (filtro === "mes")     return dl >= inicioHoje && dl < fimMes;
+  return true;
+}
 
 function OAsPage() {
-  const { cursoId }                             = Route.useParams();
-  const { data: curso }                         = useCurso(cursoId);
-  const [search,         setSearch]             = useState("");
-  const [filtroStatus,   setFiltroStatus]       = useState("");
-  const [filtroTipo,     setFiltroTipo]         = useState("");
-  const [filtroUnidade,  setFiltroUnidade]      = useState("");
-  const [visao,          setVisao]              = useState<Visao>("lista");
-  const { mutate: atualizarEtapa }              = useAtualizarEtapaGeral();
+  const { cursoId }                               = Route.useParams();
+  const { data: curso }                           = useCurso(cursoId);
+  const [search,          setSearch]              = useState("");
+  const [filtroStatus,    setFiltroStatus]        = useState("");
+  const [filtroTipo,      setFiltroTipo]          = useState("");
+  const [filtroUnidade,   setFiltroUnidade]       = useState("");
+  const [filtroDeadline,  setFiltroDeadline]      = useState<FiltroDeadline>("");
+  const [visao,           setVisao]               = useState<Visao>("lista");
+  const { mutate: atualizarEtapa }                = useAtualizarEtapaGeral();
 
   const { data: oas = [], isLoading, isError } = useOAsByCurso(cursoId, {
     status: filtroStatus || undefined,
@@ -78,8 +106,9 @@ function OAsPage() {
   ).sort((a, b) => a.numero - b.numero);
 
   const oasFiltrados = oas.filter((oa) =>
-    (!search || oa.codigo.toLowerCase().includes(search.toLowerCase())) &&
-    (!filtroUnidade || String(oa.capitulo.unidade.numero) === filtroUnidade)
+    (!search        || oa.codigo.toLowerCase().includes(search.toLowerCase())) &&
+    (!filtroUnidade || String(oa.capitulo.unidade.numero) === filtroUnidade) &&
+    matchDeadline(oa, filtroDeadline)
   );
 
   const grupos = oasFiltrados.reduce<Record<string, typeof oasFiltrados>>((acc, oa) => {
@@ -152,6 +181,19 @@ function OAsPage() {
             {unidades.map((u) => (
               <MenuItem key={u.numero} value={String(u.numero)}>U{u.numero} — {u.nome}</MenuItem>
             ))}
+          </Select>
+        </FormControl>
+        <FormControl size="small" sx={{ minWidth: 170 }}>
+          <Select
+            value={filtroDeadline}
+            onChange={(e) => setFiltroDeadline(e.target.value as FiltroDeadline)}
+            displayEmpty
+            sx={ filtroDeadline === "vencido" ? { color: "#ef4444", fontWeight: 700 } : {} }
+          >
+            <MenuItem value="">Todos os prazos</MenuItem>
+            <MenuItem value="vencido" sx={{ color: "#ef4444", fontWeight: 600 }}>⚠ Vencido</MenuItem>
+            <MenuItem value="semana">Vence esta semana</MenuItem>
+            <MenuItem value="mes">Vence este mês</MenuItem>
           </Select>
         </FormControl>
       </Box>
