@@ -10,6 +10,7 @@ services:
 
     buildCommand: |
       NODE_ENV=development pnpm install --no-frozen-lockfile
+      pnpm --filter shared build
       pnpm --filter api build
 
     startCommand: pnpm --filter api run start
