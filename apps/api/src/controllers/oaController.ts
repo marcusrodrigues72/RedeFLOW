@@ -61,13 +61,13 @@ export class OAController {
       }
 
       // Busca dados anteriores ANTES do update para calcular o delta correto
-      let todasEtapasAntes: { id: string; ordem: number; deadlinePrevisto: Date | null }[] = [];
+      let todasEtapasAntes: { id: string; ordem: number; deadlinePrevisto: Date | null; etapaDef: { papel: string } }[] = [];
       if (recalcularSequencia && deadlinePrevisto) {
         const { prisma: db } = await import("../lib/prisma.js");
         todasEtapasAntes = await db.etapaOA.findMany({
           where:   { oaId: req.params["id"] as string },
           orderBy: { ordem: "asc" },
-          select:  { id: true, ordem: true, deadlinePrevisto: true },
+          select:  { id: true, ordem: true, deadlinePrevisto: true, etapaDef: { select: { papel: true } } },
         });
       }
 
@@ -78,31 +78,75 @@ export class OAController {
         deadlinePrevisto: deadlinePrevisto ? new Date(deadlinePrevisto) : deadlinePrevisto === null ? null : undefined,
       });
 
-      // Recalcula etapas subsequentes deslocando pelo mesmo delta
+      // Recalcula etapas subsequentes
       if (recalcularSequencia && deadlinePrevisto && todasEtapasAntes.length > 0) {
         const { prisma: db } = await import("../lib/prisma.js");
         const etapaEditada = todasEtapasAntes.find((e) => e.id === req.params["etapaId"] as string);
-        if (etapaEditada?.deadlinePrevisto) {
-          const novaData     = new Date(deadlinePrevisto);
-          const deltaMs      = novaData.getTime() - etapaEditada.deadlinePrevisto.getTime();
-          const subsequentes = todasEtapasAntes.filter((e) => e.ordem > etapaEditada.ordem && e.deadlinePrevisto);
-          for (const e of subsequentes) {
-            await db.etapaOA.update({
-              where: { id: e.id },
-              data:  { deadlinePrevisto: new Date(e.deadlinePrevisto!.getTime() + deltaMs) },
-            });
-          }
-          // Atualiza deadlineFinal do OA com base na última etapa pós-ajuste
-          const ultima = todasEtapasAntes[todasEtapasAntes.length - 1];
-          if (ultima) {
-            const novoFinal = ultima.id === etapaEditada.id
-              ? novaData
-              : ultima.deadlinePrevisto
-                ? new Date(ultima.deadlinePrevisto.getTime() + (ultima.ordem > etapaEditada.ordem ? deltaMs : 0))
-                : null;
-            if (novoFinal) {
-              await db.objetoAprendizagem.update({ where: { id: req.params["id"] as string }, data: { deadlineFinal: novoFinal } });
+        if (etapaEditada) {
+          const novaData = new Date(deadlinePrevisto);
+
+          if (etapaEditada.deadlinePrevisto) {
+            // Caso 1: etapa já tinha deadline → desloca subsequentes pelo mesmo delta
+            const deltaMs      = novaData.getTime() - etapaEditada.deadlinePrevisto.getTime();
+            const subsequentes = todasEtapasAntes.filter((e) => e.ordem > etapaEditada.ordem && e.deadlinePrevisto);
+            for (const e of subsequentes) {
+              await db.etapaOA.update({
+                where: { id: e.id },
+                data:  { deadlinePrevisto: new Date(e.deadlinePrevisto!.getTime() + deltaMs) },
+              });
             }
+            // Atualiza deadlineFinal do OA com base na última etapa pós-ajuste
+            const ultima = todasEtapasAntes[todasEtapasAntes.length - 1];
+            if (ultima) {
+              const novoFinal = ultima.id === etapaEditada.id
+                ? novaData
+                : ultima.deadlinePrevisto
+                  ? new Date(ultima.deadlinePrevisto.getTime() + (ultima.ordem > etapaEditada.ordem ? deltaMs : 0))
+                  : null;
+              if (novoFinal) {
+                await db.objetoAprendizagem.update({ where: { id: req.params["id"] as string }, data: { deadlineFinal: novoFinal } });
+              }
+            }
+          } else {
+            // Caso 2: etapa sem deadline anterior → distribui subsequentes usando intervalos por tipo de OA e papel
+            // Intervalos baseados em dados históricos do projeto Microeletrônica Geral (dias corridos)
+            const INTERVALOS_VIDEO: Record<string, number> = {
+              DESIGNER_INSTRUCIONAL: 2,  // Conteudista → DI
+              PROFESSOR_ATOR:        3,  // DI → Gravação
+              PROFESSOR_TECNICO:     4,  // Gravação → Revisão Técnica
+              ACESSIBILIDADE:        7,  // RT → Acessibilidade
+              PRODUTOR_FINAL:        3,  // Acessibilidade → Produção Final
+              VALIDADOR_FINAL:       1,  // Produção Final → Validação Final
+            };
+            const INTERVALOS_PADRAO: Record<string, number> = {
+              DESIGNER_INSTRUCIONAL: 2,  // Conteudista → DI
+              PROFESSOR_TECNICO:     3,  // DI → Revisão Técnica
+              ACESSIBILIDADE:        7,  // RT → Acessibilidade
+              PRODUTOR_FINAL:        5,  // Acessibilidade → Produção Final (mais tempo sem Gravação)
+              VALIDADOR_FINAL:       1,  // Produção Final → Validação Final
+            };
+
+            const oaInfo = await db.objetoAprendizagem.findUnique({
+              where:  { id: req.params["id"] as string },
+              select: { tipo: true },
+            });
+            const intervalos = oaInfo?.tipo === "VIDEO" ? INTERVALOS_VIDEO : INTERVALOS_PADRAO;
+
+            const subsequentes = todasEtapasAntes
+              .filter((e) => e.ordem > etapaEditada.ordem && !e.deadlinePrevisto)
+              .sort((a, b) => a.ordem - b.ordem);
+            let dataBase = novaData;
+            for (const e of subsequentes) {
+              const dias = intervalos[e.etapaDef.papel] ?? 3;
+              dataBase = new Date(dataBase.getTime() + dias * 24 * 60 * 60 * 1000);
+              await db.etapaOA.update({
+                where: { id: e.id },
+                data:  { deadlinePrevisto: dataBase },
+              });
+            }
+            // Atualiza deadlineFinal do OA com a data da última etapa propagada
+            const dataFinal = subsequentes.length > 0 ? dataBase : novaData;
+            await db.objetoAprendizagem.update({ where: { id: req.params["id"] as string }, data: { deadlineFinal: dataFinal } });
           }
         }
       }
