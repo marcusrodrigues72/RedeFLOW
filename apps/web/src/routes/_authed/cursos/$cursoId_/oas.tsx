@@ -2,13 +2,15 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Box, Typography, Chip, Button, Card, CardContent, TextField, InputAdornment,
   Select, MenuItem, FormControl, Skeleton, Alert, LinearProgress,
-  Table, TableHead, TableRow, TableCell, TableBody, ToggleButtonGroup, ToggleButton,
+  Table, TableHead, TableRow, TableCell, TableBody,
+  Tabs, Tab, Tooltip, ToggleButtonGroup, ToggleButton,
 } from "@mui/material";
-import ArrowBackIcon    from "@mui/icons-material/ArrowBack";
-import SearchIcon       from "@mui/icons-material/Search";
-import TableRowsIcon    from "@mui/icons-material/TableRows";
-import ViewKanbanIcon   from "@mui/icons-material/ViewKanban";
-import { useState } from "react";
+import ArrowBackIcon     from "@mui/icons-material/ArrowBack";
+import SearchIcon        from "@mui/icons-material/Search";
+import TableRowsIcon     from "@mui/icons-material/TableRows";
+import ViewKanbanIcon    from "@mui/icons-material/ViewKanban";
+import ViewTimelineIcon  from "@mui/icons-material/ViewTimeline";
+import { useState }      from "react";
 import { useOAsByCurso, useCurso, useAtualizarEtapaGeral } from "@/lib/api/cursos";
 import type { StatusOA, TipoOA, StatusEtapa } from "shared";
 
@@ -32,6 +34,20 @@ const TIPO_CONFIG: Record<TipoOA, { label: string; color: string }> = {
   TAREFA:     { label: "Tarefa",        color: "#dc2626" },
 };
 
+const ETAPA_STATUS_COLOR: Record<string, string> = {
+  CONCLUIDA:    "#10b981",
+  EM_ANDAMENTO: "#f59e0b",
+  BLOQUEADA:    "#ef4444",
+  PENDENTE:     "#cbd5e1",
+};
+
+const ETAPA_STATUS_LABEL: Record<string, string> = {
+  CONCLUIDA:    "Concluída",
+  EM_ANDAMENTO: "Em andamento",
+  BLOQUEADA:    "Bloqueada",
+  PENDENTE:     "Pendente",
+};
+
 // Mapeamento StatusOA → StatusEtapa para atualização via drag
 const OA_TO_ETAPA: Record<StatusOA, StatusEtapa> = {
   PENDENTE:     "PENDENTE",
@@ -40,6 +56,8 @@ const OA_TO_ETAPA: Record<StatusOA, StatusEtapa> = {
   CONCLUIDO:    "CONCLUIDA",
 };
 
+type Visao = "lista" | "kanban" | "gantt";
+
 function OAsPage() {
   const { cursoId }                             = Route.useParams();
   const { data: curso }                         = useCurso(cursoId);
@@ -47,7 +65,7 @@ function OAsPage() {
   const [filtroStatus,   setFiltroStatus]       = useState("");
   const [filtroTipo,     setFiltroTipo]         = useState("");
   const [filtroUnidade,  setFiltroUnidade]      = useState("");
-  const [visao,          setVisao]              = useState<"lista" | "kanban">("lista");
+  const [visao,          setVisao]              = useState<Visao>("lista");
   const { mutate: atualizarEtapa }              = useAtualizarEtapaGeral();
 
   const { data: oas = [], isLoading, isError } = useOAsByCurso(cursoId, {
@@ -71,7 +89,6 @@ function OAsPage() {
     return acc;
   }, {});
 
-  // Handler inline status
   const handleStatusChange = (oa: (typeof oas)[0], novoStatus: StatusOA) => {
     const etapaAtual = oa.etapas.find((e) => e.status !== "CONCLUIDA");
     if (!etapaAtual) return;
@@ -80,7 +97,8 @@ function OAsPage() {
 
   return (
     <Box>
-      <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", mb: 3 }}>
+      {/* ── Header ── */}
+      <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", mb: 2 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           <Button component={Link} to={`/cursos/${cursoId}`} startIcon={<ArrowBackIcon />} sx={{ color: "text.secondary" }}>
             {curso?.nome ?? "Curso"}
@@ -92,20 +110,20 @@ function OAsPage() {
             </Typography>
           </Box>
         </Box>
-        <ToggleButtonGroup
-          value={visao} exclusive size="small"
-          onChange={(_, v) => { if (v) setVisao(v); }}
-        >
-          <ToggleButton value="lista"  aria-label="Lista">
-            <TableRowsIcon  sx={{ fontSize: 18 }} />
-          </ToggleButton>
-          <ToggleButton value="kanban" aria-label="Kanban">
-            <ViewKanbanIcon sx={{ fontSize: 18 }} />
-          </ToggleButton>
-        </ToggleButtonGroup>
       </Box>
 
-      {/* Filtros */}
+      {/* ── Abas de visão ── */}
+      <Tabs
+        value={visao}
+        onChange={(_, v) => setVisao(v as Visao)}
+        sx={{ mb: 2.5, borderBottom: "1px solid", borderColor: "divider" }}
+      >
+        <Tab value="lista"  label="Lista"  icon={<TableRowsIcon sx={{ fontSize: 18 }} />}  iconPosition="start" sx={{ minHeight: 40, fontWeight: 600 }} />
+        <Tab value="kanban" label="Kanban" icon={<ViewKanbanIcon sx={{ fontSize: 18 }} />} iconPosition="start" sx={{ minHeight: 40, fontWeight: 600 }} />
+        <Tab value="gantt"  label="Gantt"  icon={<ViewTimelineIcon sx={{ fontSize: 18 }} />} iconPosition="start" sx={{ minHeight: 40, fontWeight: 600 }} />
+      </Tabs>
+
+      {/* ── Filtros ── */}
       <Box sx={{ display: "flex", gap: 2, mb: 3, flexWrap: "wrap" }}>
         <TextField
           placeholder="Buscar por código..." size="small" value={search}
@@ -138,6 +156,7 @@ function OAsPage() {
         </FormControl>
       </Box>
 
+      {/* ── Conteúdo ── */}
       {isLoading ? (
         [1, 2, 3].map((i) => <Skeleton key={i} height={60} sx={{ mb: 1, borderRadius: 2 }} />)
       ) : isError ? (
@@ -153,8 +172,10 @@ function OAsPage() {
         </Card>
       ) : visao === "lista" ? (
         <ListaView grupos={grupos} onStatusChange={handleStatusChange} />
-      ) : (
+      ) : visao === "kanban" ? (
         <KanbanView oas={oasFiltrados} onStatusChange={handleStatusChange} />
+      ) : (
+        <GanttView oas={oasFiltrados} />
       )}
     </Box>
   );
@@ -294,7 +315,6 @@ const KANBAN_COLS: { status: StatusOA; label: string; color: string; bg: string 
   { status: "CONCLUIDO",    label: "Concluído",    color: "#10b981", bg: "#f0fdf4" },
 ];
 
-/** Deriva o status efetivo de um OA a partir das suas etapas, sem depender do campo denormalizado `oa.status`. */
 function effectiveStatus(oa: NonNullable<ReturnType<typeof useOAsByCurso>["data"]>[0]): StatusOA {
   if (oa.etapas.length === 0) return "PENDENTE";
   if (oa.etapas.every((e) => e.status === "CONCLUIDA")) return "CONCLUIDO";
@@ -322,7 +342,6 @@ function KanbanView({
             key={col.status}
             onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setOverCol(col.status); }}
             onDragLeave={(e) => {
-              // Só limpa se o cursor saiu de fato da coluna (não apenas entrou num filho)
               if (!e.currentTarget.contains(e.relatedTarget as Node)) setOverCol(null);
             }}
             onDrop={(e) => {
@@ -339,7 +358,6 @@ function KanbanView({
               bgcolor: isOver ? `${col.color}08` : "transparent",
             }}
           >
-            {/* Cabeçalho da coluna */}
             <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 1, py: 1.5 }}>
               <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: col.color }} />
               <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", letterSpacing: "0.05em" }}>
@@ -349,7 +367,6 @@ function KanbanView({
                 sx={{ height: 18, fontSize: "0.65rem", bgcolor: col.bg, color: col.color, ml: "auto" }} />
             </Box>
 
-            {/* Cards */}
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, px: 0.5 }}>
               {colOAs.map((oa) => {
                 const tc = TIPO_CONFIG[oa.tipo];
@@ -414,6 +431,324 @@ function KanbanView({
           </Box>
         );
       })}
+    </Box>
+  );
+}
+
+// ─── Visão Gantt ──────────────────────────────────────────────────────────────
+
+type OAItem = NonNullable<ReturnType<typeof useOAsByCurso>["data"]>[0];
+
+function GanttView({ oas }: { oas: OAItem[] }) {
+  const [zoom, setZoom] = useState<"mes" | "semana">("mes");
+
+  // Coleta todas as datas relevantes para calcular o range
+  const allTs: number[] = [];
+  for (const oa of oas) {
+    for (const e of oa.etapas) {
+      if (e.deadlinePrevisto) allTs.push(new Date(e.deadlinePrevisto).getTime());
+    }
+    if (oa.deadlineFinal) allTs.push(new Date(oa.deadlineFinal).getTime());
+  }
+
+  if (allTs.length === 0) {
+    return (
+      <Card>
+        <CardContent sx={{ p: 6, textAlign: "center" }}>
+          <Typography color="text.secondary">Nenhum deadline cadastrado para exibir o Gantt.</Typography>
+          <Typography variant="body2" color="text.disabled" sx={{ mt: 1 }}>
+            Configure deadlines nas etapas dos OAs para visualizar o cronograma.
+          </Typography>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Range com margem de 14 dias em cada extremidade
+  const rangeStart = new Date(Math.min(...allTs));
+  rangeStart.setDate(rangeStart.getDate() - 14);
+  rangeStart.setHours(0, 0, 0, 0);
+
+  const rangeEnd = new Date(Math.max(...allTs));
+  rangeEnd.setDate(rangeEnd.getDate() + 14);
+  rangeEnd.setHours(23, 59, 59, 0);
+
+  const totalMs = rangeEnd.getTime() - rangeStart.getTime();
+  const pct = (d: Date) =>
+    Math.max(0, Math.min(100, ((d.getTime() - rangeStart.getTime()) / totalMs) * 100));
+
+  // Cabeçalho: meses
+  const months: { label: string; left: number; width: number }[] = [];
+  const cur = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), 1);
+  while (cur <= rangeEnd) {
+    const mStart = new Date(cur);
+    const mEnd   = new Date(cur.getFullYear(), cur.getMonth() + 1, 0, 23, 59, 59);
+    const left   = pct(mStart < rangeStart ? rangeStart : mStart);
+    const right  = pct(mEnd   > rangeEnd   ? rangeEnd   : mEnd);
+    months.push({
+      label: cur.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }),
+      left,
+      width: right - left,
+    });
+    cur.setMonth(cur.getMonth() + 1);
+  }
+
+  // Linhas de grade
+  const gridLines: number[] = [];
+  if (zoom === "semana") {
+    const d = new Date(rangeStart);
+    // avança até a próxima segunda
+    d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7));
+    while (d <= rangeEnd) {
+      gridLines.push(pct(d));
+      d.setDate(d.getDate() + 7);
+    }
+  } else {
+    months.forEach((m) => gridLines.push(m.left));
+  }
+
+  const todayPct = pct(hoje);
+
+  // Agrupa OAs por capítulo (mesma lógica das outras views)
+  const grupos = oas.reduce<Record<string, OAItem[]>>((acc, oa) => {
+    const key = `U${oa.capitulo.unidade.numero} — ${oa.capitulo.unidade.nome} / C${oa.capitulo.numero} — ${oa.capitulo.nome}`;
+    (acc[key] = acc[key] ?? []).push(oa);
+    return acc;
+  }, {});
+
+  const LABEL_W = 210;
+  const ROW_H   = 38;
+
+  return (
+    <Box>
+      {/* Controle de zoom */}
+      <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1.5, gap: 1, alignItems: "center" }}>
+        <Typography variant="caption" color="text.secondary">Escala:</Typography>
+        <ToggleButtonGroup value={zoom} exclusive size="small"
+          onChange={(_, v) => { if (v) setZoom(v); }}>
+          <ToggleButton value="mes"    sx={{ fontSize: "0.72rem", px: 1.5, py: 0.5 }}>Mês</ToggleButton>
+          <ToggleButton value="semana" sx={{ fontSize: "0.72rem", px: 1.5, py: 0.5 }}>Semana</ToggleButton>
+        </ToggleButtonGroup>
+      </Box>
+
+      <Card sx={{ overflow: "hidden" }}>
+        <Box sx={{ overflowX: "auto" }}>
+          <Box sx={{ minWidth: 860 }}>
+
+            {/* ── Cabeçalho de meses ── */}
+            <Box sx={{ display: "flex", borderBottom: "1px solid", borderColor: "divider", bgcolor: "#f8fafc" }}>
+              <Box sx={{ width: LABEL_W, flexShrink: 0, borderRight: "1px solid", borderColor: "divider",
+                display: "flex", alignItems: "center", px: 2 }}>
+                <Typography variant="caption" fontWeight={700} color="text.secondary">OA</Typography>
+              </Box>
+              <Box sx={{ flex: 1, position: "relative", height: 34 }}>
+                {months.map((m) => (
+                  <Box key={m.label} sx={{
+                    position: "absolute", left: `${m.left}%`, width: `${m.width}%`,
+                    height: "100%", display: "flex", alignItems: "center",
+                    borderRight: "1px solid", borderColor: "divider", pl: 1,
+                  }}>
+                    <Typography variant="caption" fontWeight={700} color="text.secondary" noWrap
+                      sx={{ textTransform: "capitalize" }}>
+                      {m.label}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+
+            {/* ── Grupos e linhas de OA ── */}
+            {Object.entries(grupos).map(([grupo, items]) => (
+              <Box key={grupo}>
+
+                {/* Cabeçalho do grupo */}
+                <Box sx={{ display: "flex", bgcolor: "#f8fafc", borderBottom: "1px solid", borderColor: "divider" }}>
+                  <Box sx={{ width: LABEL_W, flexShrink: 0, px: 2, py: 0.75,
+                    borderRight: "1px solid", borderColor: "divider" }}>
+                    <Typography variant="caption" fontWeight={700} color="text.disabled"
+                      sx={{ letterSpacing: "0.05em" }} noWrap>
+                      {grupo.toUpperCase()}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ flex: 1, position: "relative", py: 0.75 }}>
+                    {gridLines.map((gl, i) => (
+                      <Box key={i} sx={{ position: "absolute", left: `${gl}%`, top: 0, bottom: 0,
+                        borderLeft: "1px solid", borderColor: "divider", opacity: 0.5 }} />
+                    ))}
+                  </Box>
+                </Box>
+
+                {/* Linhas de OA */}
+                {items.map((oa) => {
+                  const etapasComDL  = oa.etapas.filter((e) => e.deadlinePrevisto);
+                  const hasDates     = etapasComDL.length > 0 || !!oa.deadlineFinal;
+                  const tc           = TIPO_CONFIG[oa.tipo];
+                  const sc           = STATUS_CONFIG[oa.status];
+
+                  const barStartD = etapasComDL[0]?.deadlinePrevisto
+                    ? new Date(etapasComDL[0].deadlinePrevisto)
+                    : oa.deadlineFinal ? new Date(oa.deadlineFinal) : null;
+
+                  const barEndD = oa.deadlineFinal
+                    ? new Date(oa.deadlineFinal)
+                    : etapasComDL.length > 0
+                    ? new Date(etapasComDL[etapasComDL.length - 1]!.deadlinePrevisto!)
+                    : null;
+
+                  const barLeft  = barStartD ? pct(barStartD) : null;
+                  const barRight = barEndD   ? pct(barEndD)   : null;
+                  const barW     = barLeft !== null && barRight !== null
+                    ? Math.max(0.4, barRight - barLeft)
+                    : 0;
+
+                  return (
+                    <Box key={oa.id} sx={{
+                      display: "flex", height: ROW_H,
+                      borderBottom: "1px solid", borderColor: "divider",
+                      "&:hover": { bgcolor: "action.hover" },
+                    }}>
+                      {/* Rótulo */}
+                      <Box sx={{
+                        width: LABEL_W, flexShrink: 0,
+                        borderRight: "1px solid", borderColor: "divider",
+                        display: "flex", alignItems: "center", gap: 1,
+                        px: 1.5, overflow: "hidden",
+                      }}>
+                        <Typography sx={{
+                          fontFamily: "monospace", fontWeight: 600, fontSize: "0.75rem",
+                          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                        }}>
+                          {oa.codigo}
+                        </Typography>
+                        <Chip label={tc.label} size="small" sx={{
+                          height: 16, fontSize: "0.6rem", flexShrink: 0,
+                          bgcolor: `${tc.color}18`, color: tc.color,
+                        }} />
+                      </Box>
+
+                      {/* Timeline */}
+                      <Box sx={{ flex: 1, position: "relative", overflow: "hidden" }}>
+                        {/* Linhas de grade */}
+                        {gridLines.map((gl, i) => (
+                          <Box key={i} sx={{
+                            position: "absolute", left: `${gl}%`, top: 0, bottom: 0,
+                            borderLeft: "1px solid", borderColor: "divider", opacity: 0.4,
+                          }} />
+                        ))}
+
+                        {/* Linha de hoje */}
+                        {todayPct > 0 && todayPct < 100 && (
+                          <Tooltip title="Hoje" placement="top" arrow>
+                            <Box sx={{
+                              position: "absolute", left: `${todayPct}%`,
+                              top: 0, bottom: 0, zIndex: 2,
+                              borderLeft: "2px dashed #2b7cee", opacity: 0.8,
+                              cursor: "default",
+                            }} />
+                          </Tooltip>
+                        )}
+
+                        {/* Barra do OA */}
+                        {hasDates && barLeft !== null && (
+                          <Box sx={{
+                            position: "absolute",
+                            left: `${barLeft}%`, width: `${barW}%`,
+                            top: "50%", transform: "translateY(-50%)",
+                            height: 14, borderRadius: 1,
+                            bgcolor: sc.bg,
+                            border: `1px solid ${sc.color}40`,
+                            overflow: "hidden",
+                          }}>
+                            {/* Preenchimento de progresso */}
+                            <Box sx={{
+                              position: "absolute", left: 0, top: 0, bottom: 0,
+                              width: `${oa.progressoPct}%`,
+                              bgcolor: sc.color, opacity: 0.55,
+                              transition: "width 0.3s",
+                            }} />
+                          </Box>
+                        )}
+
+                        {/* Marcadores de etapa */}
+                        {etapasComDL.map((e) => {
+                          const x     = pct(new Date(e.deadlinePrevisto!));
+                          const color = ETAPA_STATUS_COLOR[e.status] ?? "#94a3b8";
+                          const atras = !["CONCLUIDA"].includes(e.status)
+                            && new Date(e.deadlinePrevisto!) < hoje;
+                          return (
+                            <Tooltip
+                              key={e.id}
+                              placement="top"
+                              arrow
+                              title={
+                                <Box>
+                                  <Typography variant="caption" fontWeight={700}>{e.etapaDef.nome}</Typography>
+                                  <br />
+                                  <Typography variant="caption">
+                                    {ETAPA_STATUS_LABEL[e.status]} · {fmtData(e.deadlinePrevisto)}
+                                    {atras && " ⚠ atrasado"}
+                                  </Typography>
+                                </Box>
+                              }
+                            >
+                              <Box sx={{
+                                position: "absolute",
+                                left: `${x}%`,
+                                top: "50%",
+                                transform: "translate(-50%, -50%)",
+                                width: 11, height: 11,
+                                borderRadius: "50%",
+                                bgcolor: color,
+                                border: `2px solid ${atras ? "#ef4444" : "white"}`,
+                                boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
+                                zIndex: 3, cursor: "default",
+                              }} />
+                            </Tooltip>
+                          );
+                        })}
+
+                        {!hasDates && (
+                          <Box sx={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)" }}>
+                            <Typography variant="caption" color="text.disabled">Sem deadline</Typography>
+                          </Box>
+                        )}
+                      </Box>
+                    </Box>
+                  );
+                })}
+              </Box>
+            ))}
+          </Box>
+        </Box>
+
+        {/* ── Legenda ── */}
+        <Box sx={{
+          px: 2.5, py: 1.5,
+          borderTop: "1px solid", borderColor: "divider",
+          display: "flex", gap: 3, flexWrap: "wrap", alignItems: "center",
+          bgcolor: "#fafafa",
+        }}>
+          <Typography variant="caption" color="text.disabled" fontWeight={700} sx={{ mr: 0.5 }}>
+            Marcadores de etapa:
+          </Typography>
+          {Object.entries(ETAPA_STATUS_COLOR).map(([status, color]) => (
+            <Box key={status} sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+              <Box sx={{
+                width: 10, height: 10, borderRadius: "50%",
+                bgcolor: color, border: "2px solid white",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+              }} />
+              <Typography variant="caption" color="text.secondary">
+                {ETAPA_STATUS_LABEL[status]}
+              </Typography>
+            </Box>
+          ))}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, ml: "auto" }}>
+            <Box sx={{ width: 22, height: 0, borderTop: "2px dashed #2b7cee", opacity: 0.8 }} />
+            <Typography variant="caption" color="text.secondary">Hoje</Typography>
+          </Box>
+        </Box>
+      </Card>
     </Box>
   );
 }
