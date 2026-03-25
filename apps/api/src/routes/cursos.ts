@@ -56,17 +56,23 @@ const atribuicaoSchema = z.object({
   papelEtapa:    z.string(),
   responsavelId: z.string(),
   sobrescrever:  z.boolean().default(false),
+  unidadesIds:   z.array(z.string()).optional(),
 });
 
 router.get("/:id/atribuicao-preview", async (req, res, next) => {
   try {
-    const { papelEtapa, sobrescrever } = req.query as Record<string, string>;
+    const { papelEtapa, sobrescrever, unidadesIds: unidadesParam } = req.query as Record<string, string>;
     const cursoId = req.params["id"] as string;
     const apenasVazios = !sobrescrever || sobrescrever === "false";
+    const unidadesIds = unidadesParam ? unidadesParam.split(",").filter(Boolean) : [];
+
+    const unidadeWhere = unidadesIds.length > 0
+      ? { id: { in: unidadesIds }, cursoId }
+      : { cursoId };
 
     const total = await prisma.etapaOA.count({
       where: {
-        oa:       { capitulo: { unidade: { cursoId } } },
+        oa:       { capitulo: { unidade: unidadeWhere } },
         etapaDef: { papel: (papelEtapa || undefined) as any },
         ...(apenasVazios ? { responsavelId: null } : {}),
       },
@@ -94,7 +100,7 @@ router.post("/:id/atribuir-responsaveis", async (req, res, next) => {
     const parsed = atribuicaoSchema.safeParse(req.body);
     if (!parsed.success) { res.status(400).json({ message: "Dados inválidos.", errors: parsed.error.flatten() }); return; }
 
-    const { papelEtapa, responsavelId, sobrescrever } = parsed.data;
+    const { papelEtapa, responsavelId, sobrescrever, unidadesIds } = parsed.data;
 
     // Valida que o responsável é membro do curso
     const isMembro = await prisma.cursoMembro.findUnique({
@@ -102,10 +108,14 @@ router.post("/:id/atribuir-responsaveis", async (req, res, next) => {
     });
     if (!isMembro) { res.status(422).json({ message: "O usuário selecionado não é membro do curso." }); return; }
 
+    const unidadeWhere = unidadesIds && unidadesIds.length > 0
+      ? { id: { in: unidadesIds }, cursoId }
+      : { cursoId };
+
     // 2-step bulk update (Prisma não suporta updateMany com relações no where)
     const etapas = await prisma.etapaOA.findMany({
       where: {
-        oa: { capitulo: { unidade: { cursoId } } },
+        oa: { capitulo: { unidade: unidadeWhere } },
         etapaDef: { papel: papelEtapa as any },
         ...(!sobrescrever ? { responsavelId: null } : {}),
       },

@@ -5,7 +5,7 @@ import {
   Skeleton, Avatar, AvatarGroup,
   Tabs, Tab, Accordion, AccordionSummary, AccordionDetails,
   Alert, IconButton, Tooltip, Drawer, Divider, Switch, FormControlLabel,
-  Snackbar,
+  Snackbar, Checkbox, ListItemText,
 } from "@mui/material";
 import ArrowBackIcon       from "@mui/icons-material/ArrowBack";
 import FileDownloadIcon    from "@mui/icons-material/FileDownload";
@@ -128,6 +128,7 @@ function CursoDetalhePage() {
         open={atribuirOpen}
         cursoId={cursoId}
         membros={curso.membros}
+        unidades={curso.unidades}
         onClose={() => setAtribuirOpen(false)}
       />
 
@@ -573,27 +574,35 @@ const PAPEIS_ETAPA: { value: PapelEtapa; label: string }[] = [
   { value: "VALIDADOR_FINAL",       label: "Validador Final" },
 ];
 
-function AtribuicaoDrawer({ open, cursoId, membros, onClose }: {
+function AtribuicaoDrawer({ open, cursoId, membros, unidades, onClose }: {
   open: boolean;
   cursoId: string;
   membros: { usuarioId: string; papel: string; usuario: { id: string; nome: string; email: string } }[];
+  unidades: { id: string; numero: number; nome: string }[];
   onClose: () => void;
 }) {
   const [papelEtapa,    setPapelEtapa]    = useState<PapelEtapa | "">("");
   const [responsavelId, setResponsavelId] = useState("");
   const [sobrescrever,  setSobrescrever]  = useState(false);
+  const [unidadesIds,   setUnidadesIds]   = useState<string[]>([]);
   const [snack,         setSnack]         = useState<string | null>(null);
 
-  const previewParams = papelEtapa ? { papelEtapa, sobrescrever } : null;
+  const previewParams = papelEtapa ? { papelEtapa, sobrescrever, unidadesIds } : null;
   const { data: preview, isFetching: buscandoPreview } = useAtribuicaoPreview(cursoId, previewParams);
   const { mutate: atribuir, isPending: atribuindo }    = useAtribuirResponsaveis(cursoId);
 
   const colaboradores = membros.filter((m) => m.papel !== "LEITOR");
 
+  const handleUnidadesChange = (values: string[]) => {
+    // "__todas__" limpa a seleção (= todas as unidades)
+    if (values.includes("__todas__")) { setUnidadesIds([]); return; }
+    setUnidadesIds(values);
+  };
+
   const handleConfirmar = () => {
     if (!papelEtapa || !responsavelId) return;
     atribuir(
-      { papelEtapa, responsavelId, sobrescrever },
+      { papelEtapa, responsavelId, sobrescrever, unidadesIds },
       {
         onSuccess: (result) => {
           setSnack(`${result.totalAtualizado} etapa(s) atribuída(s) com sucesso.`);
@@ -607,13 +616,21 @@ function AtribuicaoDrawer({ open, cursoId, membros, onClose }: {
     setPapelEtapa("");
     setResponsavelId("");
     setSobrescrever(false);
+    setUnidadesIds([]);
     onClose();
   };
+
+  const unidadesLabel = unidadesIds.length === 0
+    ? "Todas as unidades"
+    : unidades
+        .filter((u) => unidadesIds.includes(u.id))
+        .map((u) => `U${u.numero}`)
+        .join(", ");
 
   return (
     <>
       <Drawer anchor="right" open={open} onClose={handleClose}
-        PaperProps={{ sx: { width: 400, p: 3, display: "flex", flexDirection: "column", gap: 3 } }}>
+        PaperProps={{ sx: { width: 420, p: 3, display: "flex", flexDirection: "column", gap: 3 } }}>
         <Box>
           <Typography variant="h6" fontWeight={800} sx={{ mb: 0.5 }}>Atribuir Responsáveis</Typography>
           <Typography variant="body2" color="text.secondary">
@@ -635,6 +652,32 @@ function AtribuicaoDrawer({ open, cursoId, membros, onClose }: {
             ))}
           </Select>
         </FormControl>
+
+        {/* Filtro por unidade */}
+        {unidades.length > 1 && (
+          <FormControl size="small" fullWidth>
+            <InputLabel>Unidades</InputLabel>
+            <Select
+              multiple
+              value={unidadesIds}
+              label="Unidades"
+              onChange={(e) => handleUnidadesChange(e.target.value as string[])}
+              renderValue={() => unidadesLabel}
+            >
+              <MenuItem value="__todas__">
+                <Checkbox checked={unidadesIds.length === 0} size="small" />
+                <ListItemText primary="Todas as unidades" />
+              </MenuItem>
+              <Divider />
+              {unidades.map((u) => (
+                <MenuItem key={u.id} value={u.id}>
+                  <Checkbox checked={unidadesIds.includes(u.id)} size="small" />
+                  <ListItemText primary={`U${u.numero} — ${u.nome}`} />
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
 
         <FormControl size="small" fullWidth disabled={!papelEtapa}>
           <InputLabel>Responsável</InputLabel>
@@ -671,6 +714,7 @@ function AtribuicaoDrawer({ open, cursoId, membros, onClose }: {
                     etapa(s) serão atribuídas a {responsavelId
                       ? colaboradores.find((m) => m.usuarioId === responsavelId)?.usuario.nome ?? "..."
                       : "..."}
+                    {unidadesIds.length > 0 && ` (${unidadesLabel})`}
                   </Typography>
                 </>
               )}

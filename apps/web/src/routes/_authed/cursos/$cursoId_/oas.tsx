@@ -43,10 +43,11 @@ const OA_TO_ETAPA: Record<StatusOA, StatusEtapa> = {
 function OAsPage() {
   const { cursoId }                             = Route.useParams();
   const { data: curso }                         = useCurso(cursoId);
-  const [search,       setSearch]               = useState("");
-  const [filtroStatus, setFiltroStatus]         = useState("");
-  const [filtroTipo,   setFiltroTipo]           = useState("");
-  const [visao,        setVisao]                = useState<"lista" | "kanban">("lista");
+  const [search,         setSearch]             = useState("");
+  const [filtroStatus,   setFiltroStatus]       = useState("");
+  const [filtroTipo,     setFiltroTipo]         = useState("");
+  const [filtroUnidade,  setFiltroUnidade]      = useState("");
+  const [visao,          setVisao]              = useState<"lista" | "kanban">("lista");
   const { mutate: atualizarEtapa }              = useAtualizarEtapaGeral();
 
   const { data: oas = [], isLoading, isError } = useOAsByCurso(cursoId, {
@@ -54,8 +55,13 @@ function OAsPage() {
     tipo:   filtroTipo   || undefined,
   });
 
+  const unidades = Array.from(
+    new Map(oas.map((oa) => [oa.capitulo.unidade.numero, oa.capitulo.unidade])).values()
+  ).sort((a, b) => a.numero - b.numero);
+
   const oasFiltrados = oas.filter((oa) =>
-    !search || oa.codigo.toLowerCase().includes(search.toLowerCase())
+    (!search || oa.codigo.toLowerCase().includes(search.toLowerCase())) &&
+    (!filtroUnidade || String(oa.capitulo.unidade.numero) === filtroUnidade)
   );
 
   const grupos = oasFiltrados.reduce<Record<string, typeof oasFiltrados>>((acc, oa) => {
@@ -119,6 +125,14 @@ function OAsPage() {
             <MenuItem value="">Todos os tipos</MenuItem>
             {(Object.keys(TIPO_CONFIG) as TipoOA[]).map((t) => (
               <MenuItem key={t} value={t}>{TIPO_CONFIG[t].label}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <FormControl size="small" sx={{ minWidth: 180 }}>
+          <Select value={filtroUnidade} onChange={(e) => setFiltroUnidade(e.target.value)} displayEmpty>
+            <MenuItem value="">Todas as unidades</MenuItem>
+            {unidades.map((u) => (
+              <MenuItem key={u.numero} value={String(u.numero)}>U{u.numero} — {u.nome}</MenuItem>
             ))}
           </Select>
         </FormControl>

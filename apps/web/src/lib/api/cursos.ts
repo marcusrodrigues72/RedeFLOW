@@ -272,8 +272,16 @@ export function useExportarMC(cursoId: string, codigoCurso: string) {
   });
 }
 
-export function useAtribuicaoPreview(cursoId: string, params: { papelEtapa: string; sobrescrever: boolean } | null) {
-  const query = params ? `papelEtapa=${encodeURIComponent(params.papelEtapa)}&sobrescrever=${params.sobrescrever}` : "";
+export function useAtribuicaoPreview(cursoId: string, params: { papelEtapa: string; sobrescrever: boolean; unidadesIds?: string[] } | null) {
+  const query = params
+    ? new URLSearchParams([
+        ["papelEtapa",   params.papelEtapa],
+        ["sobrescrever", String(params.sobrescrever)],
+        ...(params.unidadesIds && params.unidadesIds.length > 0
+          ? [["unidadesIds", params.unidadesIds.join(",")]]
+          : []),
+      ]).toString()
+    : "";
   return useQuery({
     queryKey: ["cursos", cursoId, "atribuicao-preview", params],
     queryFn:  () => api.get<AtribuicaoPreview>(`/cursos/${cursoId}/atribuicao-preview?${query}`).then((r) => r.data),
@@ -284,7 +292,7 @@ export function useAtribuicaoPreview(cursoId: string, params: { papelEtapa: stri
 export function useAtribuirResponsaveis(cursoId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { papelEtapa: string; responsavelId: string; sobrescrever: boolean }) =>
+    mutationFn: (data: { papelEtapa: string; responsavelId: string; sobrescrever: boolean; unidadesIds?: string[] }) =>
       api.post<AtribuicaoResult>(`/cursos/${cursoId}/atribuir-responsaveis`, data).then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["cursos", cursoId] });
