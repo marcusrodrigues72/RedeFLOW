@@ -15,6 +15,7 @@ import CheckCircleIcon       from "@mui/icons-material/CheckCircle";
 import { useState }          from "react";
 import type { ReactNode }    from "react";
 import { useProgressoCursos, usePipelineStatus, useAtrasosResponsavel } from "@/lib/api/relatorios";
+import { useDashboardStats } from "@/lib/api/cursos";
 import type { StatusOA }     from "shared";
 
 export const Route = createFileRoute("/_authed/relatorios")({
@@ -47,12 +48,13 @@ function RelatoriosPage() {
   const { data: cursos   = [], isLoading: loadCursos,   isError: errCursos   } = useProgressoCursos();
   const { data: pipeline,      isLoading: loadPipeline, isError: errPipeline } = usePipelineStatus();
   const { data: atrasos  = [], isLoading: loadAtrasos,  isError: errAtrasos  } = useAtrasosResponsavel();
+  const { data: stats,         isLoading: loadStats                           } = useDashboardStats();
 
-  // KPIs do pipeline (status dos OAs)
-  const totalOAs    = pipeline?.porStatusOA.reduce((s, e) => s + e.total, 0) ?? 0;
-  const emProducao  = pipeline?.porStatusOA.find((e) => e.status === "EM_ANDAMENTO")?.total ?? 0;
-  const concluidos  = pipeline?.porStatusOA.find((e) => e.status === "CONCLUIDO")?.total ?? 0;
-  const totalAtrasos = atrasos.reduce((s, r) => s + r.total, 0);
+  // KPIs usam a mesma fonte do Dashboard para consistência
+  const totalOAs     = stats?.totalOAs    ?? 0;
+  const emProducao   = stats?.emProducao  ?? 0;
+  const concluidos   = stats?.oasConcluidos ?? 0;
+  const totalAtrasos = stats?.oasAtrasados  ?? 0;
 
   return (
     <Box>
@@ -63,7 +65,7 @@ function RelatoriosPage() {
 
       {/* ── KPIs ──────────────────────────────────────────────────────────────── */}
       <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2, mb: 3 }}>
-        {loadPipeline ? (
+        {loadStats ? (
           Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} height={90} sx={{ borderRadius: 2 }} />)
         ) : (
           <>
