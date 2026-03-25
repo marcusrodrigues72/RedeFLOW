@@ -11,6 +11,8 @@ import EditIcon       from "@mui/icons-material/Edit";
 import DeleteIcon     from "@mui/icons-material/DeleteOutline";
 import BlockIcon      from "@mui/icons-material/Block";
 import CheckIcon      from "@mui/icons-material/Check";
+import SearchIcon     from "@mui/icons-material/Search";
+import InputAdornment from "@mui/material/InputAdornment";
 import { useState }   from "react";
 import { useAuthStore } from "@/stores/auth.store";
 import { useUsuarios, useCriarUsuario, useAtualizarUsuario, useExcluirUsuario } from "@/lib/api/usuarios";
@@ -31,9 +33,17 @@ function UsuariosPage() {
   const { mutate: excluir, isPending: excluindo }   = useExcluirUsuario();
   const meId = useAuthStore((s) => s.user?.id);
 
-  const [dialogOpen, setDialogOpen]             = useState(false);
-  const [editando, setEditando]                 = useState<UsuarioAdmin | null>(null);
-  const [confirmExcluir, setConfirmExcluir]     = useState<UsuarioAdmin | null>(null);
+  const [busca,          setBusca]          = useState("");
+  const [dialogOpen,     setDialogOpen]     = useState(false);
+  const [editando,       setEditando]       = useState<UsuarioAdmin | null>(null);
+  const [confirmExcluir, setConfirmExcluir] = useState<UsuarioAdmin | null>(null);
+
+  const usuariosFiltrados = busca.trim()
+    ? usuarios.filter((u) => {
+        const q = busca.toLowerCase();
+        return u.nome.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+      })
+    : usuarios;
 
   const handleNovo    = () => { setEditando(null); setDialogOpen(true); };
   const handleEditar  = (u: UsuarioAdmin) => { setEditando(u); setDialogOpen(true); };
@@ -49,12 +59,28 @@ function UsuariosPage() {
         <Box>
           <Typography sx={{ fontSize: "1.375rem", fontWeight: 800 }}>Usuários</Typography>
           <Typography variant="caption" color="text.disabled">
-            {usuarios.length} usuário{usuarios.length !== 1 ? "s" : ""} cadastrado{usuarios.length !== 1 ? "s" : ""}
+            {usuariosFiltrados.length} de {usuarios.length} usuário{usuarios.length !== 1 ? "s" : ""}
           </Typography>
         </Box>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={handleNovo} sx={{ fontWeight: 700 }}>
-          Novo Usuário
-        </Button>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <TextField
+            size="small"
+            placeholder="Buscar por nome ou e-mail…"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            sx={{ width: 280 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon sx={{ fontSize: 18, color: "text.disabled" }} />
+                </InputAdornment>
+              ),
+            }}
+          />
+          <Button variant="contained" startIcon={<AddIcon />} onClick={handleNovo} sx={{ fontWeight: 700 }}>
+            Novo Usuário
+          </Button>
+        </Box>
       </Box>
 
       {isLoading ? (
@@ -73,7 +99,14 @@ function UsuariosPage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {usuarios.map((u) => {
+                {usuariosFiltrados.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} sx={{ textAlign: "center", py: 4, color: "text.disabled" }}>
+                      Nenhum usuário encontrado para "{busca}"
+                    </TableCell>
+                  </TableRow>
+                )}
+                {usuariosFiltrados.map((u) => {
                   const pc = PAPEL_CONFIG[u.papelGlobal] ?? PAPEL_CONFIG.COLABORADOR;
                   return (
                     <TableRow key={u.id} sx={{ "&:hover": { bgcolor: "action.hover" }, opacity: u.ativo ? 1 : 0.5 }}>
