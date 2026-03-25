@@ -19,7 +19,10 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, Select, MenuItem, FormControl, InputLabel,
 } from "@mui/material";
-import PersonAddIcon from "@mui/icons-material/PersonAdd";
+import PersonAddIcon   from "@mui/icons-material/PersonAdd";
+import SearchIcon      from "@mui/icons-material/Search";
+import InputAdornment  from "@mui/material/InputAdornment";
+import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import { useCurso, useAdicionarMembro, useRemoverMembro, useAtualizarCurso, useExcluirCurso, useAtribuicaoPreview, useAtribuirResponsaveis, useExportarMC } from "@/lib/api/cursos";
 import { useUsuarios } from "@/lib/api/usuarios";
 import { useAuthStore } from "@/stores/auth.store";
@@ -423,6 +426,12 @@ function ExcluirCursoDialog({ open, nomeCurso, totalOAs, excluindo, onClose, onC
 
 // ─── Aba Equipe ───────────────────────────────────────────────────────────────
 
+const PAPEL_EQUIPE_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  ADMIN:       { label: "Admin",       color: "#2b7cee", bg: "#eff6ff" },
+  COLABORADOR: { label: "Colaborador", color: "#7c3aed", bg: "#f5f3ff" },
+  LEITOR:      { label: "Leitor",      color: "#64748b", bg: "#f8fafc" },
+};
+
 function EquipeTab({ cursoId, membros }: {
   cursoId: string;
   membros: { usuarioId: string; papel: string; usuario: { id: string; nome: string; email: string } }[];
@@ -431,15 +440,30 @@ function EquipeTab({ cursoId, membros }: {
   const { mutate: remover }                           = useRemoverMembro(cursoId);
   const { data: todos = [] }                          = useUsuarios();
   const [dialogOpen, setDialogOpen]                   = useState(false);
-  const [usuarioId, setUsuarioId]                     = useState("");
-  const [papel, setPapel]                             = useState("COLABORADOR");
+  const [busca,      setBusca]                        = useState("");
+  const [papeis,     setPapeis]                       = useState<Record<string, string>>({});
+  const [adicionandoId, setAdicionandoId]             = useState<string | null>(null);
 
   const disponiveis = todos.filter((u) => u.ativo && !membros.some((m) => m.usuarioId === u.id));
 
-  const handleAdicionar = () => {
-    if (!usuarioId) return;
-    adicionar({ usuarioId, papel }, { onSuccess: () => { setDialogOpen(false); setUsuarioId(""); setPapel("COLABORADOR"); } });
+  const dispFiltrados = busca.trim()
+    ? disponiveis.filter((u) => {
+        const q = busca.toLowerCase();
+        return u.nome.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+      })
+    : disponiveis;
+
+  const getPapel = (id: string) => papeis[id] ?? "COLABORADOR";
+
+  const handleAdicionar = (usuarioId: string) => {
+    setAdicionandoId(usuarioId);
+    adicionar(
+      { usuarioId, papel: getPapel(usuarioId) },
+      { onSuccess: () => { setAdicionandoId(null); setPapeis((p) => { const n = { ...p }; delete n[usuarioId]; return n; }); } },
+    );
   };
+
+  const handleClose = () => { setDialogOpen(false); setBusca(""); setPapeis({}); };
 
   return (
     <>
@@ -462,67 +486,109 @@ function EquipeTab({ cursoId, membros }: {
               </TableRow>
             </TableHead>
             <TableBody>
-              {membros.map((m) => (
-                <TableRow key={m.usuarioId} sx={{ "&:hover": { bgcolor: "action.hover" } }}>
-                  <TableCell>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                      <Avatar sx={{ width: 32, height: 32, bgcolor: "primary.light", fontSize: "0.8rem", fontWeight: 700 }}>
-                        {m.usuario.nome[0]?.toUpperCase()}
-                      </Avatar>
-                      <Typography variant="body2" fontWeight={600}>{m.usuario.nome}</Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell><Typography variant="body2" color="text.secondary">{m.usuario.email}</Typography></TableCell>
-                  <TableCell>
-                    <Chip
-                      label={m.papel === "ADMIN" ? "Admin" : "Colaborador"}
-                      size="small"
-                      sx={{ bgcolor: m.papel === "ADMIN" ? "#eff6ff" : "#f8fafc",
-                        color: m.papel === "ADMIN" ? "primary.main" : "text.secondary",
-                        fontWeight: 600, fontSize: "0.7rem" }}
-                    />
-                  </TableCell>
-                  <TableCell align="right">
-                    <Tooltip title="Remover do curso">
-                      <IconButton size="small" onClick={() => remover(m.usuarioId)} sx={{ color: "text.disabled" }}>
-                        <DeleteOutlineIcon sx={{ fontSize: 16 }} />
-                      </IconButton>
-                    </Tooltip>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {membros.map((m) => {
+                const pc = PAPEL_EQUIPE_CONFIG[m.papel] ?? PAPEL_EQUIPE_CONFIG.COLABORADOR;
+                return (
+                  <TableRow key={m.usuarioId} sx={{ "&:hover": { bgcolor: "action.hover" } }}>
+                    <TableCell>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                        <Avatar sx={{ width: 32, height: 32, bgcolor: "primary.light", fontSize: "0.8rem", fontWeight: 700 }}>
+                          {m.usuario.nome[0]?.toUpperCase()}
+                        </Avatar>
+                        <Typography variant="body2" fontWeight={600}>{m.usuario.nome}</Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell><Typography variant="body2" color="text.secondary">{m.usuario.email}</Typography></TableCell>
+                    <TableCell>
+                      <Chip label={pc.label} size="small"
+                        sx={{ bgcolor: pc.bg, color: pc.color, fontWeight: 600, fontSize: "0.7rem" }} />
+                    </TableCell>
+                    <TableCell align="right">
+                      <Tooltip title="Remover do curso">
+                        <IconButton size="small" onClick={() => remover(m.usuarioId)} sx={{ color: "text.disabled" }}>
+                          <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
 
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>Adicionar membro</DialogTitle>
-        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "16px !important" }}>
-          <FormControl size="small" fullWidth>
-            <InputLabel>Usuário</InputLabel>
-            <Select value={usuarioId} label="Usuário" onChange={(e) => setUsuarioId(e.target.value)}>
-              {disponiveis.length === 0 && <MenuItem value="" disabled>Todos os usuários já são membros</MenuItem>}
-              {disponiveis.map((u) => (
-                <MenuItem key={u.id} value={u.id}>{u.nome} — {u.email}</MenuItem>
+      {/* ── Dialog: adicionar membro ── */}
+      <Dialog open={dialogOpen} onClose={handleClose} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>Adicionar membro</DialogTitle>
+        <DialogContent sx={{ pt: "8px !important", pb: 1 }}>
+          <TextField
+            size="small" fullWidth
+            placeholder="Buscar por nome ou e-mail…"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            sx={{ mb: 2 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon sx={{ fontSize: 18, color: "text.disabled" }} />
+                </InputAdornment>
+              ),
+            }}
+          />
+
+          {disponiveis.length === 0 ? (
+            <Typography variant="body2" color="text.disabled" sx={{ textAlign: "center", py: 3 }}>
+              Todos os usuários já fazem parte da equipe.
+            </Typography>
+          ) : dispFiltrados.length === 0 ? (
+            <Typography variant="body2" color="text.disabled" sx={{ textAlign: "center", py: 3 }}>
+              Nenhum usuário encontrado para "{busca}"
+            </Typography>
+          ) : (
+            <Box sx={{ maxHeight: 360, overflowY: "auto", display: "flex", flexDirection: "column", gap: 0.5 }}>
+              {dispFiltrados.map((u) => (
+                <Box key={u.id} sx={{
+                  display: "flex", alignItems: "center", gap: 1.5,
+                  px: 1.5, py: 1, borderRadius: 1.5,
+                  border: "1px solid", borderColor: "divider",
+                  "&:hover": { bgcolor: "action.hover" },
+                }}>
+                  <Avatar sx={{ width: 34, height: 34, bgcolor: "primary.light", fontSize: "0.8rem", fontWeight: 700, flexShrink: 0 }}>
+                    {u.nome[0]?.toUpperCase()}
+                  </Avatar>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography variant="body2" fontWeight={600} noWrap>{u.nome}</Typography>
+                    <Typography variant="caption" color="text.secondary" noWrap>{u.email}</Typography>
+                  </Box>
+                  <Select
+                    size="small"
+                    value={getPapel(u.id)}
+                    onChange={(e) => setPapeis((p) => ({ ...p, [u.id]: e.target.value }))}
+                    sx={{ minWidth: 130, fontSize: "0.8rem" }}
+                  >
+                    <MenuItem value="ADMIN">Admin</MenuItem>
+                    <MenuItem value="COLABORADOR">Colaborador</MenuItem>
+                    <MenuItem value="LEITOR">Leitor</MenuItem>
+                  </Select>
+                  <Tooltip title="Adicionar ao curso">
+                    <span>
+                      <IconButton
+                        size="small" color="primary"
+                        onClick={() => handleAdicionar(u.id)}
+                        disabled={adicionando && adicionandoId === u.id}
+                      >
+                        <AddCircleOutlineIcon sx={{ fontSize: 22 }} />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                </Box>
               ))}
-            </Select>
-          </FormControl>
-          <FormControl size="small" fullWidth>
-            <InputLabel>Papel</InputLabel>
-            <Select value={papel} label="Papel" onChange={(e) => setPapel(e.target.value)}>
-              <MenuItem value="ADMIN">Admin</MenuItem>
-              <MenuItem value="COLABORADOR">Colaborador</MenuItem>
-              <MenuItem value="LEITOR">Leitor</MenuItem>
-            </Select>
-          </FormControl>
+            </Box>
+          )}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setDialogOpen(false)}>Cancelar</Button>
-          <Button variant="contained" onClick={handleAdicionar}
-            disabled={!usuarioId || adicionando} sx={{ fontWeight: 700 }}>
-            {adicionando ? "Adicionando..." : "Adicionar"}
-          </Button>
+          <Button variant="contained" onClick={handleClose} sx={{ fontWeight: 700 }}>Fechar</Button>
         </DialogActions>
       </Dialog>
     </>
