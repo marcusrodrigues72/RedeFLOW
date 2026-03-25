@@ -25,7 +25,7 @@ export function useCriarUsuario() {
 export function useAtualizarUsuario() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: { nome?: string; email?: string; papelGlobal?: string; ativo?: boolean } }) =>
+    mutationFn: ({ id, data }: { id: string; data: { nome?: string; email?: string; papelGlobal?: string; ativo?: boolean; senha?: string } }) =>
       api.patch<UsuarioAdmin>(`/usuarios/${id}`, data).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: usuarioKeys.list() }),
   });

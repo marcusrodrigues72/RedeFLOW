@@ -166,14 +166,19 @@ function UsuarioDialog({ open, usuario, onClose }: {
   const { mutate: criar,     isPending: criando }     = useCriarUsuario();
   const { mutate: atualizar, isPending: atualizando } = useAtualizarUsuario();
 
-  const [nome,   setNome]   = useState("");
-  const [email,  setEmail]  = useState("");
-  const [senha,  setSenha]  = useState("");
-  const [papel,  setPapel]  = useState("COLABORADOR");
-  const [ativo,  setAtivo]  = useState(true);
+  const [nome,           setNome]           = useState("");
+  const [email,          setEmail]          = useState("");
+  const [senha,          setSenha]          = useState("");
+  const [novaSenha,      setNovaSenha]      = useState("");
+  const [confirmarSenha, setConfirmarSenha] = useState("");
+  const [papel,          setPapel]          = useState("COLABORADOR");
+  const [ativo,          setAtivo]          = useState(true);
 
   const isEdit = Boolean(usuario);
   const busy   = criando || atualizando;
+
+  const senhasDivergem = isEdit && novaSenha !== "" && novaSenha !== confirmarSenha;
+  const senhasCurtas   = isEdit && novaSenha !== "" && novaSenha.length < 6;
 
   // Preenche campos ao abrir edição
   const handleEnter = () => {
@@ -181,20 +186,29 @@ function UsuarioDialog({ open, usuario, onClose }: {
       setNome(usuario.nome);
       setEmail(usuario.email);
       setSenha("");
+      setNovaSenha("");
+      setConfirmarSenha("");
       setPapel(usuario.papelGlobal);
       setAtivo(usuario.ativo);
     } else {
-      setNome(""); setEmail(""); setSenha(""); setPapel("COLABORADOR"); setAtivo(true);
+      setNome(""); setEmail(""); setSenha(""); setNovaSenha(""); setConfirmarSenha(""); setPapel("COLABORADOR"); setAtivo(true);
     }
   };
 
   const handleSalvar = () => {
     if (isEdit && usuario) {
-      atualizar({ id: usuario.id, data: { nome, email, papelGlobal: papel, ativo } }, { onSuccess: onClose });
+      const data: { nome: string; email: string; papelGlobal: string; ativo: boolean; senha?: string } = { nome, email, papelGlobal: papel, ativo };
+      if (novaSenha) data.senha = novaSenha;
+      atualizar({ id: usuario.id, data }, { onSuccess: onClose });
     } else {
       criar({ nome, email, senha, papelGlobal: papel }, { onSuccess: onClose });
     }
   };
+
+  const canSave = nome && email && (isEdit
+    ? !senhasDivergem && !senhasCurtas
+    : Boolean(senha)
+  );
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth TransitionProps={{ onEnter: handleEnter }}>
@@ -214,6 +228,25 @@ function UsuarioDialog({ open, usuario, onClose }: {
             size="small" fullWidth required helperText="Mínimo 6 caracteres"
           />
         )}
+        {isEdit && (
+          <>
+            <TextField
+              label="Nova Senha" type="password" value={novaSenha}
+              onChange={(e) => setNovaSenha(e.target.value)}
+              size="small" fullWidth
+              helperText={senhasCurtas ? "Mínimo 6 caracteres" : "Deixe em branco para não alterar"}
+              error={senhasCurtas}
+            />
+            <TextField
+              label="Confirmar Nova Senha" type="password" value={confirmarSenha}
+              onChange={(e) => setConfirmarSenha(e.target.value)}
+              size="small" fullWidth
+              error={senhasDivergem}
+              helperText={senhasDivergem ? "As senhas não coincidem" : ""}
+              disabled={!novaSenha}
+            />
+          </>
+        )}
         <FormControl size="small" fullWidth>
           <InputLabel>Papel</InputLabel>
           <Select value={papel} label="Papel" onChange={(e) => setPapel(e.target.value)}>
@@ -232,7 +265,7 @@ function UsuarioDialog({ open, usuario, onClose }: {
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onClose} disabled={busy}>Cancelar</Button>
         <Button
-          variant="contained" onClick={handleSalvar} disabled={busy || !nome || !email || (!isEdit && !senha)}
+          variant="contained" onClick={handleSalvar} disabled={busy || !canSave}
           sx={{ fontWeight: 700 }}
         >
           {busy ? "Salvando..." : isEdit ? "Salvar" : "Criar"}

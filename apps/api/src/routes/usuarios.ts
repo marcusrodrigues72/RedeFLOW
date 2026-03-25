@@ -56,14 +56,17 @@ const atualizarSchema = z.object({
   email:       z.string().email().optional(),
   papelGlobal: z.enum(["ADMIN", "COLABORADOR", "LEITOR"]).optional(),
   ativo:       z.boolean().optional(),
+  senha:       z.string().min(6).optional(),
 });
 
 router.patch("/:id", adminOnly, async (req, res, next) => {
   try {
-    const data    = atualizarSchema.parse(req.body);
+    const { senha, ...rest } = atualizarSchema.parse(req.body);
+    const updateData: Record<string, unknown> = { ...rest };
+    if (senha) updateData["senhaHash"] = await bcrypt.hash(senha, 12);
     const usuario = await prisma.usuario.update({
       where: { id: req.params["id"] as string },
-      data:  data as Parameters<typeof prisma.usuario.update>[0]["data"],
+      data:  updateData as Parameters<typeof prisma.usuario.update>[0]["data"],
       select,
     });
     res.json(usuario);
