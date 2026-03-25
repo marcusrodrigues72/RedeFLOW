@@ -681,15 +681,45 @@ function GanttView({ oas }: { oas: OAItem[] }) {
                               placement="top"
                               arrow
                               title={
-                                <Box>
-                                  <Typography variant="caption" fontWeight={700}>{e.etapaDef.nome}</Typography>
-                                  <br />
-                                  <Typography variant="caption">
-                                    {ETAPA_STATUS_LABEL[e.status]} · {fmtData(e.deadlinePrevisto)}
-                                    {atras && " ⚠ atrasado"}
+                                <Box sx={{ py: 0.25 }}>
+                                  <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: "#1e293b", lineHeight: 1.4 }}>
+                                    {e.etapaDef.nome}
                                   </Typography>
+                                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mt: 0.5 }}>
+                                    <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: color, flexShrink: 0 }} />
+                                    <Typography sx={{ fontSize: "0.72rem", color: "#475569" }}>
+                                      {ETAPA_STATUS_LABEL[e.status]}
+                                    </Typography>
+                                  </Box>
+                                  <Typography sx={{ fontSize: "0.72rem", color: "#64748b", mt: 0.25 }}>
+                                    Deadline: {fmtData(e.deadlinePrevisto)}
+                                  </Typography>
+                                  {atras && (
+                                    <Typography sx={{ fontSize: "0.72rem", color: "#ef4444", fontWeight: 600, mt: 0.25 }}>
+                                      ⚠ Atrasado
+                                    </Typography>
+                                  )}
                                 </Box>
                               }
+                              componentsProps={{
+                                tooltip: {
+                                  sx: {
+                                    bgcolor: "white",
+                                    color: "#1e293b",
+                                    border: "1px solid #e2e8f0",
+                                    boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
+                                    borderRadius: 1.5,
+                                    px: 1.5, py: 1,
+                                    maxWidth: 220,
+                                  },
+                                },
+                                arrow: {
+                                  sx: {
+                                    color: "white",
+                                    "&::before": { border: "1px solid #e2e8f0" },
+                                  },
+                                },
+                              }}
                             >
                               <Box sx={{
                                 position: "absolute",
