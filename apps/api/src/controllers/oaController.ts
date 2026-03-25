@@ -40,25 +40,26 @@ export class OAController {
         recalcularSequencia?: boolean;
       };
 
+      // Verifica se o usuário é ADMIN (global ou do curso) — usado em múltiplas regras abaixo
+      const { prisma: db } = await import("../lib/prisma.js");
+      const usuario = await db.usuario.findUnique({ where: { id: req.usuario!.sub }, select: { papelGlobal: true } });
+      let isAdmin = usuario?.papelGlobal === "ADMIN";
+      if (!isAdmin) {
+        const oaParaCheck = await db.objetoAprendizagem.findUnique({
+          where: { id: req.params["id"] as string },
+          select: { capitulo: { select: { unidade: { select: { cursoId: true } } } } },
+        });
+        const cursoId = oaParaCheck?.capitulo?.unidade?.cursoId;
+        const membro  = cursoId ? await db.cursoMembro.findUnique({
+          where: { cursoId_usuarioId: { cursoId, usuarioId: req.usuario!.sub } },
+        }) : null;
+        isAdmin = membro?.papel === "ADMIN";
+      }
+
       // Edição de deadlinePrevisto exige papel ADMIN (global ou no curso)
-      if (deadlinePrevisto !== undefined) {
-        const { prisma: db } = await import("../lib/prisma.js");
-        const usuario = await db.usuario.findUnique({ where: { id: req.usuario!.sub }, select: { papelGlobal: true } });
-        if (usuario?.papelGlobal !== "ADMIN") {
-          // Verifica se é ADMIN do curso ao qual o OA pertence
-          const oaParaCheck = await db.objetoAprendizagem.findUnique({
-            where: { id: req.params["id"] as string },
-            select: { capitulo: { select: { unidade: { select: { cursoId: true } } } } },
-          });
-          const cursoId = oaParaCheck?.capitulo?.unidade?.cursoId;
-          const membro  = cursoId ? await db.cursoMembro.findUnique({
-            where: { cursoId_usuarioId: { cursoId, usuarioId: req.usuario!.sub } },
-          }) : null;
-          if (membro?.papel !== "ADMIN") {
-            res.status(403).json({ message: "Apenas administradores podem editar deadlines de etapas." });
-            return;
-          }
-        }
+      if (deadlinePrevisto !== undefined && !isAdmin) {
+        res.status(403).json({ message: "Apenas administradores podem editar deadlines de etapas." });
+        return;
       }
 
       // Busca dados anteriores ANTES do update para calcular o delta correto
@@ -72,9 +73,8 @@ export class OAController {
         });
       }
 
-      // Valida predecessora: status só pode mudar se a etapa anterior estiver CONCLUIDA
-      if (status !== undefined) {
-        const { prisma: db } = await import("../lib/prisma.js");
+      // Valida predecessora: status só pode mudar se a etapa anterior estiver CONCLUIDA (ADMINs são isentos)
+      if (status !== undefined && !isAdmin) {
         const etapaAtual = await db.etapaOA.findUnique({
           where: { id: req.params["etapaId"] as string },
           select: { ordem: true, oaId: true, status: true },
