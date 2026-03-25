@@ -2,6 +2,7 @@ import "dotenv/config";
 import { createApp } from "./app.js";
 import { logger } from "./lib/logger.js";
 import { prisma } from "./lib/prisma.js";
+import { startScheduler } from "./lib/scheduler.js";
 
 const PORT = Number(process.env["PORT"] ?? 3001);
 
@@ -16,6 +17,7 @@ async function main() {
   }
 
   const app = createApp();
+  startScheduler();
 
   const server = app.listen(PORT, () => {
     logger.info(`🚀 API RedeFLOW rodando em http://localhost:${PORT}`);

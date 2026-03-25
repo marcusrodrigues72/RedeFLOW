@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { oaRepository } from "../repositories/oaRepository.js";
+import { sendMail, tmplEtapaLiberada } from "../lib/mailer.js";
 
 export class OAController {
   // GET /cursos/:id/oas?status=&tipo=
@@ -209,6 +210,22 @@ export class OAController {
               entidadeId:   oa.id,
             },
           });
+
+          // Envia e-mail ao responsável (fire-and-forget — falha não bloqueia resposta)
+          const responsavel = await db.usuario.findUnique({
+            where:  { id: proximaEtapa.responsavelId },
+            select: { nome: true, email: true },
+          });
+          if (responsavel) {
+            sendMail(tmplEtapaLiberada({
+              email:     responsavel.email,
+              nome:      responsavel.nome,
+              oaCodigo:  oa.codigo,
+              etapaNome: proximaEtapa.etapaDef.nome,
+              deadline:  proximaEtapa.deadlinePrevisto?.toISOString() ?? null,
+              oaId:      oa.id,
+            })).catch(() => {/* falha já logada no mailer */});
+          }
         }
       }
 
