@@ -58,4 +58,18 @@ router.delete("/:id/comentarios/:comentarioId", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── Histórico de auditoria ────────────────────────────────────────────────────
+
+router.get("/:id/audit", async (req, res, next) => {
+  try {
+    const logs = await prisma.auditLog.findMany({
+      where:   { entidadeTipo: "OA", entidadeId: req.params["id"] as string },
+      include: { usuario: { select: { id: true, nome: true, fotoUrl: true } } },
+      orderBy: { createdAt: "desc" },
+      take:    200,
+    });
+    res.json(logs);
+  } catch (err) { next(err); }
+});
+
 export default router;

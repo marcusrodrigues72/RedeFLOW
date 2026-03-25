@@ -22,7 +22,7 @@ router.get("/progresso-cursos", async (req, res, next) => {
       const oaWhere    = { capitulo: { unidade: { cursoId: curso.id } } };
       const etapaWhere = { oa: { capitulo: { unidade: { cursoId: curso.id } } } };
 
-      const [total, concluidos, atrasados, minEtapa, maxOA] = await Promise.all([
+      const [total, concluidos, atrasados, minEtapa, maxEtapa, maxOA] = await Promise.all([
         prisma.objetoAprendizagem.count({ where: oaWhere }),
         prisma.objetoAprendizagem.count({ where: { status: "CONCLUIDO", ...oaWhere } }),
         prisma.etapaOA.count({
@@ -36,11 +36,18 @@ router.get("/progresso-cursos", async (req, res, next) => {
           where: { deadlinePrevisto: { not: null }, ...etapaWhere },
           _min:  { deadlinePrevisto: true },
         }),
+        prisma.etapaOA.aggregate({
+          where: { deadlinePrevisto: { not: null }, ...etapaWhere },
+          _max:  { deadlinePrevisto: true },
+        }),
         prisma.objetoAprendizagem.aggregate({
           where: { deadlineFinal: { not: null }, ...oaWhere },
           _max:  { deadlineFinal: true },
         }),
       ]);
+
+      // Usa deadlineFinal dos OAs como data fim; cai para o maior deadlinePrevisto de etapa como fallback
+      const dataFim = maxOA._max.deadlineFinal ?? maxEtapa._max.deadlinePrevisto;
 
       return {
         ...curso,
@@ -49,7 +56,7 @@ router.get("/progresso-cursos", async (req, res, next) => {
         oasAtrasados:        atrasados,
         progressoPct:        total > 0 ? Math.round((concluidos / total) * 100) : 0,
         dataInicioEstimada:  minEtapa._min.deadlinePrevisto?.toISOString() ?? null,
-        dataFimEstimada:     maxOA._max.deadlineFinal?.toISOString()       ?? null,
+        dataFimEstimada:     dataFim?.toISOString() ?? null,
       };
     }));
 
@@ -168,16 +175,6 @@ router.get("/alocacao", async (req, res, next) => {
     };
 
     // ── Carga por papel ────────────────────────────────────────────────────────
-    const porPapelRaw = await prisma.etapaOA.groupBy({
-      by:    ["status"],
-      where: {
-        status:        { in: ["PENDENTE", "EM_ANDAMENTO"] },
-        oa:            oaFilter,
-        responsavelId: { not: null },
-      },
-      _count: { id: true },
-    });
-
     // Busca por etapaDefId + status para calcular por papel
     const porPapelDef = await prisma.etapaOA.groupBy({
       by:    ["etapaDefId", "status"],

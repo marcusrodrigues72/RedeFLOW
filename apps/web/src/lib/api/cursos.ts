@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { CursoResumo, CursoDetalhe, DashboardStats, ImportPreview, ImportResult, MIPreview, MIResult, OADetalhe, EtapaOADetalhe, ComentarioOA, DashboardDetalheTipo, DashboardDetalheOA, DashboardDetalheAtraso, AtribuicaoPreview, AtribuicaoResult } from "shared";
+import type { CursoResumo, CursoDetalhe, DashboardStats, ImportPreview, ImportResult, MIPreview, MIResult, OADetalhe, EtapaOADetalhe, ComentarioOA, DashboardDetalheTipo, DashboardDetalheOA, DashboardDetalheAtraso, AtribuicaoPreview, AtribuicaoResult, AuditLogEntry } from "shared";
 
 // ─── Keys ─────────────────────────────────────────────────────────────────────
 export const cursoKeys = {
@@ -215,6 +215,15 @@ export function useAtualizarEtapaGeral() {
       qc.invalidateQueries({ queryKey: oaKeys.meuTrabalho() });
       qc.invalidateQueries({ queryKey: cursoKeys.stats() });
     },
+  });
+}
+
+// Audit log de OA
+export function useAuditLogOA(oaId: string) {
+  return useQuery({
+    queryKey: ["oas", oaId, "audit"],
+    queryFn:  () => api.get<AuditLogEntry[]>(`/oas/${oaId}/audit`).then((r) => r.data),
+    enabled:  !!oaId,
   });
 }
 

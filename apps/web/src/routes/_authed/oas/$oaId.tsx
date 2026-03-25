@@ -3,7 +3,7 @@ import {
   Box, Typography, Chip, Button, Card, CardContent,
   Stepper, Step, StepLabel, StepContent, Alert, Skeleton,
   Select, MenuItem, FormControl, InputLabel, Divider,
-  TextField, Avatar, IconButton, Tooltip, Snackbar,
+  TextField, Avatar, IconButton, Tooltip, Snackbar, Tabs, Tab,
 } from "@mui/material";
 import ArrowBackIcon            from "@mui/icons-material/ArrowBack";
 import CheckCircleIcon          from "@mui/icons-material/CheckCircle";
@@ -15,9 +15,9 @@ import EditCalendarIcon         from "@mui/icons-material/EditCalendar";
 import CheckIcon                from "@mui/icons-material/Check";
 import CloseIcon                from "@mui/icons-material/Close";
 import { useState }             from "react";
-import { useOA, useAtualizarEtapa, useComentariosOA, useAdicionarComentario, useExcluirComentario } from "@/lib/api/cursos";
+import { useOA, useAtualizarEtapa, useComentariosOA, useAdicionarComentario, useExcluirComentario, useAuditLogOA } from "@/lib/api/cursos";
 import { useAuthStore }         from "@/stores/auth.store";
-import type { StatusEtapa, TipoOA, StatusOA } from "shared";
+import type { StatusEtapa, TipoOA, StatusOA, AuditLogEntry } from "shared";
 
 export const Route = createFileRoute("/_authed/oas/$oaId")({
   component: OADetalhePage,
@@ -52,6 +52,7 @@ function OADetalhePage() {
   const { mutate: atualizarEtapa, isPending } = useAtualizarEtapa(oaId);
   const user      = useAuthStore((s) => s.user);
   const [snackMsg, setSnackMsg] = useState<string | null>(null);
+  const [abaEsquerda, setAbaEsquerda] = useState<"pipeline" | "historico">("pipeline");
 
   if (isLoading) return <LoadingSkeleton />;
   if (isError || !oa) return <Alert severity="error">OA não encontrado.</Alert>;
@@ -89,8 +90,16 @@ function OADetalhePage() {
       </Box>
 
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 340px" }, gap: 3 }}>
-        {/* Pipeline */}
+        {/* Pipeline + Histórico */}
         <Card>
+          <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+            <Tabs value={abaEsquerda} onChange={(_, v) => setAbaEsquerda(v)} sx={{ px: 2 }}>
+              <Tab label="Pipeline" value="pipeline" sx={{ fontWeight: 700, fontSize: "0.8rem" }} />
+              <Tab label="Histórico" value="historico" sx={{ fontWeight: 700, fontSize: "0.8rem" }} />
+            </Tabs>
+          </Box>
+
+          {abaEsquerda === "pipeline" && (
           <CardContent sx={{ p: 3 }}>
             <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3 }}>
               <Typography variant="h6" sx={{ fontWeight: 700 }}>Pipeline de Produção</Typography>
@@ -211,6 +220,11 @@ function OADetalhePage() {
               })}
             </Stepper>
           </CardContent>
+          )}
+
+          {abaEsquerda === "historico" && (
+            <HistoricoTab oaId={oaId} />
+          )}
         </Card>
 
         <Snackbar
@@ -419,6 +433,121 @@ function ComentariosCard({ oaId }: { oaId: string }) {
         </Box>
       </CardContent>
     </Card>
+  );
+}
+
+// ─── Histórico de auditoria ───────────────────────────────────────────────────
+
+const ACAO_LABEL: Record<string, string> = {
+  "etapa.atualizada":           "Etapa atualizada",
+  "etapa.status_atualizado":    "Status da etapa alterado",
+  "etapa.responsavel_atualizado": "Responsável alterado",
+  "etapa.deadline_atualizado":  "Deadline alterado",
+  "oa.criado":                  "OA criado",
+  "oa.status_atualizado":       "Status do OA alterado",
+};
+
+const CAMPO_LABEL: Record<string, string> = {
+  status:                   "Status",
+  responsavelId:            "Responsável",
+  responsavelSecundarioId:  "Videomaker",
+  deadlinePrevisto:         "Deadline previsto",
+  etapa:                    "Etapa",
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  PENDENTE:     "Pendente",
+  EM_ANDAMENTO: "Em Andamento",
+  CONCLUIDA:    "Concluída",
+  BLOQUEADA:    "Bloqueada",
+};
+
+function formatValor(campo: string, valor: unknown): string {
+  if (valor === null || valor === undefined) return "—";
+  if (campo === "deadlinePrevisto" && typeof valor === "string") {
+    return new Date(valor).toLocaleDateString("pt-BR");
+  }
+  if (typeof valor === "string" && STATUS_LABEL[valor]) return STATUS_LABEL[valor];
+  return String(valor);
+}
+
+function HistoricoTab({ oaId }: { oaId: string }) {
+  const { data: logs = [], isLoading } = useAuditLogOA(oaId);
+
+  if (isLoading) return (
+    <Box sx={{ p: 3 }}>
+      {[1,2,3].map((i) => <Skeleton key={i} height={60} sx={{ mb: 1, borderRadius: 2 }} />)}
+    </Box>
+  );
+
+  if (logs.length === 0) return (
+    <Box sx={{ p: 4, textAlign: "center" }}>
+      <Typography variant="body2" color="text.secondary">Nenhum evento registrado ainda.</Typography>
+    </Box>
+  );
+
+  return (
+    <Box sx={{ p: 3, display: "flex", flexDirection: "column", gap: 0 }}>
+      {logs.map((log, idx) => (
+        <HistoricoItem key={log.id} log={log} isLast={idx === logs.length - 1} />
+      ))}
+    </Box>
+  );
+}
+
+function HistoricoItem({ log, isLast }: { log: AuditLogEntry; isLast: boolean }) {
+  const label = ACAO_LABEL[log.acao] ?? log.acao;
+
+  // Campos alterados (excluindo o campo "etapa" que é só contexto)
+  const campos = Object.keys(log.payloadDepois ?? {}).filter((k) => k !== "etapa");
+  const etapaNome = (log.payloadDepois as any)?.etapa as string | undefined;
+
+  return (
+    <Box sx={{ display: "flex", gap: 1.5 }}>
+      {/* Timeline line + dot */}
+      <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
+        <Avatar sx={{ width: 28, height: 28, bgcolor: "primary.light", fontSize: "0.7rem", fontWeight: 700 }}>
+          {log.usuario?.nome?.[0]?.toUpperCase() ?? "?"}
+        </Avatar>
+        {!isLast && <Box sx={{ width: 2, flex: 1, bgcolor: "#e2e8f0", mt: 0.5, mb: 0.5 }} />}
+      </Box>
+
+      {/* Content */}
+      <Box sx={{ pb: 2.5, flex: 1, minWidth: 0 }}>
+        <Box sx={{ display: "flex", alignItems: "baseline", gap: 1, flexWrap: "wrap" }}>
+          <Typography variant="caption" fontWeight={700} sx={{ color: "text.primary" }}>
+            {log.usuario?.nome ?? "Sistema"}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">{label}</Typography>
+          <Typography variant="caption" color="text.disabled" sx={{ ml: "auto", whiteSpace: "nowrap" }}>
+            {new Date(log.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+          </Typography>
+        </Box>
+        {etapaNome && (
+          <Typography variant="caption" color="text.disabled" sx={{ display: "block", mb: 0.5 }}>
+            Etapa: {etapaNome}
+          </Typography>
+        )}
+        {campos.map((campo) => {
+          const antes  = (log.payloadAntes  as any)?.[campo];
+          const depois = (log.payloadDepois as any)?.[campo];
+          return (
+            <Box key={campo} sx={{ display: "flex", alignItems: "center", gap: 0.75, mt: 0.5, flexWrap: "wrap" }}>
+              <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600 }}>
+                {CAMPO_LABEL[campo] ?? campo}:
+              </Typography>
+              <Typography variant="caption" sx={{ bgcolor: "#fee2e2", color: "#991b1b", px: 0.75, borderRadius: 1, textDecoration: "line-through" }}>
+                {formatValor(campo, antes)}
+              </Typography>
+              <Typography variant="caption" color="text.disabled">→</Typography>
+              <Typography variant="caption" sx={{ bgcolor: "#dcfce7", color: "#166534", px: 0.75, borderRadius: 1 }}>
+                {formatValor(campo, depois)}
+              </Typography>
+            </Box>
+          );
+        })}
+      </Box>
+    </Box>
   );
 }
 

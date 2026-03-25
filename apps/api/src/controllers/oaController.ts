@@ -74,6 +74,12 @@ export class OAController {
         });
       }
 
+      // Busca estado anterior para audit log (antes do update)
+      const etapaAntes = await db.etapaOA.findUnique({
+        where:  { id: req.params["etapaId"] as string },
+        select: { status: true, responsavelId: true, responsavelSecundarioId: true, deadlinePrevisto: true, etapaDef: { select: { nome: true } } },
+      });
+
       // Valida predecessora: status só pode mudar se a etapa anterior estiver CONCLUIDA (ADMINs são isentos)
       if (status !== undefined && !isAdmin) {
         const etapaAtual = await db.etapaOA.findUnique({
@@ -101,6 +107,32 @@ export class OAController {
         deadlineReal:     deadlineReal     ? new Date(deadlineReal)     : deadlineReal     === null ? null : undefined,
         deadlinePrevisto: deadlinePrevisto ? new Date(deadlinePrevisto) : deadlinePrevisto === null ? null : undefined,
       });
+
+      // Grava audit log com as mudanças realizadas
+      {
+        const mudancas: Record<string, { antes: unknown; depois: unknown }> = {};
+        if (status !== undefined && etapaAntes?.status !== status)
+          mudancas.status = { antes: etapaAntes?.status, depois: status };
+        if (responsavelId !== undefined && etapaAntes?.responsavelId !== responsavelId)
+          mudancas.responsavelId = { antes: etapaAntes?.responsavelId ?? null, depois: responsavelId ?? null };
+        if (responsavelSecundarioId !== undefined && etapaAntes?.responsavelSecundarioId !== responsavelSecundarioId)
+          mudancas.responsavelSecundarioId = { antes: etapaAntes?.responsavelSecundarioId ?? null, depois: responsavelSecundarioId ?? null };
+        if (deadlinePrevisto !== undefined)
+          mudancas.deadlinePrevisto = { antes: etapaAntes?.deadlinePrevisto?.toISOString() ?? null, depois: deadlinePrevisto ?? null };
+        if (Object.keys(mudancas).length > 0) {
+          await db.auditLog.create({
+            data: {
+              usuarioId:    req.usuario!.sub,
+              acao:         "etapa.atualizada",
+              entidadeTipo: "OA",
+              entidadeId:   req.params["id"] as string,
+              payloadAntes: { etapa: etapaAntes?.etapaDef.nome, ...Object.fromEntries(Object.entries(mudancas).map(([k, v]) => [k, v.antes])) },
+              payloadDepois: { etapa: etapaAntes?.etapaDef.nome, ...Object.fromEntries(Object.entries(mudancas).map(([k, v]) => [k, v.depois])) },
+              ip:           req.ip ?? null,
+            },
+          });
+        }
+      }
 
       // Recalcula etapas subsequentes
       if (recalcularSequencia && deadlinePrevisto && todasEtapasAntes.length > 0) {

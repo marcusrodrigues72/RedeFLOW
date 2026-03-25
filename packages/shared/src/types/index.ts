@@ -282,6 +282,20 @@ export interface RelatorioAlocacao {
   porResponsavel:  ResponsavelAlocacao[];
 }
 
+// ─── Audit Log ────────────────────────────────────────────────────────────────
+
+export interface AuditLogEntry {
+  id:           string;
+  acao:         string;
+  entidadeTipo: string;
+  entidadeId:   string;
+  payloadAntes:  Record<string, unknown> | null;
+  payloadDepois: Record<string, unknown> | null;
+  ip:           string | null;
+  createdAt:    string;
+  usuario:      { id: string; nome: string; fotoUrl: string | null } | null;
+}
+
 // ─── Import ───────────────────────────────────────────────────────────────────
 
 export interface ImportPreview {

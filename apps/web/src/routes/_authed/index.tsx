@@ -53,7 +53,7 @@ function DashboardPage() {
   const user            = useAuthStore((s) => s.user);
   const { data: stats,  isLoading: loadStats  } = useDashboardStats();
   const { data: cursos, isLoading: loadCursos } = useCursos();
-  const { data: progresso }                     = useProgressoCursos();
+  const { data: progresso, isLoading: loadProgresso } = useProgressoCursos();
   const [drawerTipo, setDrawerTipo]             = useState<DashboardDetalheTipo | null>(null);
 
   const hoje = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
@@ -244,7 +244,7 @@ function DashboardPage() {
             </Button>
           </Box>
 
-          {loadCursos ? (
+          {loadProgresso ? (
             [1, 2, 3].map((i) => <Skeleton key={i} height={52} sx={{ mb: 1.5, borderRadius: 2 }} />)
           ) : cursosTimeline.length === 0 ? (
             <Box sx={{ textAlign: "center", py: 5 }}>
