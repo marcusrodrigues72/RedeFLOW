@@ -57,7 +57,7 @@ export async function runDeadlineChecks(): Promise<void> {
       responsavel:      { isNot: null },
     },
     include: {
-      responsavel: { select: { id: true, nome: true, email: true } },
+      responsavel: { select: { id: true, nome: true, email: true, notifEmailAtivo: true } },
       etapaDef:    { select: { nome: true } },
       oa:          { select: { id: true, codigo: true } },
     },
@@ -79,6 +79,7 @@ export async function runDeadlineChecks(): Promise<void> {
     if (vencido) {
       const jaFeito = await jaNotificado("DEADLINE_VENCIDO", etapa.id);
       if (jaFeito) continue;
+      const enviarEmail = resp.notifEmailAtivo !== false;
 
       const diasAtraso = diffDays(dl, hoje);
 
@@ -95,21 +96,24 @@ export async function runDeadlineChecks(): Promise<void> {
       });
       inApp++;
 
-      // E-mail
-      await sendMail(tmplDeadlineVencido({
-        email:      resp.email,
-        nome:       resp.nome,
-        oaCodigo:   etapa.oa.codigo,
-        etapaNome:  etapa.etapaDef.nome,
-        deadline:   etapa.deadlinePrevisto.toISOString(),
-        diasAtraso,
-        oaId:       etapa.oa.id,
-      }));
-      enviados++;
+      // E-mail (respeitando preferência do usuário)
+      if (enviarEmail) {
+        await sendMail(tmplDeadlineVencido({
+          email:      resp.email,
+          nome:       resp.nome,
+          oaCodigo:   etapa.oa.codigo,
+          etapaNome:  etapa.etapaDef.nome,
+          deadline:   etapa.deadlinePrevisto.toISOString(),
+          diasAtraso,
+          oaId:       etapa.oa.id,
+        }));
+        enviados++;
+      }
 
     } else if (proximo) {
       const jaFeito = await jaNotificado("PRAZO_PROXIMO", etapa.id);
       if (jaFeito) continue;
+      const enviarEmail = resp.notifEmailAtivo !== false;
 
       const diasRestantes = Math.max(0, diffDays(hoje, dl));
 
@@ -126,17 +130,19 @@ export async function runDeadlineChecks(): Promise<void> {
       });
       inApp++;
 
-      // E-mail
-      await sendMail(tmplPrazoProximo({
-        email:         resp.email,
-        nome:          resp.nome,
-        oaCodigo:      etapa.oa.codigo,
-        etapaNome:     etapa.etapaDef.nome,
-        deadline:      etapa.deadlinePrevisto.toISOString(),
-        diasRestantes,
-        oaId:          etapa.oa.id,
-      }));
-      enviados++;
+      // E-mail (respeitando preferência do usuário)
+      if (enviarEmail) {
+        await sendMail(tmplPrazoProximo({
+          email:         resp.email,
+          nome:          resp.nome,
+          oaCodigo:      etapa.oa.codigo,
+          etapaNome:     etapa.etapaDef.nome,
+          deadline:      etapa.deadlinePrevisto.toISOString(),
+          diasRestantes,
+          oaId:          etapa.oa.id,
+        }));
+        enviados++;
+      }
     }
   }
 

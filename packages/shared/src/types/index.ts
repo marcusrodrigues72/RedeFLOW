@@ -15,6 +15,7 @@ export interface UsuarioPublico {
   email: string;
   papelGlobal: PapelGlobal;
   fotoUrl: string | null;
+  notifEmailAtivo?: boolean;
 }
 
 export interface AuthTokens { accessToken: string; refreshToken: string }

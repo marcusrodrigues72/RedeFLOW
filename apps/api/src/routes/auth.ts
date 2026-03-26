@@ -1,5 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
+import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import {
   signAccessToken,
@@ -132,12 +133,9 @@ router.get("/me", authenticate, async (req, res, next) => {
     const usuario = await prisma.usuario.findUnique({
       where: { id: req.usuario!.sub },
       select: {
-        id: true,
-        nome: true,
-        email: true,
-        papelGlobal: true,
-        fotoUrl: true,
-        ativo: true,
+        id: true, nome: true, email: true,
+        papelGlobal: true, fotoUrl: true, ativo: true,
+        notifEmailAtivo: true,
       },
     });
 
@@ -150,6 +148,58 @@ router.get("/me", authenticate, async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// PATCH /api/auth/me — auto-edição de perfil (qualquer usuário autenticado)
+const perfilSchema = z.object({
+  nome:            z.string().min(2).max(100).optional(),
+  email:           z.string().email().optional(),
+  senhaAtual:      z.string().min(1).optional(),
+  novaSenha:       z.string().min(6).optional(),
+  notifEmailAtivo: z.boolean().optional(),
+}).refine(
+  (d) => !d.novaSenha || d.senhaAtual,
+  { message: "Informe a senha atual para definir uma nova senha.", path: ["senhaAtual"] }
+);
+
+router.patch("/me", authenticate, async (req, res, next) => {
+  try {
+    const { nome, email, senhaAtual, novaSenha, notifEmailAtivo } = perfilSchema.parse(req.body);
+    const id = req.usuario!.sub;
+
+    // Se e-mail mudou, verifica conflito
+    if (email) {
+      const conflito = await prisma.usuario.findFirst({ where: { email, NOT: { id } } });
+      if (conflito) {
+        res.status(409).json({ message: "Este e-mail já está em uso." });
+        return;
+      }
+    }
+
+    // Se troca de senha, valida senha atual
+    if (novaSenha) {
+      const atual = await prisma.usuario.findUnique({ where: { id }, select: { senhaHash: true } });
+      const correta = atual && await bcrypt.compare(senhaAtual!, atual.senhaHash);
+      if (!correta) {
+        res.status(400).json({ message: "Senha atual incorreta." });
+        return;
+      }
+    }
+
+    const updateData: Record<string, unknown> = {};
+    if (nome            !== undefined) updateData["nome"]            = nome;
+    if (email           !== undefined) updateData["email"]           = email;
+    if (notifEmailAtivo !== undefined) updateData["notifEmailAtivo"] = notifEmailAtivo;
+    if (novaSenha)                     updateData["senhaHash"]       = await bcrypt.hash(novaSenha, 12);
+
+    const usuario = await prisma.usuario.update({
+      where: { id },
+      data:  updateData as Parameters<typeof prisma.usuario.update>[0]["data"],
+      select: { id: true, nome: true, email: true, papelGlobal: true, fotoUrl: true, notifEmailAtivo: true },
+    });
+
+    res.json(usuario);
+  } catch (err) { next(err); }
 });
 
 export default router;

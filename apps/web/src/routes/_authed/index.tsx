@@ -53,7 +53,7 @@ function DashboardPage() {
   const user            = useAuthStore((s) => s.user);
   const { data: stats,  isLoading: loadStats  } = useDashboardStats();
   const { data: cursos, isLoading: loadCursos } = useCursos();
-  const { data: progresso, isLoading: loadProgresso } = useProgressoCursos();
+  const { data: progresso, isLoading: loadProgresso, isError: erroProgresso } = useProgressoCursos();
   const [drawerTipo, setDrawerTipo]             = useState<DashboardDetalheTipo | null>(null);
 
   const hoje = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
@@ -246,13 +246,22 @@ function DashboardPage() {
 
           {loadProgresso ? (
             [1, 2, 3].map((i) => <Skeleton key={i} height={52} sx={{ mb: 1.5, borderRadius: 2 }} />)
+          ) : erroProgresso ? (
+            <Box sx={{ textAlign: "center", py: 5 }}>
+              <Typography variant="body2" color="error" sx={{ mb: 1 }}>
+                Erro ao carregar dados da timeline.
+              </Typography>
+              <Typography variant="caption" color="text.disabled">
+                Verifique os logs da API ou tente novamente mais tarde.
+              </Typography>
+            </Box>
           ) : cursosTimeline.length === 0 ? (
             <Box sx={{ textAlign: "center", py: 5 }}>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                 Nenhum curso com período de execução definido.
               </Typography>
               <Typography variant="caption" color="text.disabled">
-                Defina datas de início e fim nos cursos para visualizar a timeline.
+                Os deadlines das etapas dos OAs definem o período de execução.
               </Typography>
             </Box>
           ) : (

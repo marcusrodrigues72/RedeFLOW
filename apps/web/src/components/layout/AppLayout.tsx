@@ -136,19 +136,26 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         {/* Perfil */}
         <Divider />
         <Box sx={{ p: 2, display: "flex", alignItems: "center", gap: 1.5 }}>
-          <Avatar
-            src={user?.fotoUrl ?? undefined}
-            sx={{ width: 34, height: 34, bgcolor: "primary.main", fontSize: "0.8125rem", fontWeight: 700 }}
+          <Box
+            component={Link} to="/perfil"
+            sx={{ display: "flex", alignItems: "center", gap: 1.5, flex: 1, minWidth: 0, textDecoration: "none",
+              borderRadius: 2, px: 1, py: 0.5, mx: -1,
+              "&:hover": { bgcolor: "action.hover" }, transition: "background 0.15s" }}
           >
-            {user?.nome?.[0]?.toUpperCase()}
-          </Avatar>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography variant="body2" fontWeight={600} noWrap sx={{ fontSize: "0.8125rem" }}>
-              {user?.nome}
-            </Typography>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-              <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "#10b981" }} />
-              <Typography variant="caption" color="text.disabled" sx={{ fontSize: "0.7rem" }}>Online</Typography>
+            <Avatar
+              src={user?.fotoUrl ?? undefined}
+              sx={{ width: 34, height: 34, bgcolor: "primary.main", fontSize: "0.8125rem", fontWeight: 700 }}
+            >
+              {user?.nome?.[0]?.toUpperCase()}
+            </Avatar>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography variant="body2" fontWeight={600} noWrap sx={{ fontSize: "0.8125rem", color: "text.primary" }}>
+                {user?.nome}
+              </Typography>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "#10b981" }} />
+                <Typography variant="caption" color="text.disabled" sx={{ fontSize: "0.7rem" }}>Online</Typography>
+              </Box>
             </Box>
           </Box>
           <Tooltip title="Sair">
@@ -294,5 +301,6 @@ function getBreadcrumb(path: string): string {
   if (path.startsWith("/alocacao"))        return "REDEFLOW · ALOCAÇÃO DO TIME";
   if (path.startsWith("/oas/"))            return "REDEFLOW · OAs · DETALHE";
   if (path.startsWith("/admin/usuarios"))  return "REDEFLOW · EQUIPE";
+  if (path.startsWith("/perfil"))          return "REDEFLOW · MEU PERFIL";
   return "REDEFLOW";
 }

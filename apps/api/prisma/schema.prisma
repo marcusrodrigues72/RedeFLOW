@@ -75,10 +75,11 @@ model Usuario {
   senhaHash   String
   papelGlobal PapelGlobal @default(COLABORADOR)
   ativo       Boolean     @default(true)
-  fotoUrl     String?
-  mfaSecret   String?
-  mfaAtivo    Boolean     @default(false)
-  createdAt   DateTime    @default(now())
+  fotoUrl          String?
+  notifEmailAtivo  Boolean     @default(true)
+  mfaSecret        String?
+  mfaAtivo         Boolean     @default(false)
+  createdAt        DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
   refreshTokens              RefreshToken[]

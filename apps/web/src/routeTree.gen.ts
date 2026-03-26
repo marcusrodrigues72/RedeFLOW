@@ -13,6 +13,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
 import { Route as AuthedRelatoriosRouteImport } from './routes/_authed/relatorios'
+import { Route as AuthedPerfilRouteImport } from './routes/_authed/perfil'
 import { Route as AuthedMeuTrabalhoRouteImport } from './routes/_authed/meu-trabalho'
 import { Route as AuthedAlocacaoRouteImport } from './routes/_authed/alocacao'
 import { Route as AuthedCursosIndexRouteImport } from './routes/_authed/cursos/index'
@@ -39,6 +40,11 @@ const AuthedIndexRoute = AuthedIndexRouteImport.update({
 const AuthedRelatoriosRoute = AuthedRelatoriosRouteImport.update({
   id: '/relatorios',
   path: '/relatorios',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedPerfilRoute = AuthedPerfilRouteImport.update({
+  id: '/perfil',
+  path: '/perfil',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedMeuTrabalhoRoute = AuthedMeuTrabalhoRouteImport.update({
@@ -87,6 +93,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/alocacao': typeof AuthedAlocacaoRoute
   '/meu-trabalho': typeof AuthedMeuTrabalhoRoute
+  '/perfil': typeof AuthedPerfilRoute
   '/relatorios': typeof AuthedRelatoriosRoute
   '/admin/usuarios': typeof AuthedAdminUsuariosRoute
   '/cursos/$cursoId': typeof AuthedCursosCursoIdRoute
@@ -99,6 +106,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/alocacao': typeof AuthedAlocacaoRoute
   '/meu-trabalho': typeof AuthedMeuTrabalhoRoute
+  '/perfil': typeof AuthedPerfilRoute
   '/relatorios': typeof AuthedRelatoriosRoute
   '/': typeof AuthedIndexRoute
   '/admin/usuarios': typeof AuthedAdminUsuariosRoute
@@ -114,6 +122,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_authed/alocacao': typeof AuthedAlocacaoRoute
   '/_authed/meu-trabalho': typeof AuthedMeuTrabalhoRoute
+  '/_authed/perfil': typeof AuthedPerfilRoute
   '/_authed/relatorios': typeof AuthedRelatoriosRoute
   '/_authed/': typeof AuthedIndexRoute
   '/_authed/admin/usuarios': typeof AuthedAdminUsuariosRoute
@@ -130,6 +139,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/alocacao'
     | '/meu-trabalho'
+    | '/perfil'
     | '/relatorios'
     | '/admin/usuarios'
     | '/cursos/$cursoId'
@@ -142,6 +152,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/alocacao'
     | '/meu-trabalho'
+    | '/perfil'
     | '/relatorios'
     | '/'
     | '/admin/usuarios'
@@ -156,6 +167,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/_authed/alocacao'
     | '/_authed/meu-trabalho'
+    | '/_authed/perfil'
     | '/_authed/relatorios'
     | '/_authed/'
     | '/_authed/admin/usuarios'
@@ -199,6 +211,13 @@ declare module '@tanstack/react-router' {
       path: '/relatorios'
       fullPath: '/relatorios'
       preLoaderRoute: typeof AuthedRelatoriosRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/perfil': {
+      id: '/_authed/perfil'
+      path: '/perfil'
+      fullPath: '/perfil'
+      preLoaderRoute: typeof AuthedPerfilRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/meu-trabalho': {
@@ -263,6 +282,7 @@ declare module '@tanstack/react-router' {
 interface AuthedRouteChildren {
   AuthedAlocacaoRoute: typeof AuthedAlocacaoRoute
   AuthedMeuTrabalhoRoute: typeof AuthedMeuTrabalhoRoute
+  AuthedPerfilRoute: typeof AuthedPerfilRoute
   AuthedRelatoriosRoute: typeof AuthedRelatoriosRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
   AuthedAdminUsuariosRoute: typeof AuthedAdminUsuariosRoute
@@ -276,6 +296,7 @@ interface AuthedRouteChildren {
 const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAlocacaoRoute: AuthedAlocacaoRoute,
   AuthedMeuTrabalhoRoute: AuthedMeuTrabalhoRoute,
+  AuthedPerfilRoute: AuthedPerfilRoute,
   AuthedRelatoriosRoute: AuthedRelatoriosRoute,
   AuthedIndexRoute: AuthedIndexRoute,
   AuthedAdminUsuariosRoute: AuthedAdminUsuariosRoute,

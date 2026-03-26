@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { CursoResumo, CursoDetalhe, DashboardStats, ImportPreview, ImportResult, MIPreview, MIResult, OADetalhe, EtapaOADetalhe, ComentarioOA, DashboardDetalheTipo, DashboardDetalheOA, DashboardDetalheAtraso, AtribuicaoPreview, AtribuicaoResult, AuditLogEntry } from "shared";
+import type { CursoResumo, CursoDetalhe, DashboardStats, ImportPreview, ImportResult, MIPreview, MIResult, OADetalhe, EtapaOADetalhe, ComentarioOA, DashboardDetalheTipo, DashboardDetalheOA, DashboardDetalheAtraso, AtribuicaoPreview, AtribuicaoResult, AuditLogEntry, UsuarioPublico } from "shared";
+import { useAuthStore } from "@/stores/auth.store";
 
 // ─── Keys ─────────────────────────────────────────────────────────────────────
 export const cursoKeys = {
@@ -333,5 +334,24 @@ export function useImportarConfirmar(cursoId: string) {
       qc.invalidateQueries({ queryKey: cursoKeys.list() });
       qc.invalidateQueries({ queryKey: cursoKeys.stats() });
     },
+  });
+}
+
+// ─── Perfil do usuário ────────────────────────────────────────────────────────
+
+export interface AtualizarPerfilPayload {
+  nome?:            string;
+  email?:           string;
+  senhaAtual?:      string;
+  novaSenha?:       string;
+  notifEmailAtivo?: boolean;
+}
+
+export function useAtualizarPerfil() {
+  const setUser = useAuthStore((s) => s.setUser);
+  return useMutation({
+    mutationFn: (data: AtualizarPerfilPayload) =>
+      api.patch<UsuarioPublico>("/auth/me", data).then((r) => r.data),
+    onSuccess: (updated) => setUser(updated),
   });
 }
