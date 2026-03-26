@@ -8,55 +8,68 @@ router.use(authenticate);
 // GET /relatorios/progresso-cursos
 router.get("/progresso-cursos", async (req, res, next) => {
   try {
-    const usuarioId  = req.usuario!.sub;
-    const isAdmin    = req.usuario!.papel === "ADMIN";
-    const cursosWhere = isAdmin ? {} : { membros: { some: { usuarioId } } };
+    const usuarioId = req.usuario!.sub;
+    const isAdmin   = req.usuario!.papel === "ADMIN";
 
+    // Busca cursos acessíveis
     const cursos = await prisma.curso.findMany({
-      where: cursosWhere,
+      where: isAdmin ? {} : { membros: { some: { usuarioId } } },
       select: { id: true, nome: true, codigo: true, status: true },
       orderBy: { nome: "asc" },
     });
 
-    const result = await Promise.all(cursos.map(async (curso) => {
-      const oaWhere    = { capitulo: { unidade: { cursoId: curso.id } } };
-      const etapaWhere = { oa: { capitulo: { unidade: { cursoId: curso.id } } } };
+    if (cursos.length === 0) { res.json([]); return; }
 
-      const [total, concluidos, atrasados, etapaAggregate, maxOA] = await Promise.all([
-        prisma.objetoAprendizagem.count({ where: oaWhere }),
-        prisma.objetoAprendizagem.count({ where: { status: "CONCLUIDO", ...oaWhere } }),
-        prisma.etapaOA.count({
-          where: {
-            status: { in: ["PENDENTE", "EM_ANDAMENTO"] },
-            deadlinePrevisto: { lt: new Date() },
-            ...etapaWhere,
-          },
-        }),
-        // Busca mínimo e máximo de deadlinePrevisto em uma única aggregate
-        prisma.etapaOA.aggregate({
-          where: { deadlinePrevisto: { not: null }, ...etapaWhere },
-          _min:  { deadlinePrevisto: true },
-          _max:  { deadlinePrevisto: true },
-        }),
-        prisma.objetoAprendizagem.aggregate({
-          where: { deadlineFinal: { not: null }, ...oaWhere },
-          _max:  { deadlineFinal: true },
-        }),
-      ]);
+    const cursoIds = cursos.map((c) => c.id);
 
-      // Usa deadlineFinal dos OAs como data fim; fallback para o maior deadlinePrevisto de etapa
-      const dataFim = maxOA._max.deadlineFinal ?? etapaAggregate._max.deadlinePrevisto;
+    // Uma única query SQL agrega todos os dados por curso
+    type AggRow = {
+      cursoId:      string;
+      total:        bigint;
+      concluidos:   bigint;
+      atrasados:    bigint;
+      minDeadline:  Date | null;
+      maxDeadline:  Date | null;
+      maxFinal:     Date | null;
+    };
+
+    const aggs = await prisma.$queryRaw<AggRow[]>`
+      SELECT
+        u."cursoId",
+        COUNT(DISTINCT oa.id)                                                        AS total,
+        COUNT(DISTINCT CASE WHEN oa.status = 'CONCLUIDO'           THEN oa.id END)  AS concluidos,
+        COUNT(DISTINCT CASE WHEN e.status IN ('PENDENTE','EM_ANDAMENTO')
+                             AND e."deadlinePrevisto" < NOW()       THEN e.id  END)  AS atrasados,
+        MIN(e."deadlinePrevisto")                                                    AS "minDeadline",
+        MAX(e."deadlinePrevisto")                                                    AS "maxDeadline",
+        MAX(oa."deadlineFinal")                                                      AS "maxFinal"
+      FROM       "unidades"               u
+      JOIN       "capitulos"              c  ON c."unidadeId"  = u.id
+      JOIN       "objetos_aprendizagem"   oa ON oa."capituloId" = c.id
+      LEFT JOIN  "etapas_oa"             e  ON e."oaId"        = oa.id
+      WHERE u."cursoId" = ANY(${cursoIds})
+      GROUP BY u."cursoId"
+    `;
+
+    const aggMap = new Map(aggs.map((r) => [r.cursoId, r]));
+
+    const result = cursos.map((curso) => {
+      const agg       = aggMap.get(curso.id);
+      const total     = Number(agg?.total     ?? 0);
+      const concluidos = Number(agg?.concluidos ?? 0);
+      const atrasados  = Number(agg?.atrasados  ?? 0);
+      const dataFim    = agg?.maxFinal ?? agg?.maxDeadline ?? null;
 
       return {
         ...curso,
-        totalOAs:            total,
-        oasConcluidos:       concluidos,
-        oasAtrasados:        atrasados,
-        progressoPct:        total > 0 ? Math.round((concluidos / total) * 100) : 0,
-        dataInicioEstimada:  etapaAggregate._min.deadlinePrevisto?.toISOString() ?? null,
-        dataFimEstimada:     dataFim?.toISOString() ?? null,
+        totalOAs:           total,
+        oasConcluidos:      concluidos,
+        oasAtrasados:       atrasados,
+        progressoPct:       total > 0 ? Math.round((concluidos / total) * 100) : 0,
+        dataInicioEstimada: agg?.minDeadline?.toISOString() ?? null,
+        dataFimEstimada:    dataFim?.toISOString()          ?? null,
       };
-    }));
+    });
 
     res.json(result);
   } catch (err) { next(err); }
