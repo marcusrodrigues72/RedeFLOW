@@ -3,6 +3,96 @@ import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
+// ─── Pipeline por tipo de OA ───────────────────────────────────────────────────
+//
+// VIDEO      : Conteudista(roteiro) → DI Valida → Gravação → Edição(vídeo) → Validação Final
+// SLIDE/EBOOK: Conteudista(preliminar) → DI Valida → Acessibilidade → Diagramação(final) → Validação Final
+// Demais     : Conteudista(preliminar) → DI Valida → Acessibilidade → Diagramação(final) → Validação Final
+//
+type TipoOA = "VIDEO" | "SLIDE" | "EBOOK" | "QUIZ" | "PLANO_AULA" | "TAREFA" | "INFOGRAFICO" | "TIMELINE";
+type PapelEtapa =
+  | "CONTEUDISTA" | "DESIGNER_INSTRUCIONAL" | "PROFESSOR_ATOR" | "PROFESSOR_TECNICO"
+  | "ACESSIBILIDADE" | "EDITOR_VIDEO" | "DESIGNER_GRAFICO" | "PRODUTOR_FINAL" | "VALIDADOR_FINAL";
+
+interface EtapaDef {
+  id:          string;
+  nome:        string;
+  papel:       PapelEtapa;
+  ordem:       number;
+  tipoOA:      TipoOA | null;
+  obrigatorio: boolean;
+  temArtefato: boolean;
+}
+
+const PIPELINE: EtapaDef[] = [
+  // ── VIDEO ──────────────────────────────────────────────────────────────────
+  { id: "seed-video-1-conteudista",    nome: "Produção de Conteúdo",      papel: "CONTEUDISTA",           ordem: 1, tipoOA: "VIDEO",     obrigatorio: true, temArtefato: true  },
+  { id: "seed-video-2-di",             nome: "Validação DI",              papel: "DESIGNER_INSTRUCIONAL", ordem: 2, tipoOA: "VIDEO",     obrigatorio: true, temArtefato: false },
+  { id: "seed-video-3-gravacao",       nome: "Gravação",                  papel: "PROFESSOR_ATOR",        ordem: 3, tipoOA: "VIDEO",     obrigatorio: true, temArtefato: false },
+  { id: "seed-video-4-edicao",         nome: "Edição de Vídeo",           papel: "EDITOR_VIDEO",          ordem: 4, tipoOA: "VIDEO",     obrigatorio: true, temArtefato: true  },
+  { id: "seed-video-5-validacao",      nome: "Validação Final",           papel: "VALIDADOR_FINAL",       ordem: 5, tipoOA: "VIDEO",     obrigatorio: true, temArtefato: false },
+
+  // ── SLIDE ──────────────────────────────────────────────────────────────────
+  { id: "seed-slide-1-conteudista",    nome: "Produção de Conteúdo",      papel: "CONTEUDISTA",           ordem: 1, tipoOA: "SLIDE",     obrigatorio: true, temArtefato: true  },
+  { id: "seed-slide-2-di",             nome: "Validação DI",              papel: "DESIGNER_INSTRUCIONAL", ordem: 2, tipoOA: "SLIDE",     obrigatorio: true, temArtefato: false },
+  { id: "seed-slide-3-acessibilidade", nome: "Acessibilidade",            papel: "ACESSIBILIDADE",        ordem: 3, tipoOA: "SLIDE",     obrigatorio: true, temArtefato: false },
+  { id: "seed-slide-4-diagramacao",    nome: "Diagramação",               papel: "DESIGNER_GRAFICO",      ordem: 4, tipoOA: "SLIDE",     obrigatorio: true, temArtefato: true  },
+  { id: "seed-slide-5-validacao",      nome: "Validação Final",           papel: "VALIDADOR_FINAL",       ordem: 5, tipoOA: "SLIDE",     obrigatorio: true, temArtefato: false },
+
+  // ── EBOOK ──────────────────────────────────────────────────────────────────
+  { id: "seed-ebook-1-conteudista",    nome: "Produção de Conteúdo",      papel: "CONTEUDISTA",           ordem: 1, tipoOA: "EBOOK",     obrigatorio: true, temArtefato: true  },
+  { id: "seed-ebook-2-di",             nome: "Validação DI",              papel: "DESIGNER_INSTRUCIONAL", ordem: 2, tipoOA: "EBOOK",     obrigatorio: true, temArtefato: false },
+  { id: "seed-ebook-3-acessibilidade", nome: "Acessibilidade",            papel: "ACESSIBILIDADE",        ordem: 3, tipoOA: "EBOOK",     obrigatorio: true, temArtefato: false },
+  { id: "seed-ebook-4-diagramacao",    nome: "Diagramação",               papel: "DESIGNER_GRAFICO",      ordem: 4, tipoOA: "EBOOK",     obrigatorio: true, temArtefato: true  },
+  { id: "seed-ebook-5-validacao",      nome: "Validação Final",           papel: "VALIDADOR_FINAL",       ordem: 5, tipoOA: "EBOOK",     obrigatorio: true, temArtefato: false },
+
+  // ── QUIZ ───────────────────────────────────────────────────────────────────
+  { id: "seed-quiz-1-conteudista",     nome: "Produção de Conteúdo",      papel: "CONTEUDISTA",           ordem: 1, tipoOA: "QUIZ",      obrigatorio: true, temArtefato: true  },
+  { id: "seed-quiz-2-di",              nome: "Validação DI",              papel: "DESIGNER_INSTRUCIONAL", ordem: 2, tipoOA: "QUIZ",      obrigatorio: true, temArtefato: false },
+  { id: "seed-quiz-3-acessibilidade",  nome: "Acessibilidade",            papel: "ACESSIBILIDADE",        ordem: 3, tipoOA: "QUIZ",      obrigatorio: true, temArtefato: false },
+  { id: "seed-quiz-4-diagramacao",     nome: "Diagramação",               papel: "DESIGNER_GRAFICO",      ordem: 4, tipoOA: "QUIZ",      obrigatorio: true, temArtefato: true  },
+  { id: "seed-quiz-5-validacao",       nome: "Validação Final",           papel: "VALIDADOR_FINAL",       ordem: 5, tipoOA: "QUIZ",      obrigatorio: true, temArtefato: false },
+
+  // ── INFOGRAFICO ────────────────────────────────────────────────────────────
+  { id: "seed-info-1-conteudista",     nome: "Produção de Conteúdo",      papel: "CONTEUDISTA",           ordem: 1, tipoOA: "INFOGRAFICO", obrigatorio: true, temArtefato: true  },
+  { id: "seed-info-2-di",              nome: "Validação DI",              papel: "DESIGNER_INSTRUCIONAL", ordem: 2, tipoOA: "INFOGRAFICO", obrigatorio: true, temArtefato: false },
+  { id: "seed-info-3-acessibilidade",  nome: "Acessibilidade",            papel: "ACESSIBILIDADE",        ordem: 3, tipoOA: "INFOGRAFICO", obrigatorio: true, temArtefato: false },
+  { id: "seed-info-4-diagramacao",     nome: "Diagramação",               papel: "DESIGNER_GRAFICO",      ordem: 4, tipoOA: "INFOGRAFICO", obrigatorio: true, temArtefato: true  },
+  { id: "seed-info-5-validacao",       nome: "Validação Final",           papel: "VALIDADOR_FINAL",       ordem: 5, tipoOA: "INFOGRAFICO", obrigatorio: true, temArtefato: false },
+
+  // ── TIMELINE ───────────────────────────────────────────────────────────────
+  { id: "seed-timeline-1-conteudista",    nome: "Produção de Conteúdo",   papel: "CONTEUDISTA",           ordem: 1, tipoOA: "TIMELINE",  obrigatorio: true, temArtefato: true  },
+  { id: "seed-timeline-2-di",             nome: "Validação DI",           papel: "DESIGNER_INSTRUCIONAL", ordem: 2, tipoOA: "TIMELINE",  obrigatorio: true, temArtefato: false },
+  { id: "seed-timeline-3-acessibilidade", nome: "Acessibilidade",         papel: "ACESSIBILIDADE",        ordem: 3, tipoOA: "TIMELINE",  obrigatorio: true, temArtefato: false },
+  { id: "seed-timeline-4-diagramacao",    nome: "Diagramação",            papel: "DESIGNER_GRAFICO",      ordem: 4, tipoOA: "TIMELINE",  obrigatorio: true, temArtefato: true  },
+  { id: "seed-timeline-5-validacao",      nome: "Validação Final",        papel: "VALIDADOR_FINAL",       ordem: 5, tipoOA: "TIMELINE",  obrigatorio: true, temArtefato: false },
+
+  // ── TAREFA ─────────────────────────────────────────────────────────────────
+  { id: "seed-tarefa-1-conteudista",   nome: "Produção de Conteúdo",      papel: "CONTEUDISTA",           ordem: 1, tipoOA: "TAREFA",    obrigatorio: true, temArtefato: true  },
+  { id: "seed-tarefa-2-di",            nome: "Validação DI",              papel: "DESIGNER_INSTRUCIONAL", ordem: 2, tipoOA: "TAREFA",    obrigatorio: true, temArtefato: false },
+  { id: "seed-tarefa-3-acessibilidade",nome: "Acessibilidade",            papel: "ACESSIBILIDADE",        ordem: 3, tipoOA: "TAREFA",    obrigatorio: true, temArtefato: false },
+  { id: "seed-tarefa-4-diagramacao",   nome: "Diagramação",               papel: "DESIGNER_GRAFICO",      ordem: 4, tipoOA: "TAREFA",    obrigatorio: true, temArtefato: true  },
+  { id: "seed-tarefa-5-validacao",     nome: "Validação Final",           papel: "VALIDADOR_FINAL",       ordem: 5, tipoOA: "TAREFA",    obrigatorio: true, temArtefato: false },
+
+  // ── PLANO_AULA ─────────────────────────────────────────────────────────────
+  { id: "seed-plano-1-conteudista",    nome: "Produção de Conteúdo",      papel: "CONTEUDISTA",           ordem: 1, tipoOA: "PLANO_AULA", obrigatorio: true, temArtefato: true  },
+  { id: "seed-plano-2-di",             nome: "Validação DI",              papel: "DESIGNER_INSTRUCIONAL", ordem: 2, tipoOA: "PLANO_AULA", obrigatorio: true, temArtefato: false },
+  { id: "seed-plano-3-acessibilidade", nome: "Acessibilidade",            papel: "ACESSIBILIDADE",        ordem: 3, tipoOA: "PLANO_AULA", obrigatorio: true, temArtefato: false },
+  { id: "seed-plano-4-diagramacao",    nome: "Diagramação",               papel: "DESIGNER_GRAFICO",      ordem: 4, tipoOA: "PLANO_AULA", obrigatorio: true, temArtefato: true  },
+  { id: "seed-plano-5-validacao",      nome: "Validação Final",           papel: "VALIDADOR_FINAL",       ordem: 5, tipoOA: "PLANO_AULA", obrigatorio: true, temArtefato: false },
+];
+
+// IDs das antigas etapas globais (criadas pelo seed anterior) — serão desativadas
+const OLD_GLOBAL_IDS = [
+  "seed-conteudista-global",
+  "seed-designer_instrucional-global",
+  "seed-professor_tecnico-global",
+  "seed-acessibilidade-global",
+  "seed-produtor_final-global",
+  "seed-validador_final-global",
+  "seed-professor_ator-video",
+];
+
 async function main() {
   console.log("🌱 Iniciando seed do banco de dados...\n");
 
@@ -30,58 +120,25 @@ async function main() {
 
   console.log(`✅ Usuários criados: ${admin.nome}, ${di.nome}, ${conteudista.nome}`);
 
-  // ─── Pipeline padrão (EtapaDefinicao) ───────────────────────────────────────
-  // Etapas globais (aplicam a todos os tipos de OA)
-  const etapasGlobais = [
-    { nome: "Conteudista",           papel: "CONTEUDISTA",             ordem: 1, tipoOA: null },
-    { nome: "Designer Instrucional", papel: "DESIGNER_INSTRUCIONAL",   ordem: 2, tipoOA: null },
-    { nome: "Revisão Técnica",       papel: "PROFESSOR_TECNICO",       ordem: 4, tipoOA: null },
-    { nome: "Acessibilidade",        papel: "ACESSIBILIDADE",          ordem: 5, tipoOA: null },
-    { nome: "Produção Final",        papel: "PRODUTOR_FINAL",          ordem: 6, tipoOA: null },
-    { nome: "Validação Final",       papel: "VALIDADOR_FINAL",         ordem: 7, tipoOA: null },
-  ];
+  // ─── Desativa etapas globais legadas ────────────────────────────────────────
+  for (const id of OLD_GLOBAL_IDS) {
+    await prisma.etapaDefinicao.updateMany({ where: { id }, data: { ativo: false } });
+  }
 
-  // Etapa exclusiva de vídeo (Gravação — entre DI e Rev. Técnica)
-  const etapaGravacao = {
-    nome: "Gravação",
-    papel: "PROFESSOR_ATOR",
-    ordem: 3,
-    tipoOA: "VIDEO" as const,
-  };
-
-  for (const etapa of etapasGlobais) {
+  // ─── Pipeline por tipo de OA ─────────────────────────────────────────────────
+  for (const etapa of PIPELINE) {
     await prisma.etapaDefinicao.upsert({
-      where: {
-        id: `seed-${etapa.papel.toLowerCase()}-global`,
-      },
-      update: {},
-      create: {
-        id: `seed-${etapa.papel.toLowerCase()}-global`,
-        nome: etapa.nome,
-        papel: etapa.papel as any,
-        ordem: etapa.ordem,
-        tipoOA: null,
-        obrigatorio: true,
-        ativo: true,
-      },
+      where:  { id: etapa.id },
+      update: { nome: etapa.nome, papel: etapa.papel as any, ordem: etapa.ordem,
+                tipoOA: etapa.tipoOA as any, obrigatorio: etapa.obrigatorio,
+                temArtefato: etapa.temArtefato, ativo: true },
+      create: { id: etapa.id, nome: etapa.nome, papel: etapa.papel as any, ordem: etapa.ordem,
+                tipoOA: etapa.tipoOA as any, obrigatorio: etapa.obrigatorio,
+                temArtefato: etapa.temArtefato, ativo: true },
     });
   }
 
-  await prisma.etapaDefinicao.upsert({
-    where: { id: "seed-professor_ator-video" },
-    update: {},
-    create: {
-      id: "seed-professor_ator-video",
-      nome: etapaGravacao.nome,
-      papel: etapaGravacao.papel as any,
-      ordem: etapaGravacao.ordem,
-      tipoOA: etapaGravacao.tipoOA,
-      obrigatorio: true,
-      ativo: true,
-    },
-  });
-
-  console.log("✅ Pipeline padrão (7 etapas) configurado.");
+  console.log(`✅ Pipeline configurado: ${PIPELINE.length} etapas distribuídas por tipo de OA.`);
 
   // ─── Resumo ─────────────────────────────────────────────────────────────────
   console.log("\n📋 Credenciais de acesso:");

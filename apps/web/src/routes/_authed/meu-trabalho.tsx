@@ -17,12 +17,14 @@ export const Route = createFileRoute("/_authed/meu-trabalho")({
 // ─── Configs ──────────────────────────────────────────────────────────────────
 
 const TIPO_CONFIG: Record<TipoOA, { label: string; color: string }> = {
-  VIDEO:      { label: "Vídeo",         color: "#2b7cee" },
-  SLIDE:      { label: "Slide",         color: "#7c3aed" },
-  QUIZ:       { label: "Quiz",          color: "#0891b2" },
-  EBOOK:      { label: "E-book",        color: "#059669" },
-  PLANO_AULA: { label: "Plano de Aula", color: "#d97706" },
-  TAREFA:     { label: "Tarefa",        color: "#dc2626" },
+  VIDEO:       { label: "Vídeo",         color: "#2b7cee" },
+  SLIDE:       { label: "Slide",         color: "#7c3aed" },
+  QUIZ:        { label: "Quiz",          color: "#0891b2" },
+  EBOOK:       { label: "E-book",        color: "#059669" },
+  PLANO_AULA:  { label: "Plano de Aula", color: "#d97706" },
+  TAREFA:      { label: "Tarefa",        color: "#dc2626" },
+  INFOGRAFICO: { label: "Infográfico",   color: "#7e22ce" },
+  TIMELINE:    { label: "Timeline",      color: "#0f766e" },
 };
 
 const ETAPA_STATUS: Record<StatusEtapa, { label: string; color: string; bg: string }> = {

@@ -32,13 +32,14 @@ export class OAController {
   // PATCH /oas/:id/etapas/:etapaId
   atualizarEtapa = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { status, responsavelId, responsavelSecundarioId, deadlineReal, deadlinePrevisto, recalcularSequencia } = req.body as {
+      const { status, responsavelId, responsavelSecundarioId, deadlineReal, deadlinePrevisto, recalcularSequencia, linkArtefato } = req.body as {
         status?: string;
         responsavelId?: string | null;
         responsavelSecundarioId?: string | null;
         deadlineReal?: string | null;
         deadlinePrevisto?: string | null;
         recalcularSequencia?: boolean;
+        linkArtefato?: string | null;
       };
 
       // Verifica se o usuário é ADMIN (global ou do curso) — usado em múltiplas regras abaixo
@@ -106,6 +107,7 @@ export class OAController {
         responsavelSecundarioId,
         deadlineReal:     deadlineReal     ? new Date(deadlineReal)     : deadlineReal     === null ? null : undefined,
         deadlinePrevisto: deadlinePrevisto ? new Date(deadlinePrevisto) : deadlinePrevisto === null ? null : undefined,
+        linkArtefato:     linkArtefato !== undefined ? linkArtefato : undefined,
       });
 
       // Grava audit log com as mudanças realizadas

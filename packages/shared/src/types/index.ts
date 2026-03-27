@@ -3,8 +3,9 @@
 export type PapelGlobal = "ADMIN" | "COLABORADOR" | "LEITOR";
 export type PapelEtapa  =
   | "CONTEUDISTA" | "DESIGNER_INSTRUCIONAL" | "PROFESSOR_ATOR"
-  | "PROFESSOR_TECNICO" | "ACESSIBILIDADE" | "PRODUTOR_FINAL" | "VALIDADOR_FINAL";
-export type TipoOA = "VIDEO" | "SLIDE" | "QUIZ" | "EBOOK" | "PLANO_AULA" | "TAREFA";
+  | "PROFESSOR_TECNICO" | "ACESSIBILIDADE" | "EDITOR_VIDEO" | "DESIGNER_GRAFICO"
+  | "PRODUTOR_FINAL" | "VALIDADOR_FINAL";
+export type TipoOA = "VIDEO" | "SLIDE" | "QUIZ" | "EBOOK" | "PLANO_AULA" | "TAREFA" | "INFOGRAFICO" | "TIMELINE";
 export type StatusOA = "PENDENTE" | "EM_ANDAMENTO" | "BLOQUEADO" | "CONCLUIDO";
 export type StatusEtapa = "PENDENTE" | "EM_ANDAMENTO" | "CONCLUIDA" | "BLOQUEADA";
 export type StatusCurso = "RASCUNHO" | "ATIVO" | "ARQUIVADO";
@@ -115,11 +116,12 @@ export interface EtapaOADetalhe {
   deadlinePrevisto: string | null;
   deadlineReal: string | null;
   bloqueada: boolean;
+  linkArtefato: string | null;
   responsavel: UsuarioPublico | null;
   responsavelId: string | null;
   responsavelSecundario: UsuarioPublico | null;
   responsavelSecundarioId: string | null;
-  etapaDef: { id: string; nome: string; papel: string };
+  etapaDef: { id: string; nome: string; papel: string; temArtefato: boolean };
 }
 
 export interface OADetalhe {

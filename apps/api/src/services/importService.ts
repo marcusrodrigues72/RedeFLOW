@@ -480,6 +480,7 @@ export async function persistMC(rows: MCRow[], cursoId: string): Promise<{ criad
 
 const TIPO_LETRA: Record<string, string> = {
   VIDEO: "V", SLIDE: "S", QUIZ: "Q", EBOOK: "E", PLANO_AULA: "P", TAREFA: "T",
+  INFOGRAFICO: "I", TIMELINE: "L",
 };
 
 const BLOOM_MAP: Record<string, string> = {
@@ -863,15 +864,22 @@ export async function persistMI(caps: MICapitulo[], cursoId: string, options: { 
           });
 
           // Cria etapas do pipeline com deadlines calculados
-          const etapasParaCriar = [
-            { papel: "CONTEUDISTA",           ordem: 1 },
-            { papel: "DESIGNER_INSTRUCIONAL", ordem: 2 },
-            ...(def.tipo === "VIDEO" ? [{ papel: "PROFESSOR_ATOR", ordem: 3 }] : []),
-            { papel: "PROFESSOR_TECNICO",     ordem: 4 },
-            { papel: "ACESSIBILIDADE",        ordem: 5 },
-            { papel: "PRODUTOR_FINAL",        ordem: 6 },
-            { papel: "VALIDADOR_FINAL",       ordem: 7 },
-          ];
+          // Pipeline por tipo: VIDEO tem gravação+edição; demais têm acessibilidade+diagramação
+          const etapasParaCriar = def.tipo === "VIDEO"
+            ? [
+                { papel: "CONTEUDISTA",           ordem: 1 },
+                { papel: "DESIGNER_INSTRUCIONAL", ordem: 2 },
+                { papel: "PROFESSOR_ATOR",        ordem: 3 },
+                { papel: "EDITOR_VIDEO",          ordem: 4 },
+                { papel: "VALIDADOR_FINAL",       ordem: 5 },
+              ]
+            : [
+                { papel: "CONTEUDISTA",           ordem: 1 },
+                { papel: "DESIGNER_INSTRUCIONAL", ordem: 2 },
+                { papel: "ACESSIBILIDADE",        ordem: 3 },
+                { papel: "DESIGNER_GRAFICO",      ordem: 4 },
+                { papel: "VALIDADOR_FINAL",       ordem: 5 },
+              ];
 
           for (const etapa of etapasParaCriar) {
             const etapaDef = getEtapaDef(etapa.papel, def.tipo);

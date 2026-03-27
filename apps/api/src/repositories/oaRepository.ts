@@ -89,6 +89,7 @@ export const oaRepository = {
     responsavelSecundarioId?: string | null | undefined;
     deadlineReal?: Date | null | undefined;
     deadlinePrevisto?: Date | null | undefined;
+    linkArtefato?: string | null | undefined;
   }) {
     return prisma.etapaOA.update({
       where: { id: etapaId },
@@ -98,6 +99,7 @@ export const oaRepository = {
         ...(data.responsavelSecundarioId   !== undefined ? { responsavelSecundarioId:   data.responsavelSecundarioId     } : {}),
         ...(data.deadlineReal              !== undefined ? { deadlineReal:              data.deadlineReal                } : {}),
         ...(data.deadlinePrevisto          !== undefined ? { deadlinePrevisto:          data.deadlinePrevisto            } : {}),
+        ...(data.linkArtefato              !== undefined ? { linkArtefato:              data.linkArtefato                } : {}),
       },
       include: etapasInclude,
     });

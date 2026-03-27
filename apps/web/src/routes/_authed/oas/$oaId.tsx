@@ -14,6 +14,8 @@ import DeleteOutlineIcon        from "@mui/icons-material/DeleteOutline";
 import EditCalendarIcon         from "@mui/icons-material/EditCalendar";
 import CheckIcon                from "@mui/icons-material/Check";
 import CloseIcon                from "@mui/icons-material/Close";
+import LinkIcon                 from "@mui/icons-material/Link";
+import EditIcon                 from "@mui/icons-material/Edit";
 import { useState }             from "react";
 import { useOA, useAtualizarEtapa, useComentariosOA, useAdicionarComentario, useExcluirComentario, useAuditLogOA } from "@/lib/api/cursos";
 import { useAuthStore }         from "@/stores/auth.store";
@@ -31,12 +33,14 @@ const STATUS_OA_CONFIG: Record<StatusOA, { label: string; color: string; bg: str
 };
 
 const TIPO_CONFIG: Record<TipoOA, { label: string; color: string }> = {
-  VIDEO:      { label: "Vídeo",         color: "#2b7cee" },
-  SLIDE:      { label: "Slide",         color: "#7c3aed" },
-  QUIZ:       { label: "Quiz",          color: "#0891b2" },
-  EBOOK:      { label: "E-book",        color: "#059669" },
-  PLANO_AULA: { label: "Plano de Aula", color: "#d97706" },
-  TAREFA:     { label: "Tarefa",        color: "#dc2626" },
+  VIDEO:       { label: "Vídeo",         color: "#2b7cee" },
+  SLIDE:       { label: "Slide",         color: "#7c3aed" },
+  QUIZ:        { label: "Quiz",          color: "#0891b2" },
+  EBOOK:       { label: "E-book",        color: "#059669" },
+  PLANO_AULA:  { label: "Plano de Aula", color: "#d97706" },
+  TAREFA:      { label: "Tarefa",        color: "#dc2626" },
+  INFOGRAFICO: { label: "Infográfico",   color: "#7e22ce" },
+  TIMELINE:    { label: "Timeline",      color: "#0f766e" },
 };
 
 const STATUS_ETAPA: Record<StatusEtapa, { label: string; icon: React.ReactNode }> = {
@@ -159,14 +163,10 @@ function OADetalhePage() {
                             </Select>
                           </FormControl>
                           <FormControl size="small" sx={{ minWidth: 180 }}>
-                            <InputLabel>
-                              {etapa.etapaDef.papel === "PROFESSOR_ATOR" && oa.tipo === "VIDEO"
-                                ? "Professor Ator" : "Responsável"}
-                            </InputLabel>
+                            <InputLabel>Responsável</InputLabel>
                             <Select
                               value={etapa.responsavelId ?? ""}
-                              label={etapa.etapaDef.papel === "PROFESSOR_ATOR" && oa.tipo === "VIDEO"
-                                ? "Professor Ator" : "Responsável"}
+                              label="Responsável"
                               onChange={(e) => atualizarEtapa({
                                 etapaId: etapa.id,
                                 data: { responsavelId: e.target.value || null },
@@ -179,8 +179,8 @@ function OADetalhePage() {
                               ))}
                             </Select>
                           </FormControl>
-                          {/* Videomaker — apenas para etapa de Gravação (VIDEO + PROFESSOR_ATOR) */}
-                          {etapa.etapaDef.papel === "PROFESSOR_ATOR" && oa.tipo === "VIDEO" && (
+                          {/* Videomaker — apenas para etapa de Gravação (PROFESSOR_ATOR) */}
+                          {etapa.etapaDef.papel === "PROFESSOR_ATOR" && (
                             <FormControl size="small" sx={{ minWidth: 180 }}>
                               <InputLabel>Videomaker</InputLabel>
                               <Select
@@ -213,6 +213,14 @@ function OADetalhePage() {
                             </Button>
                           )}
                         </Box>
+                        {/* Link de artefato — exibido apenas para etapas que produzem entregável */}
+                        {etapa.etapaDef.temArtefato && (
+                          <ArtefatoInput
+                            etapa={etapa}
+                            isPending={isPending}
+                            onSave={(link) => atualizarEtapa({ etapaId: etapa.id, data: { linkArtefato: link } })}
+                          />
+                        )}
                       </StepContent>
                     )}
                   </Step>
@@ -547,6 +555,76 @@ function HistoricoItem({ log, isLast }: { log: AuditLogEntry; isLast: boolean })
           );
         })}
       </Box>
+    </Box>
+  );
+}
+
+// ─── Link de artefato (entregável da etapa) ───────────────────────────────────
+
+function ArtefatoInput({ etapa, isPending, onSave }: {
+  etapa: { linkArtefato: string | null; etapaDef: { nome: string } };
+  isPending: boolean;
+  onSave: (link: string | null) => void;
+}) {
+  const [editando, setEditando] = useState(false);
+  const [valor, setValor]       = useState(etapa.linkArtefato ?? "");
+
+  const handleAbrir = () => { setValor(etapa.linkArtefato ?? ""); setEditando(true); };
+  const handleSalvar = () => { onSave(valor.trim() || null); setEditando(false); };
+  const handleCancelar = () => setEditando(false);
+
+  return (
+    <Box sx={{ mt: 1.5, pt: 1.5, borderTop: "1px solid", borderColor: "divider" }}>
+      <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ display: "block", mb: 0.75 }}>
+        Link do artefato ({etapa.etapaDef.nome})
+      </Typography>
+      {editando ? (
+        <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+          <TextField
+            size="small" fullWidth autoFocus
+            placeholder="Cole aqui o link do entregável..."
+            value={valor}
+            onChange={(e) => setValor(e.target.value)}
+            disabled={isPending}
+            sx={{ "& .MuiInputBase-input": { fontSize: "0.8125rem" } }}
+          />
+          <Tooltip title="Salvar link">
+            <IconButton size="small" color="primary" onClick={handleSalvar} disabled={isPending}>
+              <CheckIcon sx={{ fontSize: 16 }} />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Cancelar">
+            <IconButton size="small" onClick={handleCancelar}>
+              <CloseIcon sx={{ fontSize: 16 }} />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      ) : etapa.linkArtefato ? (
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Button
+            href={etapa.linkArtefato} target="_blank" rel="noopener noreferrer"
+            startIcon={<LinkIcon sx={{ fontSize: 14 }} />}
+            size="small" variant="outlined"
+            sx={{ fontSize: "0.75rem", py: 0.25, textTransform: "none", maxWidth: 280,
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+          >
+            {etapa.linkArtefato}
+          </Button>
+          <Tooltip title="Editar link">
+            <IconButton size="small" onClick={handleAbrir} sx={{ color: "text.disabled" }}>
+              <EditIcon sx={{ fontSize: 14 }} />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      ) : (
+        <Button
+          size="small" variant="text" startIcon={<LinkIcon sx={{ fontSize: 14 }} />}
+          onClick={handleAbrir}
+          sx={{ fontSize: "0.75rem", color: "text.secondary", textTransform: "none" }}
+        >
+          Adicionar link do entregável
+        </Button>
+      )}
     </Box>
   );
 }
