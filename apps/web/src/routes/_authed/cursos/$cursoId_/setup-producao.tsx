@@ -300,8 +300,6 @@ function SetupOARow({ oa, tipoLabel, tipoColor, setupEtapa, matrizValidada, onSe
       return;
     }
 
-    const link = linkInput.trim() || oa.linkObjeto;
-
     const concluir = () =>
       atualizarEtapa({
         oaId:    oa.id,

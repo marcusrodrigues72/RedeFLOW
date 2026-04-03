@@ -21,6 +21,7 @@ import { Route as AuthedOasOaIdRouteImport } from './routes/_authed/oas/$oaId'
 import { Route as AuthedCursosImportarRouteImport } from './routes/_authed/cursos/importar'
 import { Route as AuthedCursosCursoIdRouteImport } from './routes/_authed/cursos/$cursoId'
 import { Route as AuthedAdminUsuariosRouteImport } from './routes/_authed/admin/usuarios'
+import { Route as AuthedCursosCursoIdSetupProducaoRouteImport } from './routes/_authed/cursos/$cursoId_/setup-producao'
 import { Route as AuthedCursosCursoIdOasRouteImport } from './routes/_authed/cursos/$cursoId_/oas'
 
 const LoginRoute = LoginRouteImport.update({
@@ -82,6 +83,12 @@ const AuthedAdminUsuariosRoute = AuthedAdminUsuariosRouteImport.update({
   path: '/admin/usuarios',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedCursosCursoIdSetupProducaoRoute =
+  AuthedCursosCursoIdSetupProducaoRouteImport.update({
+    id: '/cursos/$cursoId_/setup-producao',
+    path: '/cursos/$cursoId/setup-producao',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 const AuthedCursosCursoIdOasRoute = AuthedCursosCursoIdOasRouteImport.update({
   id: '/cursos/$cursoId_/oas',
   path: '/cursos/$cursoId/oas',
@@ -101,6 +108,7 @@ export interface FileRoutesByFullPath {
   '/oas/$oaId': typeof AuthedOasOaIdRoute
   '/cursos/': typeof AuthedCursosIndexRoute
   '/cursos/$cursoId/oas': typeof AuthedCursosCursoIdOasRoute
+  '/cursos/$cursoId/setup-producao': typeof AuthedCursosCursoIdSetupProducaoRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
@@ -115,6 +123,7 @@ export interface FileRoutesByTo {
   '/oas/$oaId': typeof AuthedOasOaIdRoute
   '/cursos': typeof AuthedCursosIndexRoute
   '/cursos/$cursoId/oas': typeof AuthedCursosCursoIdOasRoute
+  '/cursos/$cursoId/setup-producao': typeof AuthedCursosCursoIdSetupProducaoRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -131,6 +140,7 @@ export interface FileRoutesById {
   '/_authed/oas/$oaId': typeof AuthedOasOaIdRoute
   '/_authed/cursos/': typeof AuthedCursosIndexRoute
   '/_authed/cursos/$cursoId_/oas': typeof AuthedCursosCursoIdOasRoute
+  '/_authed/cursos/$cursoId_/setup-producao': typeof AuthedCursosCursoIdSetupProducaoRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -147,6 +157,7 @@ export interface FileRouteTypes {
     | '/oas/$oaId'
     | '/cursos/'
     | '/cursos/$cursoId/oas'
+    | '/cursos/$cursoId/setup-producao'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -161,6 +172,7 @@ export interface FileRouteTypes {
     | '/oas/$oaId'
     | '/cursos'
     | '/cursos/$cursoId/oas'
+    | '/cursos/$cursoId/setup-producao'
   id:
     | '__root__'
     | '/_authed'
@@ -176,6 +188,7 @@ export interface FileRouteTypes {
     | '/_authed/oas/$oaId'
     | '/_authed/cursos/'
     | '/_authed/cursos/$cursoId_/oas'
+    | '/_authed/cursos/$cursoId_/setup-producao'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -269,6 +282,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAdminUsuariosRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/cursos/$cursoId_/setup-producao': {
+      id: '/_authed/cursos/$cursoId_/setup-producao'
+      path: '/cursos/$cursoId/setup-producao'
+      fullPath: '/cursos/$cursoId/setup-producao'
+      preLoaderRoute: typeof AuthedCursosCursoIdSetupProducaoRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/cursos/$cursoId_/oas': {
       id: '/_authed/cursos/$cursoId_/oas'
       path: '/cursos/$cursoId/oas'
@@ -291,6 +311,7 @@ interface AuthedRouteChildren {
   AuthedOasOaIdRoute: typeof AuthedOasOaIdRoute
   AuthedCursosIndexRoute: typeof AuthedCursosIndexRoute
   AuthedCursosCursoIdOasRoute: typeof AuthedCursosCursoIdOasRoute
+  AuthedCursosCursoIdSetupProducaoRoute: typeof AuthedCursosCursoIdSetupProducaoRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
@@ -305,6 +326,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedOasOaIdRoute: AuthedOasOaIdRoute,
   AuthedCursosIndexRoute: AuthedCursosIndexRoute,
   AuthedCursosCursoIdOasRoute: AuthedCursosCursoIdOasRoute,
+  AuthedCursosCursoIdSetupProducaoRoute: AuthedCursosCursoIdSetupProducaoRoute,
 }
 
 const AuthedRouteWithChildren =
