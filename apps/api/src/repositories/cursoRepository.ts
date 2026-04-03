@@ -42,6 +42,8 @@ export class CursoRepository {
             },
           },
         },
+        coordenadorProducao: { select: { id: true, nome: true, fotoUrl: true } },
+        matrizValidadaPor:   { select: { id: true, nome: true } },
       },
     });
   }

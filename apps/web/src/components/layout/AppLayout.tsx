@@ -293,8 +293,9 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
 function getBreadcrumb(path: string): string {
   if (path === "/")                        return "REDEFLOW · DASHBOARD";
-  if (path.startsWith("/cursos/importar")) return "REDEFLOW · CURSOS · IMPORTAR";
-  if (path.startsWith("/cursos/"))         return "REDEFLOW · CURSOS · DETALHE";
+  if (path.startsWith("/cursos/importar"))         return "REDEFLOW · CURSOS · IMPORTAR";
+  if (path.includes("/setup-producao"))            return "REDEFLOW · CURSOS · SETUP DE PRODUÇÃO";
+  if (path.startsWith("/cursos/"))                 return "REDEFLOW · CURSOS · DETALHE";
   if (path.startsWith("/cursos"))          return "REDEFLOW · CURSOS";
   if (path.startsWith("/meu-trabalho"))    return "REDEFLOW · MEU TRABALHO";
   if (path.startsWith("/relatorios"))      return "REDEFLOW · RELATÓRIOS";

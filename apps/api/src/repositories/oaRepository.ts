@@ -15,7 +15,24 @@ export const oaRepository = {
         ...(filters.tipo   ? { tipo:   filters.tipo   as any } : {}),
       },
       include: {
-        capitulo: { include: { unidade: true } },
+        capitulo: {
+          include: {
+            unidade: {
+              include: {
+                curso: {
+                  include: {
+                    membros: {
+                      include: {
+                        usuario: { select: { id: true, nome: true, email: true, fotoUrl: true, papelGlobal: true } },
+                      },
+                    },
+                    coordenadorProducao: { select: { id: true, nome: true, fotoUrl: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
         etapas: { include: etapasInclude, orderBy: { ordem: "asc" } },
       },
       orderBy: [
@@ -83,6 +100,14 @@ export const oaRepository = {
     });
   },
 
+  updateOA(oaId: string, data: { linkObjeto?: string | null }) {
+    return prisma.objetoAprendizagem.update({
+      where: { id: oaId },
+      data,
+      select: { id: true, linkObjeto: true, linkObjetoFinal: true },
+    });
+  },
+
   updateEtapa(etapaId: string, data: {
     status?: string | undefined;
     responsavelId?: string | null | undefined;
@@ -90,6 +115,8 @@ export const oaRepository = {
     deadlineReal?: Date | null | undefined;
     deadlinePrevisto?: Date | null | undefined;
     linkArtefato?: string | null | undefined;
+    templateGerado?: boolean | undefined;
+    templateOrganizado?: boolean | undefined;
   }) {
     return prisma.etapaOA.update({
       where: { id: etapaId },
@@ -100,6 +127,8 @@ export const oaRepository = {
         ...(data.deadlineReal              !== undefined ? { deadlineReal:              data.deadlineReal                } : {}),
         ...(data.deadlinePrevisto          !== undefined ? { deadlinePrevisto:          data.deadlinePrevisto            } : {}),
         ...(data.linkArtefato              !== undefined ? { linkArtefato:              data.linkArtefato                } : {}),
+        ...(data.templateGerado            !== undefined ? { templateGerado:            data.templateGerado              } : {}),
+        ...(data.templateOrganizado        !== undefined ? { templateOrganizado:        data.templateOrganizado          } : {}),
       },
       include: etapasInclude,
     });

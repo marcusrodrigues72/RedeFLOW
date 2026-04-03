@@ -132,6 +132,55 @@ router.post("/:id/atribuir-responsaveis", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── Setup de Produção — Validação da matriz e Coordenador ─────────────────────
+
+router.patch("/:id/validar-matriz", async (req, res, next) => {
+  try {
+    const cursoId   = req.params["id"] as string;
+    const usuarioId = req.usuario!.sub;
+
+    // Verifica se o curso existe
+    const curso = await prisma.curso.findUnique({ where: { id: cursoId }, select: { id: true } });
+    if (!curso) { res.status(404).json({ message: "Curso não encontrado." }); return; }
+
+    const atualizado = await prisma.curso.update({
+      where: { id: cursoId },
+      data:  { matrizValidadaEm: new Date(), matrizValidadaPorId: usuarioId },
+      select: { id: true, matrizValidadaEm: true, matrizValidadaPorId: true,
+                matrizValidadaPor: { select: { id: true, nome: true } } },
+    });
+
+    res.json(atualizado);
+  } catch (err) { next(err); }
+});
+
+router.patch("/:id/coordenador-producao", async (req, res, next) => {
+  try {
+    const cursoId = req.params["id"] as string;
+    const { coordenadorProducaoId } = req.body as { coordenadorProducaoId: string | null };
+
+    // Valida que, se informado, o usuário é membro do curso
+    if (coordenadorProducaoId) {
+      const isMembro = await prisma.cursoMembro.findUnique({
+        where: { cursoId_usuarioId: { cursoId, usuarioId: coordenadorProducaoId } },
+      });
+      if (!isMembro) {
+        res.status(422).json({ message: "O usuário selecionado não é membro do curso." });
+        return;
+      }
+    }
+
+    const atualizado = await prisma.curso.update({
+      where: { id: cursoId },
+      data:  { coordenadorProducaoId },
+      select: { id: true, coordenadorProducaoId: true,
+                coordenadorProducao: { select: { id: true, nome: true, fotoUrl: true } } },
+    });
+
+    res.json(atualizado);
+  } catch (err) { next(err); }
+});
+
 // ── Gestão de Membros ─────────────────────────────────────────────────────────
 
 const membroSchema = z.object({

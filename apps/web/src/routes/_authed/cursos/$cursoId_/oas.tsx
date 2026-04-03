@@ -10,8 +10,10 @@ import SearchIcon        from "@mui/icons-material/Search";
 import TableRowsIcon     from "@mui/icons-material/TableRows";
 import ViewKanbanIcon    from "@mui/icons-material/ViewKanban";
 import ViewTimelineIcon  from "@mui/icons-material/ViewTimeline";
+import SettingsIcon from "@mui/icons-material/Settings";
 import { useState, useCallback } from "react";
 import { useOAsByCurso, useCurso, useAtualizarEtapaGeral } from "@/lib/api/cursos";
+import { useAuthStore } from "@/stores/auth.store";
 import type { StatusOA, TipoOA, StatusEtapa } from "shared";
 
 export const Route = createFileRoute("/_authed/cursos/$cursoId_/oas")({
@@ -97,6 +99,9 @@ function OAsPage() {
   const [filtroDeadline,  setFiltroDeadline]      = useState<FiltroDeadline>("");
   const [visao,           setVisao]               = useState<Visao>("lista");
   const { mutate: atualizarEtapa }                = useAtualizarEtapaGeral();
+  const user                                      = useAuthStore((s) => s.user);
+  const isAdmin = user?.papelGlobal === "ADMIN" ||
+    curso?.membros.some((m) => m.usuarioId === user?.id && m.papel === "ADMIN");
 
   const { data: oas = [], isLoading, isError } = useOAsByCurso(cursoId, {
     status: filtroStatus || undefined,
@@ -141,6 +146,16 @@ function OAsPage() {
             </Typography>
           </Box>
         </Box>
+        {isAdmin && (
+          <Button
+            component={Link} to={`/cursos/${cursoId}/setup-producao`}
+            variant="outlined" size="small"
+            startIcon={<SettingsIcon sx={{ fontSize: 16 }} />}
+            sx={{ fontWeight: 700, fontSize: "0.75rem" }}
+          >
+            Setup de Produção
+          </Button>
+        )}
       </Box>
 
       {/* ── Abas de visão ── */}

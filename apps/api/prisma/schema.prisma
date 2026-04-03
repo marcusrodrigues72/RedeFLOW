@@ -59,6 +59,7 @@ enum NivelBloom {
 }
 
 enum PapelEtapa {
+  COORDENADOR_PRODUCAO
   CONTEUDISTA
   DESIGNER_INSTRUCIONAL
   PROFESSOR_ATOR
@@ -94,6 +95,8 @@ model Usuario {
   arquivos                   Arquivo[]
   notificacoes               Notificacao[]
   auditLogs                  AuditLog[]
+  cursosCoordenaProducao     Curso[]    @relation("CursoCoordenadorProducao")
+  cursosValidouMatriz        Curso[]    @relation("CursoMatrizValidadaPor")
 
   @@map("usuarios")
 }
@@ -121,11 +124,18 @@ model Curso {
   dataInicio       DateTime?
   dataFim          DateTime?
   status           StatusCurso @default(RASCUNHO)
+  // Coordenador administrativo de produção (ex: Nícolas)
+  coordenadorProducaoId String?
+  // Validação da matriz importada antes de liberar o Setup por OA
+  matrizValidadaEm      DateTime?
+  matrizValidadaPorId   String?
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
-  unidades Unidade[]
-  membros  CursoMembro[]
+  unidades              Unidade[]
+  membros               CursoMembro[]
+  coordenadorProducao   Usuario? @relation("CursoCoordenadorProducao",  fields: [coordenadorProducaoId], references: [id])
+  matrizValidadaPor     Usuario? @relation("CursoMatrizValidadaPor",    fields: [matrizValidadaPorId],   references: [id])
 
   @@map("cursos")
 }
@@ -266,6 +276,9 @@ model EtapaOA {
   observacoes             String?
   bloqueada               Boolean     @default(false)
   linkArtefato            String?
+  // Checklist do Setup de Produção (apenas para etapas COORDENADOR_PRODUCAO)
+  templateGerado          Boolean     @default(false)
+  templateOrganizado      Boolean     @default(false)
   createdAt               DateTime    @default(now())
   updatedAt               DateTime    @updatedAt
 

@@ -5,12 +5,13 @@ const prisma = new PrismaClient();
 
 // ─── Pipeline por tipo de OA ───────────────────────────────────────────────────
 //
-// VIDEO      : Conteudista(roteiro) → DI Valida → Gravação → Edição(vídeo) → Validação Final
-// SLIDE/EBOOK: Conteudista(preliminar) → DI Valida → Acessibilidade → Diagramação(final) → Validação Final
-// Demais     : Conteudista(preliminar) → DI Valida → Acessibilidade → Diagramação(final) → Validação Final
+// Todas: Setup(0) → Conteudista(1) → DI(2) → ...tipo específico... → Validação Final
+// VIDEO: Setup → Conteudista(roteiro) → DI → Gravação → Edição(vídeo) → Validação Final
+// Demais: Setup → Conteudista(preliminar) → DI → Acessibilidade → Diagramação(final) → Validação Final
 //
 type TipoOA = "VIDEO" | "SLIDE" | "EBOOK" | "QUIZ" | "PLANO_AULA" | "TAREFA" | "INFOGRAFICO" | "TIMELINE";
 type PapelEtapa =
+  | "COORDENADOR_PRODUCAO"
   | "CONTEUDISTA" | "DESIGNER_INSTRUCIONAL" | "PROFESSOR_ATOR" | "PROFESSOR_TECNICO"
   | "ACESSIBILIDADE" | "EDITOR_VIDEO" | "DESIGNER_GRAFICO" | "PRODUTOR_FINAL" | "VALIDADOR_FINAL";
 
@@ -26,6 +27,7 @@ interface EtapaDef {
 
 const PIPELINE: EtapaDef[] = [
   // ── VIDEO ──────────────────────────────────────────────────────────────────
+  { id: "seed-video-0-setup",          nome: "Setup de Produção",         papel: "COORDENADOR_PRODUCAO",  ordem: 0, tipoOA: "VIDEO",     obrigatorio: true, temArtefato: false },
   { id: "seed-video-1-conteudista",    nome: "Produção de Conteúdo",      papel: "CONTEUDISTA",           ordem: 1, tipoOA: "VIDEO",     obrigatorio: true, temArtefato: true  },
   { id: "seed-video-2-di",             nome: "Validação DI",              papel: "DESIGNER_INSTRUCIONAL", ordem: 2, tipoOA: "VIDEO",     obrigatorio: true, temArtefato: false },
   { id: "seed-video-3-gravacao",       nome: "Gravação",                  papel: "PROFESSOR_ATOR",        ordem: 3, tipoOA: "VIDEO",     obrigatorio: true, temArtefato: false },
@@ -33,6 +35,7 @@ const PIPELINE: EtapaDef[] = [
   { id: "seed-video-5-validacao",      nome: "Validação Final",           papel: "VALIDADOR_FINAL",       ordem: 5, tipoOA: "VIDEO",     obrigatorio: true, temArtefato: false },
 
   // ── SLIDE ──────────────────────────────────────────────────────────────────
+  { id: "seed-slide-0-setup",          nome: "Setup de Produção",         papel: "COORDENADOR_PRODUCAO",  ordem: 0, tipoOA: "SLIDE",     obrigatorio: true, temArtefato: false },
   { id: "seed-slide-1-conteudista",    nome: "Produção de Conteúdo",      papel: "CONTEUDISTA",           ordem: 1, tipoOA: "SLIDE",     obrigatorio: true, temArtefato: true  },
   { id: "seed-slide-2-di",             nome: "Validação DI",              papel: "DESIGNER_INSTRUCIONAL", ordem: 2, tipoOA: "SLIDE",     obrigatorio: true, temArtefato: false },
   { id: "seed-slide-3-acessibilidade", nome: "Acessibilidade",            papel: "ACESSIBILIDADE",        ordem: 3, tipoOA: "SLIDE",     obrigatorio: true, temArtefato: false },
@@ -40,6 +43,7 @@ const PIPELINE: EtapaDef[] = [
   { id: "seed-slide-5-validacao",      nome: "Validação Final",           papel: "VALIDADOR_FINAL",       ordem: 5, tipoOA: "SLIDE",     obrigatorio: true, temArtefato: false },
 
   // ── EBOOK ──────────────────────────────────────────────────────────────────
+  { id: "seed-ebook-0-setup",          nome: "Setup de Produção",         papel: "COORDENADOR_PRODUCAO",  ordem: 0, tipoOA: "EBOOK",     obrigatorio: true, temArtefato: false },
   { id: "seed-ebook-1-conteudista",    nome: "Produção de Conteúdo",      papel: "CONTEUDISTA",           ordem: 1, tipoOA: "EBOOK",     obrigatorio: true, temArtefato: true  },
   { id: "seed-ebook-2-di",             nome: "Validação DI",              papel: "DESIGNER_INSTRUCIONAL", ordem: 2, tipoOA: "EBOOK",     obrigatorio: true, temArtefato: false },
   { id: "seed-ebook-3-acessibilidade", nome: "Acessibilidade",            papel: "ACESSIBILIDADE",        ordem: 3, tipoOA: "EBOOK",     obrigatorio: true, temArtefato: false },
@@ -47,6 +51,7 @@ const PIPELINE: EtapaDef[] = [
   { id: "seed-ebook-5-validacao",      nome: "Validação Final",           papel: "VALIDADOR_FINAL",       ordem: 5, tipoOA: "EBOOK",     obrigatorio: true, temArtefato: false },
 
   // ── QUIZ ───────────────────────────────────────────────────────────────────
+  { id: "seed-quiz-0-setup",           nome: "Setup de Produção",         papel: "COORDENADOR_PRODUCAO",  ordem: 0, tipoOA: "QUIZ",      obrigatorio: true, temArtefato: false },
   { id: "seed-quiz-1-conteudista",     nome: "Produção de Conteúdo",      papel: "CONTEUDISTA",           ordem: 1, tipoOA: "QUIZ",      obrigatorio: true, temArtefato: true  },
   { id: "seed-quiz-2-di",              nome: "Validação DI",              papel: "DESIGNER_INSTRUCIONAL", ordem: 2, tipoOA: "QUIZ",      obrigatorio: true, temArtefato: false },
   { id: "seed-quiz-3-acessibilidade",  nome: "Acessibilidade",            papel: "ACESSIBILIDADE",        ordem: 3, tipoOA: "QUIZ",      obrigatorio: true, temArtefato: false },
@@ -54,6 +59,7 @@ const PIPELINE: EtapaDef[] = [
   { id: "seed-quiz-5-validacao",       nome: "Validação Final",           papel: "VALIDADOR_FINAL",       ordem: 5, tipoOA: "QUIZ",      obrigatorio: true, temArtefato: false },
 
   // ── INFOGRAFICO ────────────────────────────────────────────────────────────
+  { id: "seed-info-0-setup",           nome: "Setup de Produção",         papel: "COORDENADOR_PRODUCAO",  ordem: 0, tipoOA: "INFOGRAFICO", obrigatorio: true, temArtefato: false },
   { id: "seed-info-1-conteudista",     nome: "Produção de Conteúdo",      papel: "CONTEUDISTA",           ordem: 1, tipoOA: "INFOGRAFICO", obrigatorio: true, temArtefato: true  },
   { id: "seed-info-2-di",              nome: "Validação DI",              papel: "DESIGNER_INSTRUCIONAL", ordem: 2, tipoOA: "INFOGRAFICO", obrigatorio: true, temArtefato: false },
   { id: "seed-info-3-acessibilidade",  nome: "Acessibilidade",            papel: "ACESSIBILIDADE",        ordem: 3, tipoOA: "INFOGRAFICO", obrigatorio: true, temArtefato: false },
@@ -61,6 +67,7 @@ const PIPELINE: EtapaDef[] = [
   { id: "seed-info-5-validacao",       nome: "Validação Final",           papel: "VALIDADOR_FINAL",       ordem: 5, tipoOA: "INFOGRAFICO", obrigatorio: true, temArtefato: false },
 
   // ── TIMELINE ───────────────────────────────────────────────────────────────
+  { id: "seed-timeline-0-setup",          nome: "Setup de Produção",      papel: "COORDENADOR_PRODUCAO",  ordem: 0, tipoOA: "TIMELINE",  obrigatorio: true, temArtefato: false },
   { id: "seed-timeline-1-conteudista",    nome: "Produção de Conteúdo",   papel: "CONTEUDISTA",           ordem: 1, tipoOA: "TIMELINE",  obrigatorio: true, temArtefato: true  },
   { id: "seed-timeline-2-di",             nome: "Validação DI",           papel: "DESIGNER_INSTRUCIONAL", ordem: 2, tipoOA: "TIMELINE",  obrigatorio: true, temArtefato: false },
   { id: "seed-timeline-3-acessibilidade", nome: "Acessibilidade",         papel: "ACESSIBILIDADE",        ordem: 3, tipoOA: "TIMELINE",  obrigatorio: true, temArtefato: false },
@@ -68,6 +75,7 @@ const PIPELINE: EtapaDef[] = [
   { id: "seed-timeline-5-validacao",      nome: "Validação Final",        papel: "VALIDADOR_FINAL",       ordem: 5, tipoOA: "TIMELINE",  obrigatorio: true, temArtefato: false },
 
   // ── TAREFA ─────────────────────────────────────────────────────────────────
+  { id: "seed-tarefa-0-setup",         nome: "Setup de Produção",         papel: "COORDENADOR_PRODUCAO",  ordem: 0, tipoOA: "TAREFA",    obrigatorio: true, temArtefato: false },
   { id: "seed-tarefa-1-conteudista",   nome: "Produção de Conteúdo",      papel: "CONTEUDISTA",           ordem: 1, tipoOA: "TAREFA",    obrigatorio: true, temArtefato: true  },
   { id: "seed-tarefa-2-di",            nome: "Validação DI",              papel: "DESIGNER_INSTRUCIONAL", ordem: 2, tipoOA: "TAREFA",    obrigatorio: true, temArtefato: false },
   { id: "seed-tarefa-3-acessibilidade",nome: "Acessibilidade",            papel: "ACESSIBILIDADE",        ordem: 3, tipoOA: "TAREFA",    obrigatorio: true, temArtefato: false },
@@ -75,6 +83,7 @@ const PIPELINE: EtapaDef[] = [
   { id: "seed-tarefa-5-validacao",     nome: "Validação Final",           papel: "VALIDADOR_FINAL",       ordem: 5, tipoOA: "TAREFA",    obrigatorio: true, temArtefato: false },
 
   // ── PLANO_AULA ─────────────────────────────────────────────────────────────
+  { id: "seed-plano-0-setup",          nome: "Setup de Produção",         papel: "COORDENADOR_PRODUCAO",  ordem: 0, tipoOA: "PLANO_AULA", obrigatorio: true, temArtefato: false },
   { id: "seed-plano-1-conteudista",    nome: "Produção de Conteúdo",      papel: "CONTEUDISTA",           ordem: 1, tipoOA: "PLANO_AULA", obrigatorio: true, temArtefato: true  },
   { id: "seed-plano-2-di",             nome: "Validação DI",              papel: "DESIGNER_INSTRUCIONAL", ordem: 2, tipoOA: "PLANO_AULA", obrigatorio: true, temArtefato: false },
   { id: "seed-plano-3-acessibilidade", nome: "Acessibilidade",            papel: "ACESSIBILIDADE",        ordem: 3, tipoOA: "PLANO_AULA", obrigatorio: true, temArtefato: false },

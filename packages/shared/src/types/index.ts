@@ -2,6 +2,7 @@
 
 export type PapelGlobal = "ADMIN" | "COLABORADOR" | "LEITOR";
 export type PapelEtapa  =
+  | "COORDENADOR_PRODUCAO"
   | "CONTEUDISTA" | "DESIGNER_INSTRUCIONAL" | "PROFESSOR_ATOR"
   | "PROFESSOR_TECNICO" | "ACESSIBILIDADE" | "EDITOR_VIDEO" | "DESIGNER_GRAFICO"
   | "PRODUTOR_FINAL" | "VALIDADOR_FINAL";
@@ -67,6 +68,11 @@ export interface CursoDetalhe extends Omit<CursoResumo, "_count"> {
     papel: PapelGlobal;
     usuario: UsuarioPublico;
   }[];
+  coordenadorProducaoId: string | null;
+  coordenadorProducao: { id: string; nome: string; fotoUrl: string | null } | null;
+  matrizValidadaEm: string | null;
+  matrizValidadaPorId: string | null;
+  matrizValidadaPor: { id: string; nome: string } | null;
 }
 
 // ─── OA ───────────────────────────────────────────────────────────────────────
@@ -117,6 +123,8 @@ export interface EtapaOADetalhe {
   deadlineReal: string | null;
   bloqueada: boolean;
   linkArtefato: string | null;
+  templateGerado: boolean;
+  templateOrganizado: boolean;
   responsavel: UsuarioPublico | null;
   responsavelId: string | null;
   responsavelSecundario: UsuarioPublico | null;
@@ -148,6 +156,10 @@ export interface OADetalhe {
         nome: string;
         codigo: string;
         membros: { usuarioId: string; papel: PapelGlobal; usuario: UsuarioPublico }[];
+        coordenadorProducaoId: string | null;
+        coordenadorProducao: { id: string; nome: string; fotoUrl: string | null } | null;
+        matrizValidadaEm: string | null;
+        matrizValidadaPorId: string | null;
       };
     };
   };

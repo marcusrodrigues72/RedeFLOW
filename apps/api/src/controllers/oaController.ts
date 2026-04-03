@@ -29,10 +29,21 @@ export class OAController {
     } catch (err) { next(err); }
   };
 
+  // PATCH /oas/:id
+  atualizarOA = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { linkObjeto } = req.body as { linkObjeto?: string | null };
+      const result = await oaRepository.updateOA(req.params["id"] as string, {
+        ...(linkObjeto !== undefined ? { linkObjeto } : {}),
+      });
+      res.json(result);
+    } catch (err) { next(err); }
+  };
+
   // PATCH /oas/:id/etapas/:etapaId
   atualizarEtapa = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { status, responsavelId, responsavelSecundarioId, deadlineReal, deadlinePrevisto, recalcularSequencia, linkArtefato } = req.body as {
+      const { status, responsavelId, responsavelSecundarioId, deadlineReal, deadlinePrevisto, recalcularSequencia, linkArtefato, templateGerado, templateOrganizado } = req.body as {
         status?: string;
         responsavelId?: string | null;
         responsavelSecundarioId?: string | null;
@@ -40,6 +51,8 @@ export class OAController {
         deadlinePrevisto?: string | null;
         recalcularSequencia?: boolean;
         linkArtefato?: string | null;
+        templateGerado?: boolean;
+        templateOrganizado?: boolean;
       };
 
       // Verifica se o usuário é ADMIN (global ou do curso) — usado em múltiplas regras abaixo
@@ -87,7 +100,7 @@ export class OAController {
           where: { id: req.params["etapaId"] as string },
           select: { ordem: true, oaId: true, status: true },
         });
-        if (etapaAtual && etapaAtual.ordem > 1 && status !== etapaAtual.status) {
+        if (etapaAtual && etapaAtual.ordem > 0 && status !== etapaAtual.status) {
           const predecessora = await db.etapaOA.findFirst({
             where: { oaId: etapaAtual.oaId, ordem: etapaAtual.ordem - 1 },
             select: { status: true, etapaDef: { select: { nome: true } } },
@@ -101,6 +114,27 @@ export class OAController {
         }
       }
 
+      // Gate: Setup de Produção só pode ser concluído se o checklist estiver completo
+      if (status === "CONCLUIDA") {
+        const etapaParaGate = await db.etapaOA.findUnique({
+          where:  { id: req.params["etapaId"] as string },
+          select: {
+            templateGerado:    true,
+            templateOrganizado: true,
+            etapaDef: { select: { papel: true } },
+            oa: { select: { linkObjeto: true } },
+          },
+        });
+        if (etapaParaGate?.etapaDef.papel === "COORDENADOR_PRODUCAO") {
+          const tg  = templateGerado  ?? etapaParaGate.templateGerado;
+          const to  = templateOrganizado ?? etapaParaGate.templateOrganizado;
+          const lnk = etapaParaGate.oa.linkObjeto;
+          if (!tg)  { res.status(422).json({ message: "Confirme que os templates foram gerados via Google Apps Script." }); return; }
+          if (!to)  { res.status(422).json({ message: "Confirme que os templates foram organizados na pasta do projeto." }); return; }
+          if (!lnk) { res.status(422).json({ message: "Adicione o link do template antes de concluir o Setup de Produção." }); return; }
+        }
+      }
+
       const etapa = await oaRepository.updateEtapa(req.params["etapaId"] as string, {
         status,
         responsavelId,
@@ -108,6 +142,8 @@ export class OAController {
         deadlineReal:     deadlineReal     ? new Date(deadlineReal)     : deadlineReal     === null ? null : undefined,
         deadlinePrevisto: deadlinePrevisto ? new Date(deadlinePrevisto) : deadlinePrevisto === null ? null : undefined,
         linkArtefato:     linkArtefato !== undefined ? linkArtefato : undefined,
+        templateGerado:     templateGerado     !== undefined ? templateGerado     : undefined,
+        templateOrganizado: templateOrganizado !== undefined ? templateOrganizado : undefined,
       });
 
       // Grava audit log com as mudanças realizadas

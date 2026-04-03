@@ -139,6 +139,18 @@ export function useAtualizarEtapa(oaId: string) {
   });
 }
 
+export function useAtualizarOA(oaId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { linkObjeto?: string | null }) =>
+      api.patch<{ id: string; linkObjeto: string | null }>(`/oas/${oaId}`, data).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: oaKeys.detail(oaId) });
+      qc.invalidateQueries({ queryKey: ["cursos"] });
+    },
+  });
+}
+
 export function useImportarMIPreview(cursoId: string) {
   return useMutation({
     mutationFn: (file: File) => {
@@ -209,12 +221,49 @@ export function useAtualizarEtapaGeral() {
     mutationFn: ({ oaId, etapaId, data }: {
       oaId: string;
       etapaId: string;
-      data: Partial<EtapaOADetalhe> & { deadlineReal?: string | null; responsavelSecundarioId?: string | null };
+      data: Partial<EtapaOADetalhe> & {
+        deadlineReal?: string | null;
+        responsavelSecundarioId?: string | null;
+        recalcularSequencia?: boolean;
+        templateGerado?: boolean;
+        templateOrganizado?: boolean;
+      };
     }) => api.patch<EtapaOADetalhe>(`/oas/${oaId}/etapas/${etapaId}`, data).then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["cursos"] });
       qc.invalidateQueries({ queryKey: oaKeys.meuTrabalho() });
       qc.invalidateQueries({ queryKey: cursoKeys.stats() });
+    },
+  });
+}
+
+// ─── Setup de Produção — Validação da matriz e Coordenador ────────────────────
+
+export function useValidarMatriz(cursoId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api.patch<{ id: string; matrizValidadaEm: string; matrizValidadaPorId: string; matrizValidadaPor: { id: string; nome: string } }>(
+        `/cursos/${cursoId}/validar-matriz`
+      ).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: cursoKeys.detail(cursoId) });
+      qc.invalidateQueries({ queryKey: cursoKeys.oas(cursoId) });
+    },
+  });
+}
+
+export function useDefinirCoordenadorProducao(cursoId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (coordenadorProducaoId: string | null) =>
+      api.patch<{ id: string; coordenadorProducaoId: string | null; coordenadorProducao: { id: string; nome: string; fotoUrl: string | null } | null }>(
+        `/cursos/${cursoId}/coordenador-producao`,
+        { coordenadorProducaoId }
+      ).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: cursoKeys.detail(cursoId) });
+      qc.invalidateQueries({ queryKey: cursoKeys.oas(cursoId) });
     },
   });
 }

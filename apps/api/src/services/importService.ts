@@ -438,6 +438,7 @@ export async function persistMC(rows: MCRow[], cursoId: string): Promise<{ criad
 
       // ── Cria EtapaOAs ─────────────────────────────────────────────────────
       const etapasParaCriar = [
+        { papel: "COORDENADOR_PRODUCAO", status: "PENDENTE",             dl: null as Date | null, ordem: 0 },
         { papel: "CONTEUDISTA",          status: row.conteudiostaStatus, dl: row.conteudistaDL, ordem: 1 },
         { papel: "DESIGNER_INSTRUCIONAL",status: row.diStatus,           dl: row.diDL,          ordem: 2 },
         ...(row.tipo === "VIDEO"
@@ -719,11 +720,14 @@ export function buildMIPreview(caps: MICapitulo[]): MIPreview {
 
 /** Fração do periodoDias do capítulo em que cada etapa deve ser concluída */
 const FRACAO_ETAPA: Record<string, number> = {
+  COORDENADOR_PRODUCAO:  0.10,  // Setup: primeiros ~10% do período
   CONTEUDISTA:           0.40,
   DESIGNER_INSTRUCIONAL: 0.55,
   PROFESSOR_ATOR:        0.65,
   PROFESSOR_TECNICO:     0.75,
   ACESSIBILIDADE:        0.82,
+  EDITOR_VIDEO:          0.88,
+  DESIGNER_GRAFICO:      0.88,
   PRODUTOR_FINAL:        0.90,
   VALIDADOR_FINAL:       1.00,
 };
@@ -865,8 +869,10 @@ export async function persistMI(caps: MICapitulo[], cursoId: string, options: { 
 
           // Cria etapas do pipeline com deadlines calculados
           // Pipeline por tipo: VIDEO tem gravação+edição; demais têm acessibilidade+diagramação
+          // Todos os tipos começam com Setup de Produção (ordem 0 — coordenador administrativo)
           const etapasParaCriar = def.tipo === "VIDEO"
             ? [
+                { papel: "COORDENADOR_PRODUCAO",  ordem: 0 },
                 { papel: "CONTEUDISTA",           ordem: 1 },
                 { papel: "DESIGNER_INSTRUCIONAL", ordem: 2 },
                 { papel: "PROFESSOR_ATOR",        ordem: 3 },
@@ -874,6 +880,7 @@ export async function persistMI(caps: MICapitulo[], cursoId: string, options: { 
                 { papel: "VALIDADOR_FINAL",       ordem: 5 },
               ]
             : [
+                { papel: "COORDENADOR_PRODUCAO",  ordem: 0 },
                 { papel: "CONTEUDISTA",           ordem: 1 },
                 { papel: "DESIGNER_INSTRUCIONAL", ordem: 2 },
                 { papel: "ACESSIBILIDADE",        ordem: 3 },
