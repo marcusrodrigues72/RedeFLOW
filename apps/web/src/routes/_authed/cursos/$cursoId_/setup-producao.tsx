@@ -271,7 +271,7 @@ function SetupOARow({ oa, tipoLabel, tipoColor, setupEtapa, matrizValidada, onSe
   const [errMsg, setErrMsg]       = useState<string | null>(null);
 
   const { mutate: atualizarOA, isPending: salvandoLink }    = useAtualizarOA(oa.id);
-  const { mutate: atualizarEtapa, isPending: salvandoEtapa } = useAtualizarEtapaGeral();
+  const { mutate: atualizarEtapa } = useAtualizarEtapaGeral();
 
   const membros       = oa.capitulo.unidade.curso.membros;
   const setupConcluido = setupEtapa?.status === "CONCLUIDA";
@@ -371,7 +371,7 @@ function SetupOARow({ oa, tipoLabel, tipoColor, setupEtapa, matrizValidada, onSe
                 numero={1}
                 label="Templates gerados via Google Apps Script"
                 checked={templateGerado}
-                disabled={setupConcluido || salvandoEtapa}
+                disabled={setupConcluido}
                 onChange={(v) => handleCheckTemplate("templateGerado", v)}
               />
 
@@ -382,7 +382,7 @@ function SetupOARow({ oa, tipoLabel, tipoColor, setupEtapa, matrizValidada, onSe
                     numero={2}
                     label="Templates organizados na pasta do projeto (Google Drive)"
                     checked={templateOrganizado}
-                    disabled={setupConcluido || salvandoEtapa || !templateGerado}
+                    disabled={setupConcluido || !templateGerado}
                     onChange={(v) => handleCheckTemplate("templateOrganizado", v)}
                   />
                 </span>
@@ -467,7 +467,7 @@ function SetupOARow({ oa, tipoLabel, tipoColor, setupEtapa, matrizValidada, onSe
                 <Box sx={{ mt: 2.5, pt: 2, borderTop: "1px solid", borderColor: "divider" }}>
                   <Button
                     variant="contained" color="success" size="small"
-                    disabled={salvandoEtapa || salvandoLink || !checklistOk}
+                    disabled={salvandoLink || !checklistOk}
                     onClick={handleConcluirSetup}
                     startIcon={<CheckCircleIcon />}
                     sx={{ fontWeight: 700 }}

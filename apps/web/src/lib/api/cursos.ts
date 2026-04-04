@@ -168,26 +168,19 @@ export function useAtualizarOA(oaId: string) {
       api.patch<{ id: string; linkObjeto: string | null }>(`/oas/${oaId}`, data).then((r) => r.data),
 
     onMutate: async (data) => {
-      await qc.cancelQueries({ queryKey: ["cursos", "oas"] });
-      const snapshots = qc.getQueriesData<OADetalhe[]>({ queryKey: ["cursos", "oas"] });
-      qc.setQueriesData<OADetalhe[]>(
-        { queryKey: ["cursos", "oas"] },
-        (cached) => cached?.map((oa) => oa.id !== oaId ? oa : { ...oa, ...data }),
-      );
+      const [snapshots, cancels] = patchOACache(qc, oaId, (oa) => ({ ...oa, ...data }));
+      await Promise.all(cancels);
       return { snapshots };
     },
 
     onError: (_err, _vars, context) => {
-      for (const [key, data] of context?.snapshots ?? []) {
-        qc.setQueryData(key, data);
+      for (const [key, d] of context?.snapshots ?? []) {
+        qc.setQueryData(key, d);
       }
     },
 
     onSuccess: (updated) => {
-      qc.setQueriesData<OADetalhe[]>(
-        { queryKey: ["cursos", "oas"] },
-        (cached) => cached?.map((oa) => oa.id !== updated.id ? oa : { ...oa, linkObjeto: updated.linkObjeto }),
-      );
+      patchOACache(qc, updated.id, (oa) => ({ ...oa, linkObjeto: updated.linkObjeto }));
       qc.invalidateQueries({ queryKey: oaKeys.detail(oaId) });
     },
   });
@@ -265,57 +258,52 @@ type AtualizarEtapaPayload = Partial<EtapaOADetalhe> & {
   templateOrganizado?: boolean;
 };
 
+// Helpers para atualizar o cache de OAs cirurgicamente
+function patchOACache(
+  qc: ReturnType<typeof useQueryClient>,
+  oaId: string,
+  patchFn: (oa: OADetalhe) => OADetalhe,
+): [ReturnType<typeof qc.getQueriesData<OADetalhe[]>>, Promise<void>[]] {
+  const snapshots = qc.getQueriesData<OADetalhe[]>({ queryKey: ["cursos", "oas"] });
+  const cancels: Promise<void>[] = [];
+  for (const [key, oas] of snapshots) {
+    if (!oas) continue;
+    cancels.push(qc.cancelQueries({ queryKey: key as any }));
+    qc.setQueryData<OADetalhe[]>(key, oas.map((oa) => oa.id !== oaId ? oa : patchFn(oa)));
+  }
+  return [snapshots, cancels];
+}
+
 export function useAtualizarEtapaGeral() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ oaId, etapaId, data }: { oaId: string; etapaId: string; data: AtualizarEtapaPayload }) =>
       api.patch<EtapaOADetalhe>(`/oas/${oaId}/etapas/${etapaId}`, data).then((r) => r.data),
 
-    // ── Optimistic update: UI responde instantaneamente ───────────────────
     onMutate: async ({ oaId, etapaId, data }) => {
-      // Cancela refetches em andamento para não sobrescrever o otimismo
-      await qc.cancelQueries({ queryKey: ["cursos", "oas"] });
-
-      // Snapshot do estado atual (para rollback em caso de erro)
-      const snapshots = qc.getQueriesData<OADetalhe[]>({ queryKey: ["cursos", "oas"] });
-
-      // Campos que existem na etapa cacheada (exclui metadados da requisição)
       const { recalcularSequencia: _rc, ...etapaFields } = data;
-
-      // Aplica update otimístico em todas as listas de OAs cacheadas
-      qc.setQueriesData<OADetalhe[]>(
-        { queryKey: ["cursos", "oas"] },
-        (cached) => cached?.map((oa) =>
-          oa.id !== oaId
-            ? oa
-            : { ...oa, etapas: oa.etapas.map((e) => e.id !== etapaId ? e : { ...e, ...etapaFields }) }
-        ),
-      );
-
+      const [snapshots, cancels] = patchOACache(qc, oaId, (oa) => ({
+        ...oa,
+        etapas: oa.etapas.map((e) => e.id !== etapaId ? e : { ...e, ...etapaFields }),
+      }));
+      await Promise.all(cancels);
       return { snapshots };
     },
 
-    // ── Rollback se o servidor rejeitar ──────────────────────────────────
     onError: (_err, _vars, context) => {
       for (const [key, data] of context?.snapshots ?? []) {
         qc.setQueryData(key, data);
       }
     },
 
-    // ── Aplica dados reais do servidor (substitui optimismo) ──────────────
     onSuccess: (etapaAtualizada, { oaId }) => {
-      qc.setQueriesData<OADetalhe[]>(
-        { queryKey: ["cursos", "oas"] },
-        (cached) => cached?.map((oa) =>
-          oa.id !== oaId
-            ? oa
-            : { ...oa, etapas: oa.etapas.map((e) => e.id === etapaAtualizada.id ? { ...e, ...etapaAtualizada } : e) }
-        ),
-      );
+      patchOACache(qc, oaId, (oa) => ({
+        ...oa,
+        etapas: oa.etapas.map((e) => e.id === etapaAtualizada.id ? { ...e, ...etapaAtualizada } : e),
+      }));
     },
 
     onSettled: () => {
-      // Invalida apenas queries pequenas, não a lista de 41 OAs
       qc.invalidateQueries({ queryKey: oaKeys.meuTrabalho() });
       qc.invalidateQueries({ queryKey: cursoKeys.stats() });
     },
