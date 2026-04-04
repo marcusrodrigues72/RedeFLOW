@@ -651,27 +651,49 @@ export function parseMI(buffer: Buffer, filename: string): MICapitulo[] {
     // Usa o índice detectado para capNum; fallback para 1 (posição real nos arquivos padrão)
     const capColIdx = colMap.capNum >= 0 ? colMap.capNum : 1;
 
-    // Log de diagnóstico: colunas críticas não encontradas
-    if (colMap.tipoOA < 0) {
-      logger.warn(
-        { sheetName, headerRow: rows[headerIdx]?.slice(0, 20) },
-        "parseMI: coluna 'Objetos de Aprendizagem' não detectada — OAs não serão gerados. Verifique o cabeçalho da planilha."
-      );
-    }
     if (colMap.capNum < 0) {
       logger.warn(
         { sheetName, headerIdx, capColIdx },
         "parseMI: coluna 'Nº Capítulo' não detectada — usando fallback coluna 1."
       );
     }
-    logger.debug(
-      { sheetName, headerIdx, tipoOA: colMap.tipoOA, qtdOA: colMap.qtdOA, capNum: colMap.capNum, oeDesc: colMap.oeDesc },
-      "parseMI: mapeamento de colunas"
-    );
 
     const dataRows = rows
       .slice(headerIdx + 1)
       .filter((r) => r[capColIdx]?.trim() && !isNaN(Number(r[capColIdx]?.trim())));
+
+    // Fallback: se tipoOA não foi encontrado pelo cabeçalho, tenta detectar por conteúdo
+    // (busca uma coluna onde ≥2 células contêm valores reconhecidos de tipo de OA)
+    if (colMap.tipoOA < 0 && dataRows.length > 0) {
+      const tipoKeys = new Set(Object.keys(TIPO_MAP).map(normH));
+      const sampleRows = dataRows.slice(0, Math.min(30, dataRows.length));
+      const ncols = rows[headerIdx]?.length ?? 30;
+      for (let ci = 0; ci < ncols; ci++) {
+        const hits = sampleRows.filter((r) => {
+          const v = normH(r[ci]?.toString() ?? "");
+          return v && tipoKeys.has(v);
+        }).length;
+        if (hits >= 2) {
+          colMap.tipoOA = ci;
+          logger.info(
+            { sheetName, colIdx: ci, headerCell: rows[headerIdx]?.[ci] },
+            "parseMI: coluna tipoOA detectada por conteúdo (fallback)"
+          );
+          break;
+        }
+      }
+    }
+
+    if (colMap.tipoOA < 0) {
+      logger.warn(
+        { sheetName, headerRow: rows[headerIdx]?.slice(0, 25) },
+        "parseMI: coluna tipoOA não detectada nem por cabeçalho nem por conteúdo — OAs não serão gerados nesta aba."
+      );
+    }
+    logger.debug(
+      { sheetName, headerIdx, tipoOA: colMap.tipoOA, qtdOA: colMap.qtdOA, capNum: colMap.capNum, oeDesc: colMap.oeDesc },
+      "parseMI: mapeamento de colunas"
+    );
 
     const capMap     = new Map<number, MICapitulo>();
     const prevValues = Array(rows[headerIdx]?.length ?? 20).fill("") as string[];
