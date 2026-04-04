@@ -365,7 +365,8 @@ router.get("/burndown", async (req, res, next) => {
       points.push(new Date(cur));
       cur.setDate(cur.getDate() + 7);
     }
-    if (points[points.length - 1].getTime() < lastPoint.getTime()) {
+    const lastAdded = points[points.length - 1];
+    if (lastAdded && lastAdded.getTime() < lastPoint.getTime()) {
       points.push(new Date(lastPoint));
     }
 
