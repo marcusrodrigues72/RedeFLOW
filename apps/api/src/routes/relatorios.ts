@@ -83,17 +83,27 @@ router.get("/pipeline-status", async (req, res, next) => {
     const cursosWhere = isAdmin ? {} : { membros: { some: { usuarioId } } };
     const oaWhere     = { capitulo: { unidade: { curso: cursosWhere } } };
 
+    // Prisma groupBy não suporta relation filters no where — busca IDs primeiro
+    const oaIds = await prisma.objetoAprendizagem
+      .findMany({ where: oaWhere, select: { id: true } })
+      .then((rows) => rows.map((r) => r.id));
+
+    if (oaIds.length === 0) {
+      res.json({ porStatusOA: [], porEtapa: [] });
+      return;
+    }
+
     const [porStatusOA, porEtapaStatus, defs] = await Promise.all([
       // Status dos OAs (nível de OA)
       prisma.objetoAprendizagem.groupBy({
         by:    ["status"],
-        where: oaWhere,
+        where: { id: { in: oaIds } },
         _count: { id: true },
       }),
       // Status de cada instância de etapa, agrupado por (etapaDefId, status)
       prisma.etapaOA.groupBy({
         by:    ["etapaDefId", "status"],
-        where: { oa: oaWhere },
+        where: { oaId: { in: oaIds } },
         _count: { id: true },
       }),
       prisma.etapaDefinicao.findMany({

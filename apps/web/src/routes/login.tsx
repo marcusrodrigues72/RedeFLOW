@@ -76,9 +76,12 @@ function LoginPage() {
     >
       {/* Painel editorial — visível em telas largas */}
       <Box sx={{ display: { xs: "none", md: "flex" }, flexDirection: "column", width: 400, pr: 8 }}>
-        <Typography sx={{ fontWeight: 900, fontSize: "2.5rem", mb: 1, color: "primary.main" }}>
-          RedeFLOW
-        </Typography>
+        <Box
+          component="img"
+          src="/redeflow_logo.png"
+          alt="RedeFLOW"
+          sx={{ width: 220, height: "auto", mb: 2.5, borderRadius: 2 }}
+        />
         <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.8 }}>
           Gestão da produção de conteúdo educacional do iRede.
           Pipeline, Matrizes Instrucional e de Conteúdo em um só lugar.

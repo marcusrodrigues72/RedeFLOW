@@ -72,11 +72,13 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         }}
       >
         {/* Marca */}
-        <Box sx={{ px: 3, pt: 3, pb: 2 }}>
-          <Typography sx={{ fontWeight: 900, fontSize: "1.25rem", color: "primary.main", letterSpacing: "-0.02em" }}>
-            RedeFLOW
-          </Typography>
-          <Typography variant="caption" color="text.disabled">iRede EAD</Typography>
+        <Box sx={{ px: 2.5, pt: 2, pb: 1.5 }}>
+          <Box
+            component="img"
+            src="/redeflow_logo.png"
+            alt="RedeFLOW"
+            sx={{ width: "100%", height: "auto", maxHeight: 52, objectFit: "contain", objectPosition: "left", borderRadius: 1.5 }}
+          />
         </Box>
 
         {/* CTA */}
