@@ -148,10 +148,14 @@ export function useAtualizarEtapa(oaId: string) {
       if (context?.snapshot) qc.setQueryData(oaKeys.detail(oaId), context.snapshot);
     },
 
-    onSuccess: (etapaAtualizada) => {
-      qc.setQueryData<OADetalhe>(oaKeys.detail(oaId), (oa) =>
-        oa ? { ...oa, etapas: oa.etapas.map((e) => e.id === etapaAtualizada.id ? { ...e, ...etapaAtualizada } : e) } : oa
-      );
+    onSuccess: (etapaAtualizada, vars) => {
+      if (vars.data.recalcularSequencia) {
+        qc.invalidateQueries({ queryKey: oaKeys.detail(oaId) });
+      } else {
+        qc.setQueryData<OADetalhe>(oaKeys.detail(oaId), (oa) =>
+          oa ? { ...oa, etapas: oa.etapas.map((e) => e.id === etapaAtualizada.id ? { ...e, ...etapaAtualizada } : e) } : oa
+        );
+      }
     },
 
     onSettled: () => {

@@ -72,7 +72,7 @@ function CursoDetalhePage() {
   return (
     <Box>
       {/* ── Banner de Setup de Produção ─────────────────────────────────────── */}
-      {setupPendente > 0 && (
+      {setupPendente > 0 && isAdmin && (
         <Alert
           severity="warning"
           sx={{ mb: 2.5 }}

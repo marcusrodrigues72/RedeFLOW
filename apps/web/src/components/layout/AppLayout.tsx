@@ -252,7 +252,13 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               <Box key={n.id}>
                 <ListItem disablePadding>
                   <ListItemButton
-                    onClick={() => { if (!n.lida) marcarUma(n.id); }}
+                    onClick={() => {
+                      if (!n.lida) marcarUma(n.id);
+                      if (n.entidadeTipo === "OA" && n.entidadeId) {
+                        setAnchorEl(null);
+                        navigate({ to: "/oas/$oaId", params: { oaId: n.entidadeId } });
+                      }
+                    }}
                     sx={{ px: 2.5, py: 1.5, bgcolor: n.lida ? "transparent" : "#f0f7ff", alignItems: "flex-start" }}
                   >
                     {!n.lida && (

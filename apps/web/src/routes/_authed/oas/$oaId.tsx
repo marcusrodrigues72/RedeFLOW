@@ -78,7 +78,7 @@ function OADetalhePage() {
   return (
     <Box>
       {/* Banner de Setup pendente */}
-      {setupPendente && (
+      {setupPendente && isAdmin && (
         <Alert
           severity="warning"
           sx={{ mb: 2.5 }}
@@ -231,6 +231,22 @@ function OADetalhePage() {
                             </Button>
                           )}
                         </Box>
+                        {/* Template — link do objeto em produção (visível para etapas de produção) */}
+                        {oa.linkObjeto && etapa.etapaDef.papel !== "COORDENADOR_PRODUCAO" && (
+                          <Box sx={{ mt: 1.5, pt: 1.5, borderTop: "1px solid", borderColor: "divider" }}>
+                            <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ display: "block", mb: 0.75 }}>
+                              Template de produção
+                            </Typography>
+                            <Button
+                              href={oa.linkObjeto} target="_blank" rel="noopener noreferrer"
+                              startIcon={<LinkIcon sx={{ fontSize: 14 }} />}
+                              size="small" variant="outlined"
+                              sx={{ fontSize: "0.75rem", py: 0.25, textTransform: "none" }}
+                            >
+                              Abrir template
+                            </Button>
+                          </Box>
+                        )}
                         {/* Link de artefato — exibido apenas para etapas que produzem entregável */}
                         {etapa.etapaDef.temArtefato && (
                           <ArtefatoInput

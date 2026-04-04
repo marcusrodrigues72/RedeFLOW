@@ -16,6 +16,7 @@ import {
   useOAsByCurso, useCurso, useAtualizarOA, useAtualizarEtapaGeral,
   useValidarMatriz, useDefinirCoordenadorProducao,
 } from "@/lib/api/cursos";
+import { useAuthStore } from "@/stores/auth.store";
 import type { OADetalhe, TipoOA, StatusEtapa } from "shared";
 
 export const Route = createFileRoute("/_authed/cursos/$cursoId_/setup-producao")({
@@ -39,11 +40,16 @@ function SetupProducaoPage() {
   const { data: oas = [], isLoading: loadingOAs, isError } = useOAsByCurso(cursoId, {});
   const [filtro, setFiltro]     = useState<"todos" | "pendente" | "concluido">("pendente");
   const [snackMsg, setSnackMsg] = useState<string | null>(null);
+  const user = useAuthStore((s) => s.user);
 
   const { mutate: validarMatriz, isPending: validando } = useValidarMatriz(cursoId);
 
   if (loadingCurso || loadingOAs) return <LoadingSkeleton />;
   if (isError) return <Alert severity="error">Erro ao carregar OAs.</Alert>;
+
+  const isAdmin = user?.papelGlobal === "ADMIN"
+    || curso?.membros.some((m) => m.usuarioId === user?.id && m.papel === "ADMIN");
+  if (!isAdmin) return <Alert severity="error">Acesso restrito. Apenas administradores do curso podem acessar o Setup de Produção.</Alert>;
 
   // OAs com etapa de Setup
   const oasComSetup = oas.filter((oa) =>

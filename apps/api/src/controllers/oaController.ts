@@ -94,8 +94,8 @@ export class OAController {
         select: { status: true, responsavelId: true, responsavelSecundarioId: true, deadlinePrevisto: true, etapaDef: { select: { nome: true } } },
       });
 
-      // Valida predecessora: status só pode mudar se a etapa anterior estiver CONCLUIDA (ADMINs são isentos)
-      if (status !== undefined && !isAdmin) {
+      // Valida predecessora: só bloqueia CONCLUIDA se a etapa anterior não estiver CONCLUIDA (ADMINs são isentos)
+      if (status === "CONCLUIDA" && !isAdmin) {
         const etapaAtual = await db.etapaOA.findUnique({
           where: { id: req.params["etapaId"] as string },
           select: { ordem: true, oaId: true, status: true },
