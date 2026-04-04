@@ -189,8 +189,7 @@ router.patch("/me", authenticate, async (req, res, next) => {
     const updateData: Record<string, unknown> = {};
     if (nome  !== undefined) updateData["nome"]  = nome;
     if (email !== undefined) updateData["email"] = email;
-    // notifEmailAtivo: somente ADMINs podem alterar
-    if (notifEmailAtivo !== undefined && req.usuario!.papel === "ADMIN") {
+    if (notifEmailAtivo !== undefined) {
       updateData["notifEmailAtivo"] = notifEmailAtivo;
     }
     if (novaSenha) updateData["senhaHash"] = await bcrypt.hash(novaSenha, 12);
