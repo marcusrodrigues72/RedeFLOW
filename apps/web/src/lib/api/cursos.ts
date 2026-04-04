@@ -46,9 +46,10 @@ export function useCursos() {
 
 export function useCurso(id: string) {
   return useQuery({
-    queryKey: cursoKeys.detail(id),
-    queryFn:  () => api.get<CursoDetalhe>(`/cursos/${id}`).then((r) => r.data),
-    enabled:  !!id,
+    queryKey:  cursoKeys.detail(id),
+    queryFn:   () => api.get<CursoDetalhe>(`/cursos/${id}`).then((r) => r.data),
+    enabled:   !!id,
+    staleTime: 60_000,
   });
 }
 
@@ -105,9 +106,10 @@ export function useOAsByCurso(cursoId: string, filters: { status?: string; tipo?
   if (filters.status) params.set("status", filters.status);
   if (filters.tipo)   params.set("tipo",   filters.tipo);
   return useQuery({
-    queryKey: [...cursoKeys.oas(cursoId), filters],
-    queryFn:  () => api.get<OADetalhe[]>(`/cursos/${cursoId}/oas?${params}`).then((r) => r.data),
-    enabled:  !!cursoId,
+    queryKey:  [...cursoKeys.oas(cursoId), filters],
+    queryFn:   () => api.get<OADetalhe[]>(`/cursos/${cursoId}/oas?${params}`).then((r) => r.data),
+    enabled:   !!cursoId,
+    staleTime: 30_000,   // não refaz o fetch se os dados têm menos de 30s
   });
 }
 
@@ -131,8 +133,28 @@ export function useAtualizarEtapa(oaId: string) {
   return useMutation({
     mutationFn: ({ etapaId, data }: { etapaId: string; data: Partial<EtapaOADetalhe> & { deadlineReal?: string | null; deadlinePrevisto?: string | null; recalcularSequencia?: boolean; responsavelSecundarioId?: string | null } }) =>
       api.patch<EtapaOADetalhe>(`/oas/${oaId}/etapas/${etapaId}`, data).then((r) => r.data),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: oaKeys.detail(oaId) });
+
+    onMutate: async ({ etapaId, data }) => {
+      await qc.cancelQueries({ queryKey: oaKeys.detail(oaId) });
+      const snapshot = qc.getQueryData<OADetalhe>(oaKeys.detail(oaId));
+      const { recalcularSequencia: _rc, ...etapaFields } = data as AtualizarEtapaPayload;
+      qc.setQueryData<OADetalhe>(oaKeys.detail(oaId), (oa) =>
+        oa ? { ...oa, etapas: oa.etapas.map((e) => e.id !== etapaId ? e : { ...e, ...etapaFields }) } : oa
+      );
+      return { snapshot };
+    },
+
+    onError: (_err, _vars, context) => {
+      if (context?.snapshot) qc.setQueryData(oaKeys.detail(oaId), context.snapshot);
+    },
+
+    onSuccess: (etapaAtualizada) => {
+      qc.setQueryData<OADetalhe>(oaKeys.detail(oaId), (oa) =>
+        oa ? { ...oa, etapas: oa.etapas.map((e) => e.id === etapaAtualizada.id ? { ...e, ...etapaAtualizada } : e) } : oa
+      );
+    },
+
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: oaKeys.meuTrabalho() });
       qc.invalidateQueries({ queryKey: cursoKeys.stats() });
     },
@@ -144,9 +166,29 @@ export function useAtualizarOA(oaId: string) {
   return useMutation({
     mutationFn: (data: { linkObjeto?: string | null }) =>
       api.patch<{ id: string; linkObjeto: string | null }>(`/oas/${oaId}`, data).then((r) => r.data),
-    onSuccess: () => {
+
+    onMutate: async (data) => {
+      await qc.cancelQueries({ queryKey: ["cursos", "oas"] });
+      const snapshots = qc.getQueriesData<OADetalhe[]>({ queryKey: ["cursos", "oas"] });
+      qc.setQueriesData<OADetalhe[]>(
+        { queryKey: ["cursos", "oas"] },
+        (cached) => cached?.map((oa) => oa.id !== oaId ? oa : { ...oa, ...data }),
+      );
+      return { snapshots };
+    },
+
+    onError: (_err, _vars, context) => {
+      for (const [key, data] of context?.snapshots ?? []) {
+        qc.setQueryData(key, data);
+      }
+    },
+
+    onSuccess: (updated) => {
+      qc.setQueriesData<OADetalhe[]>(
+        { queryKey: ["cursos", "oas"] },
+        (cached) => cached?.map((oa) => oa.id !== updated.id ? oa : { ...oa, linkObjeto: updated.linkObjeto }),
+      );
       qc.invalidateQueries({ queryKey: oaKeys.detail(oaId) });
-      qc.invalidateQueries({ queryKey: ["cursos"] });
     },
   });
 }
@@ -215,22 +257,65 @@ export function useImportarMINovoCurso() {
 }
 
 // Hook geral para atualizar qualquer etapa (sem precisar do cursoId no hook)
+type AtualizarEtapaPayload = Partial<EtapaOADetalhe> & {
+  deadlineReal?: string | null;
+  responsavelSecundarioId?: string | null;
+  recalcularSequencia?: boolean;
+  templateGerado?: boolean;
+  templateOrganizado?: boolean;
+};
+
 export function useAtualizarEtapaGeral() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ oaId, etapaId, data }: {
-      oaId: string;
-      etapaId: string;
-      data: Partial<EtapaOADetalhe> & {
-        deadlineReal?: string | null;
-        responsavelSecundarioId?: string | null;
-        recalcularSequencia?: boolean;
-        templateGerado?: boolean;
-        templateOrganizado?: boolean;
-      };
-    }) => api.patch<EtapaOADetalhe>(`/oas/${oaId}/etapas/${etapaId}`, data).then((r) => r.data),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["cursos"] });
+    mutationFn: ({ oaId, etapaId, data }: { oaId: string; etapaId: string; data: AtualizarEtapaPayload }) =>
+      api.patch<EtapaOADetalhe>(`/oas/${oaId}/etapas/${etapaId}`, data).then((r) => r.data),
+
+    // ── Optimistic update: UI responde instantaneamente ───────────────────
+    onMutate: async ({ oaId, etapaId, data }) => {
+      // Cancela refetches em andamento para não sobrescrever o otimismo
+      await qc.cancelQueries({ queryKey: ["cursos", "oas"] });
+
+      // Snapshot do estado atual (para rollback em caso de erro)
+      const snapshots = qc.getQueriesData<OADetalhe[]>({ queryKey: ["cursos", "oas"] });
+
+      // Campos que existem na etapa cacheada (exclui metadados da requisição)
+      const { recalcularSequencia: _rc, ...etapaFields } = data;
+
+      // Aplica update otimístico em todas as listas de OAs cacheadas
+      qc.setQueriesData<OADetalhe[]>(
+        { queryKey: ["cursos", "oas"] },
+        (cached) => cached?.map((oa) =>
+          oa.id !== oaId
+            ? oa
+            : { ...oa, etapas: oa.etapas.map((e) => e.id !== etapaId ? e : { ...e, ...etapaFields }) }
+        ),
+      );
+
+      return { snapshots };
+    },
+
+    // ── Rollback se o servidor rejeitar ──────────────────────────────────
+    onError: (_err, _vars, context) => {
+      for (const [key, data] of context?.snapshots ?? []) {
+        qc.setQueryData(key, data);
+      }
+    },
+
+    // ── Aplica dados reais do servidor (substitui optimismo) ──────────────
+    onSuccess: (etapaAtualizada, { oaId }) => {
+      qc.setQueriesData<OADetalhe[]>(
+        { queryKey: ["cursos", "oas"] },
+        (cached) => cached?.map((oa) =>
+          oa.id !== oaId
+            ? oa
+            : { ...oa, etapas: oa.etapas.map((e) => e.id === etapaAtualizada.id ? { ...e, ...etapaAtualizada } : e) }
+        ),
+      );
+    },
+
+    onSettled: () => {
+      // Invalida apenas queries pequenas, não a lista de 41 OAs
       qc.invalidateQueries({ queryKey: oaKeys.meuTrabalho() });
       qc.invalidateQueries({ queryKey: cursoKeys.stats() });
     },
