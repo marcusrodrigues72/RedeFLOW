@@ -4,11 +4,13 @@ import {
   Box, Typography, Paper, TextField, Button, Divider,
   Switch, FormControlLabel, Alert, CircularProgress, Avatar,
 } from "@mui/material";
-import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
-import LockOutlinedIcon  from "@mui/icons-material/LockOutlined";
-import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
+import PersonOutlineIcon   from "@mui/icons-material/PersonOutline";
+import LockOutlinedIcon    from "@mui/icons-material/LockOutlined";
+import EmailOutlinedIcon   from "@mui/icons-material/EmailOutlined";
+import PlayArrowOutlinedIcon from "@mui/icons-material/PlayArrowOutlined";
 import { useAuthStore }       from "@/stores/auth.store";
 import { useAtualizarPerfil } from "@/lib/api/cursos";
+import { api } from "@/lib/api";
 
 export const Route = createFileRoute("/_authed/perfil")({
   component: PerfilPage,
@@ -16,7 +18,10 @@ export const Route = createFileRoute("/_authed/perfil")({
 
 export default function PerfilPage() {
   const user    = useAuthStore((s) => s.user);
+  const isAdmin = user?.papelGlobal === "ADMIN";
   const { mutate, isPending } = useAtualizarPerfil();
+  const [cronMsg,     setCronMsg]     = useState<string | null>(null);
+  const [cronPending, setCronPending] = useState(false);
 
   // Dados pessoais
   const [nome,  setNome]  = useState(user?.nome  ?? "");
@@ -165,6 +170,49 @@ export default function PerfilPage() {
           </Button>
         </Box>
       </Paper>
+
+      {/* Ferramentas de Admin */}
+      {isAdmin && (
+        <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, mb: 3, borderColor: "#fde68a" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
+            <PlayArrowOutlinedIcon sx={{ color: "#d97706", fontSize: 20 }} />
+            <Typography fontWeight={600} color="#92400e">Ferramentas de Admin</Typography>
+          </Box>
+          <Typography variant="body2" color="text.secondary" mb={2}>
+            Dispara manualmente a verificação de deadlines — envia e-mails de prazo vencido e prazo próximo sem esperar o cron das 08:00. Útil para testar a integração com SendGrid.
+          </Typography>
+          {cronMsg && (
+            <Alert
+              severity={cronMsg.startsWith("Erro") ? "error" : "success"}
+              sx={{ mb: 2 }}
+              onClose={() => setCronMsg(null)}
+            >
+              {cronMsg}
+            </Alert>
+          )}
+          <Button
+            variant="outlined"
+            color="warning"
+            size="small"
+            disabled={cronPending}
+            startIcon={cronPending ? <CircularProgress size={14} color="inherit" /> : <PlayArrowOutlinedIcon />}
+            onClick={async () => {
+              setCronPending(true);
+              setCronMsg(null);
+              try {
+                const r = await api.post<{ message: string }>("/admin/run-deadline-checks");
+                setCronMsg(r.data.message);
+              } catch {
+                setCronMsg("Erro ao executar o job. Verifique os logs do servidor.");
+              } finally {
+                setCronPending(false);
+              }
+            }}
+          >
+            Executar verificação de deadlines agora
+          </Button>
+        </Paper>
+      )}
 
       {/* Alterar senha */}
       <Paper variant="outlined" sx={{ p: 3, borderRadius: 3 }}>

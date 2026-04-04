@@ -6,6 +6,7 @@ import oasRouter           from "./oas.js";
 import relatoriosRouter    from "./relatorios.js";
 import notificacoesRouter  from "./notificacoes.js";
 import usuariosRouter      from "./usuarios.js";
+import adminRouter         from "./admin.js";
 
 const router = Router();
 
@@ -20,5 +21,6 @@ router.use("/oas",           oasRouter);
 router.use("/relatorios",    relatoriosRouter);
 router.use("/notificacoes",  notificacoesRouter);
 router.use("/usuarios",      usuariosRouter);
+router.use("/admin",         adminRouter);
 
 export default router;
