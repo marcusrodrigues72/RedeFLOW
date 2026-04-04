@@ -300,11 +300,16 @@ export function useAtualizarEtapaGeral() {
       }
     },
 
-    onSuccess: (etapaAtualizada, { oaId }) => {
-      patchOACache(qc, oaId, (oa) => ({
-        ...oa,
-        etapas: oa.etapas.map((e) => e.id === etapaAtualizada.id ? { ...e, ...etapaAtualizada } : e),
-      }));
+    onSuccess: (etapaAtualizada, { oaId, data }) => {
+      if (data.recalcularSequencia) {
+        // Subsequentes tiveram deadlines recalculados no servidor — invalida todas as listas
+        qc.invalidateQueries({ queryKey: ["cursos", "oas"] });
+      } else {
+        patchOACache(qc, oaId, (oa) => ({
+          ...oa,
+          etapas: oa.etapas.map((e) => e.id === etapaAtualizada.id ? { ...e, ...etapaAtualizada } : e),
+        }));
+      }
     },
 
     onSettled: () => {

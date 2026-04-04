@@ -84,14 +84,8 @@ export const oaRepository = {
       },
       include: {
         capitulo: { include: { unidade: { include: { curso: true } } } },
+        // Busca TODAS as etapas para verificar predecessoras no controller
         etapas: {
-          where: {
-            OR: [
-              { responsavelId: usuarioId },
-              { responsavelSecundarioId: usuarioId },
-            ],
-            status: { not: "CONCLUIDA" },
-          },
           include: { etapaDef: true, responsavel: true, responsavelSecundario: true },
           orderBy: { ordem: "asc" },
         },

@@ -133,8 +133,10 @@ function OADetalhePage() {
             </Box>
             <Stepper activeStep={etapaAtivaIdx} orientation="vertical">
               {oa.etapas.map((etapa, idx) => {
-                const cfg     = STATUS_ETAPA[etapa.status];
-                const isAtiva = idx === etapaAtivaIdx;
+                const cfg           = STATUS_ETAPA[etapa.status];
+                const isAtiva       = idx === etapaAtivaIdx;
+                const isResponsavel = user?.id === etapa.responsavelId || user?.id === etapa.responsavelSecundarioId;
+                const podeEditar    = isAdmin || isResponsavel;
                 return (
                   <Step key={etapa.id} completed={etapa.status === "CONCLUIDA"}>
                     <StepLabel
@@ -172,7 +174,7 @@ function OADetalhePage() {
                               value={etapa.status}
                               label="Status"
                               onChange={(e) => atualizarEtapa({ etapaId: etapa.id, data: { status: e.target.value as StatusEtapa } })}
-                              disabled={isPending}
+                              disabled={isPending || !podeEditar}
                             >
                               <MenuItem value="PENDENTE">Pendente</MenuItem>
                               <MenuItem value="EM_ANDAMENTO">Em Andamento</MenuItem>
@@ -189,7 +191,7 @@ function OADetalhePage() {
                                 etapaId: etapa.id,
                                 data: { responsavelId: e.target.value || null },
                               })}
-                              disabled={isPending}
+                              disabled={isPending || !isAdmin}
                             >
                               <MenuItem value=""><em>Sem responsável</em></MenuItem>
                               {curso.membros.map((m) => (
@@ -208,7 +210,7 @@ function OADetalhePage() {
                                   etapaId: etapa.id,
                                   data: { responsavelSecundarioId: e.target.value || null },
                                 })}
-                                disabled={isPending}
+                                disabled={isPending || !isAdmin}
                               >
                                 <MenuItem value=""><em>Sem videomaker</em></MenuItem>
                                 {curso.membros.map((m) => (
@@ -220,7 +222,7 @@ function OADetalhePage() {
                           {etapa.status !== "CONCLUIDA" && (
                             <Button
                               variant="contained" size="small"
-                              disabled={isPending}
+                              disabled={isPending || !podeEditar}
                               onClick={() => atualizarEtapa({
                                 etapaId: etapa.id,
                                 data: { status: "CONCLUIDA", deadlineReal: new Date().toISOString() },

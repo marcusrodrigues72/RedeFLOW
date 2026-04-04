@@ -24,8 +24,23 @@ export class OAController {
   // GET /meu-trabalho
   meuTrabalho = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const oas = await oaRepository.findByUsuario(req.usuario!.sub);
-      res.json(oas);
+      const userId = req.usuario!.sub;
+      const oas    = await oaRepository.findByUsuario(userId);
+
+      // Filtra: mostra apenas etapas que pertencem ao usuário, não concluídas,
+      // e cuja predecessora já esteja CONCLUIDA (ou seja a primeira etapa)
+      const result = oas.map((oa) => {
+        const etapasFiltradas = oa.etapas.filter((etapa) => {
+          const isAssigned = etapa.responsavelId === userId || etapa.responsavelSecundarioId === userId;
+          if (!isAssigned || etapa.status === "CONCLUIDA") return false;
+          if (etapa.ordem === 0) return true;
+          const predecessora = oa.etapas.find((e) => e.ordem === etapa.ordem - 1);
+          return !predecessora || predecessora.status === "CONCLUIDA";
+        });
+        return { ...oa, etapas: etapasFiltradas };
+      }).filter((oa) => oa.etapas.length > 0);
+
+      res.json(result);
     } catch (err) { next(err); }
   };
 
