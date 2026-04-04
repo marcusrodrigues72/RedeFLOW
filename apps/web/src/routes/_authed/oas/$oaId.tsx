@@ -133,10 +133,13 @@ function OADetalhePage() {
             </Box>
             <Stepper activeStep={etapaAtivaIdx} orientation="vertical">
               {oa.etapas.map((etapa, idx) => {
-                const cfg           = STATUS_ETAPA[etapa.status];
-                const isAtiva       = idx === etapaAtivaIdx;
-                const isResponsavel = user?.id === etapa.responsavelId || user?.id === etapa.responsavelSecundarioId;
-                const podeEditar    = isAdmin || isResponsavel;
+                const cfg              = STATUS_ETAPA[etapa.status];
+                const isAtiva         = idx === etapaAtivaIdx;
+                const isResponsavel   = user?.id === etapa.responsavelId || user?.id === etapa.responsavelSecundarioId;
+                const podeEditar      = isAdmin || isResponsavel;
+                // Bloqueia conclusão se a etapa exige artefato e ele ainda não foi adicionado
+                const precisaArtefato = etapa.etapaDef.temArtefato || etapa.etapaDef.papel === "PROFESSOR_ATOR";
+                const artefatoFaltando = precisaArtefato && !etapa.linkArtefato && !isAdmin;
                 return (
                   <Step key={etapa.id} completed={etapa.status === "CONCLUIDA"}>
                     <StepLabel
@@ -178,7 +181,7 @@ function OADetalhePage() {
                             >
                               <MenuItem value="PENDENTE">Pendente</MenuItem>
                               <MenuItem value="EM_ANDAMENTO">Em Andamento</MenuItem>
-                              <MenuItem value="CONCLUIDA">Concluída</MenuItem>
+                              <MenuItem value="CONCLUIDA" disabled={artefatoFaltando}>Concluída</MenuItem>
                               <MenuItem value="BLOQUEADA">Bloqueada</MenuItem>
                             </Select>
                           </FormControl>
@@ -220,17 +223,21 @@ function OADetalhePage() {
                             </FormControl>
                           )}
                           {etapa.status !== "CONCLUIDA" && (
-                            <Button
-                              variant="contained" size="small"
-                              disabled={isPending || !podeEditar}
-                              onClick={() => atualizarEtapa({
-                                etapaId: etapa.id,
-                                data: { status: "CONCLUIDA", deadlineReal: new Date().toISOString() },
-                              })}
-                              sx={{ fontWeight: 700 }}
-                            >
-                              Marcar como Concluída
-                            </Button>
+                            <Tooltip title={artefatoFaltando ? "Adicione o link do entregável antes de concluir esta etapa." : ""}>
+                              <span>
+                                <Button
+                                  variant="contained" size="small"
+                                  disabled={isPending || !podeEditar || artefatoFaltando}
+                                  onClick={() => atualizarEtapa({
+                                    etapaId: etapa.id,
+                                    data: { status: "CONCLUIDA", deadlineReal: new Date().toISOString() },
+                                  })}
+                                  sx={{ fontWeight: 700 }}
+                                >
+                                  Marcar como Concluída
+                                </Button>
+                              </span>
+                            </Tooltip>
                           )}
                         </Box>
                         {/* Template — link do objeto em produção (visível para etapas de produção) */}
