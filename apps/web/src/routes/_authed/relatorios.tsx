@@ -17,7 +17,7 @@ import { useState }          from "react";
 import type { ReactNode }    from "react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
-  Legend, ResponsiveContainer, ReferenceLine,
+  ResponsiveContainer, ReferenceLine,
 } from "recharts";
 import { useProgressoCursos, usePipelineStatus, useAtrasosResponsavel, useBurndown } from "@/lib/api/relatorios";
 import { useDashboardStats, useCursos } from "@/lib/api/cursos";
@@ -401,10 +401,12 @@ function BurndownChart({ cursoId }: { cursoId: string }) {
             label={{ value: "OAs restantes", angle: -90, position: "insideLeft", offset: 12, style: { fontSize: 10, fill: "#94a3b8" } }}
           />
           <RTooltip
-            formatter={(v: number | null, name: string) =>
-              v !== null ? [v, name === "planejado" ? "Planejado" : "Realizado"] : ["-", name]
-            }
-            labelFormatter={(l: string) => new Date(l + "T12:00:00").toLocaleDateString("pt-BR")}
+            formatter={(v: unknown, name: unknown) => {
+              const val = v as number | null | undefined;
+              const key = name as string;
+              return val != null ? [val, key === "planejado" ? "Planejado" : "Realizado"] : ["-", key];
+            }}
+            labelFormatter={(l: unknown) => new Date(String(l) + "T12:00:00").toLocaleDateString("pt-BR")}
             contentStyle={{ fontSize: 12, borderRadius: 8 }}
           />
           <ReferenceLine
