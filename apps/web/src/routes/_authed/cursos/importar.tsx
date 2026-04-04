@@ -103,8 +103,10 @@ function ImportarPage() {
         onSuccess: (data) => {
           setResultadoMI(data);
           setPasso(3);
-          // Redireciona para o Setup de Produção após 2s
-          setTimeout(() => navigate({ to: "/cursos/$cursoId/setup-producao", params: { cursoId: data.cursoId } }), 2000);
+          // Só redireciona se OAs foram gerados com sucesso
+          if (data.oasCriados > 0) {
+            setTimeout(() => navigate({ to: "/cursos/$cursoId/setup-producao", params: { cursoId: data.cursoId } }), 2000);
+          }
         },
       });
     }
@@ -361,9 +363,21 @@ function ImportarPage() {
                     </Paper>
                   ))}
                 </Box>
-                <Typography color="text.secondary" sx={{ mb: 3 }}>
+                <Typography color="text.secondary" sx={{ mb: resultadoMI.avisos?.length ? 2 : 3 }}>
                   Curso <strong>{nome}</strong> criado com pipeline de produção configurado.
                 </Typography>
+                {resultadoMI.avisos && resultadoMI.avisos.length > 0 && (
+                  <Alert severity={resultadoMI.oasCriados === 0 ? "error" : "warning"} sx={{ mb: 3, textAlign: "left" }}>
+                    <strong>
+                      {resultadoMI.oasCriados === 0
+                        ? "Nenhum OA foi gerado. Verifique os avisos abaixo:"
+                        : "Avisos durante a importação:"}
+                    </strong>
+                    <ul style={{ margin: "4px 0 0", paddingLeft: 20 }}>
+                      {resultadoMI.avisos.map((a, i) => <li key={i}>{a}</li>)}
+                    </ul>
+                  </Alert>
+                )}
               </>
             )}
 

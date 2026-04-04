@@ -98,6 +98,7 @@ export class CursoController {
       const curso   = await this.service.buscarPorId(cursoId, req.usuario!.sub);
       if (!curso) { res.status(404).json({ message: "Curso não encontrado." }); return; }
       const caps   = parseMI(req.file.buffer, req.file.originalname);
+      const avisos = buildMIPreview(caps).avisos;
       const result = await persistMI(caps, cursoId);
       res.json({
         message:              `MI importada: ${result.capitulosAtualizados} capítulos, ${result.objetivosCriados} objetivos, ${result.oasCriados} OAs gerados.`,
@@ -106,6 +107,7 @@ export class CursoController {
         objetivosCriados:     result.objetivosCriados,
         oasCriados:           result.oasCriados,
         oasIgnorados:         result.oasIgnorados,
+        avisos,
       });
     } catch (err) { next(err); }
   };
@@ -142,6 +144,7 @@ export class CursoController {
       });
 
       const caps   = parseMI(req.file.buffer, req.file.originalname);
+      const avisos = buildMIPreview(caps).avisos;
       const result = await persistMI(caps, curso.id, dataInicioDate ? { dataInicio: dataInicioDate } : {});
 
       res.status(201).json({
@@ -151,6 +154,7 @@ export class CursoController {
         objetivosCriados:     result.objetivosCriados,
         oasCriados:           result.oasCriados,
         oasIgnorados:         result.oasIgnorados,
+        avisos,
       });
     } catch (err) { next(err); }
   };

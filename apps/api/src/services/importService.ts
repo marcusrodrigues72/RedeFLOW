@@ -559,19 +559,55 @@ interface MIColMap {
 function buildMIColMap(headerRow: string[]): MIColMap {
   const h    = headerRow.map(normH);
   const find = (pat: RegExp) => h.findIndex((v) => pat.test(v));
+
+  // Capítulo — tenta "n capitulo" (Nº Capítulo) primeiro; fallback para qualquer "capitulo"
+  const capNum = (() => {
+    const byN = find(/^n[ \t].*capitulo/);
+    return byN >= 0 ? byN : find(/\bcapitulo\b/);
+  })();
+
+  // OA tipo — aceita plural/singular/abreviações comuns
+  const tipoOA = (() => {
+    // Tenta ordem de especificidade decrescente
+    for (const pat of [
+      /^objetos de aprendizagem$/, // exato padrão original
+      /^objeto de aprendizagem$/,  // singular
+      /objeto.*aprendizagem/,      // qualquer variação com ambas as palavras
+      /^tipo.*\boa\b/,             // "Tipo OA", "Tipo de OA"
+      /^oa$/,                      // coluna chamada apenas "OA"
+    ]) {
+      const idx = find(pat);
+      if (idx >= 0) return idx;
+    }
+    return -1;
+  })();
+
+  // Quantidade de OAs — aceita variações de "Nº Objetos de Aprendizagem"
+  const qtdOA = (() => {
+    for (const pat of [
+      /n.*objetos de aprendizagem/,
+      /n.*objeto.*aprendizagem/,
+      /n.*\boas?\b/,
+      /qtd.*\boas?\b/,
+      /quantidade.*\boas?\b/,
+    ]) {
+      const idx = find(pat);
+      if (idx >= 0) return idx;
+    }
+    return -1;
+  })();
+
   return {
-    // Capítulo — "n capitulo" (Nº Capítulo), não "nome capitulo"
-    capNum:             find(/^n .*capitulo|^n\tcapitulo/),
+    capNum,
     nome:               find(/nome.*capitulo/),
     conteudo:           find(/^conte/),
     // Objetivo — "n objetivo" (Nº OE), não "objetivo educacional"
-    oeNum:              find(/^n .*objetivo/),
+    oeNum:              find(/^n[ \t].*objetivo/),
     oeDesc:             find(/^objetivo educacional$/),
     bloom:              find(/nivel.*trb|^trb$|bloom/),
     papeis:             find(/papeis|atores/),
-    // OA — "objetos de aprendizagem" (tipo), não "nº objetos"
-    tipoOA:             find(/^objetos de aprendizagem$/),
-    qtdOA:              find(/n.*objetos de aprendizagem/),
+    tipoOA,
+    qtdOA,
     chSin:              find(/ch sincrona/),
     chAss:              find(/ch assincrona/),
     periodo:            find(/periodo/),
@@ -598,18 +634,40 @@ export function parseMI(buffer: Buffer, filename: string): MICapitulo[] {
       header: 1, raw: false, defval: "",
     }) as string[][];
 
-    // Localiza linha de cabeçalho pela presença de "Nº Capítulo" (ou variação)
-    let headerIdx = rows.findIndex((r) =>
-      r.some((c) => {
-        const n = normH(c?.toString() ?? "");
-        return /capitulo/.test(n) && /^n\b/.test(n);
-      })
-    );
+    // Localiza linha de cabeçalho pela presença de "Nº Capítulo" (ou variação).
+    // Estratégia 1: célula que contenha "capitulo" E comece com "n" (Nº Capítulo)
+    // Estratégia 2: linha que contenha AMBAS as palavras "capitulo" E "objetivo" em células distintas
+    let headerIdx = rows.findIndex((r) => {
+      const cells = r.map((c) => normH(c?.toString() ?? ""));
+      const hasCapN = cells.some((n) => /capitulo/.test(n) && /^n\b/.test(n));
+      if (hasCapN) return true;
+      const hasCap = cells.some((n) => /\bcapitulo\b/.test(n));
+      const hasObj = cells.some((n) => /\bobjetivo\b/.test(n));
+      return hasCap && hasObj;
+    });
     if (headerIdx === -1) headerIdx = 7; // fallback
 
     const colMap   = buildMIColMap(rows[headerIdx] ?? []);
     // Usa o índice detectado para capNum; fallback para 1 (posição real nos arquivos padrão)
     const capColIdx = colMap.capNum >= 0 ? colMap.capNum : 1;
+
+    // Log de diagnóstico: colunas críticas não encontradas
+    if (colMap.tipoOA < 0) {
+      logger.warn(
+        { sheetName, headerRow: rows[headerIdx]?.slice(0, 20) },
+        "parseMI: coluna 'Objetos de Aprendizagem' não detectada — OAs não serão gerados. Verifique o cabeçalho da planilha."
+      );
+    }
+    if (colMap.capNum < 0) {
+      logger.warn(
+        { sheetName, headerIdx, capColIdx },
+        "parseMI: coluna 'Nº Capítulo' não detectada — usando fallback coluna 1."
+      );
+    }
+    logger.debug(
+      { sheetName, headerIdx, tipoOA: colMap.tipoOA, qtdOA: colMap.qtdOA, capNum: colMap.capNum, oeDesc: colMap.oeDesc },
+      "parseMI: mapeamento de colunas"
+    );
 
     const dataRows = rows
       .slice(headerIdx + 1)

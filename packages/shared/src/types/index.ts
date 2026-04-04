@@ -352,4 +352,5 @@ export interface MIResult {
   objetivosCriados: number;
   oasCriados: number;
   oasIgnorados: number;
+  avisos?: string[];
 }
