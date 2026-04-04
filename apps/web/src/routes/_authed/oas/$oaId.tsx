@@ -249,11 +249,12 @@ function OADetalhePage() {
                             </Button>
                           </Box>
                         )}
-                        {/* Link de artefato — exibido apenas para etapas que produzem entregável */}
-                        {etapa.etapaDef.temArtefato && (
+                        {/* Link de artefato — etapas com entregável + Gravação (videomaker) */}
+                        {(etapa.etapaDef.temArtefato || etapa.etapaDef.papel === "PROFESSOR_ATOR") && (
                           <ArtefatoInput
                             etapa={etapa}
                             isPending={isPending}
+                            label={etapa.etapaDef.papel === "PROFESSOR_ATOR" ? "Vídeo Gravado" : undefined}
                             onSave={(link) => atualizarEtapa({ etapaId: etapa.id, data: { linkArtefato: link } })}
                           />
                         )}
@@ -305,21 +306,31 @@ function OADetalhePage() {
             </CardContent>
           </Card>
 
-          {/* Links */}
-          {(oa.linkObjeto || oa.linkObjetoFinal) && (
+          {/* Links — roteiro + artefatos por etapa + objeto final */}
+          {(oa.linkObjeto || oa.linkObjetoFinal || oa.etapas.some((e) => e.linkArtefato)) && (
             <Card>
               <CardContent sx={{ p: 3 }}>
                 <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>Links</Typography>
-                {oa.linkObjeto && (
-                  <Button href={oa.linkObjeto} target="_blank" variant="outlined" fullWidth size="small" sx={{ mb: 1 }}>
-                    Objeto em Produção
-                  </Button>
-                )}
-                {oa.linkObjetoFinal && (
-                  <Button href={oa.linkObjetoFinal} target="_blank" variant="contained" fullWidth size="small">
-                    Objeto Final
-                  </Button>
-                )}
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+                  {oa.linkObjeto && (
+                    <LinkFase
+                      label={oa.tipo === "VIDEO" ? "Roteiro de Produção" : "Template de Produção"}
+                      href={oa.linkObjeto}
+                    />
+                  )}
+                  {oa.etapas
+                    .filter((e) => e.linkArtefato)
+                    .map((e) => (
+                      <LinkFase
+                        key={e.id}
+                        label={PAPEL_LINK_LABEL[e.etapaDef.papel] ?? e.etapaDef.nome}
+                        href={e.linkArtefato!}
+                      />
+                    ))}
+                  {oa.linkObjetoFinal && (
+                    <LinkFase label="Objeto Final" href={oa.linkObjetoFinal} primary />
+                  )}
+                </Box>
               </CardContent>
             </Card>
           )}
@@ -595,12 +606,52 @@ function HistoricoItem({ log, isLast }: { log: AuditLogEntry; isLast: boolean })
   );
 }
 
+// ─── Mapa de rótulos de link por papel ────────────────────────────────────────
+
+const PAPEL_LINK_LABEL: Record<string, string> = {
+  PROFESSOR_ATOR:        "Vídeo Gravado",
+  EDITOR_VIDEO:          "Vídeo Final (Edição)",
+  CONTEUDISTA:           "Conteúdo",
+  DESIGNER_INSTRUCIONAL: "Versão Revisada DI",
+  PRODUTOR_FINAL:        "Versão de Produção Final",
+  VALIDADOR_FINAL:       "Versão Validada",
+};
+
+// ─── LinkFase — link rotulado por fase ────────────────────────────────────────
+
+function LinkFase({ label, href, primary }: { label: string; href: string; primary?: boolean }) {
+  return (
+    <Box>
+      <Typography
+        variant="caption"
+        sx={{ display: "block", mb: 0.5, fontWeight: 700, color: "text.disabled",
+          textTransform: "uppercase", letterSpacing: "0.07em", fontSize: "0.62rem" }}
+      >
+        {label}
+      </Typography>
+      <Button
+        href={href} target="_blank" rel="noopener noreferrer"
+        variant={primary ? "contained" : "outlined"}
+        fullWidth size="small"
+        startIcon={<LinkIcon sx={{ fontSize: 13 }} />}
+        sx={{ justifyContent: "flex-start", fontSize: "0.75rem", textTransform: "none",
+          overflow: "hidden", "& .MuiButton-endIcon": { ml: "auto" } }}
+      >
+        <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {href.length > 36 ? href.slice(0, 36) + "…" : href}
+        </Box>
+      </Button>
+    </Box>
+  );
+}
+
 // ─── Link de artefato (entregável da etapa) ───────────────────────────────────
 
-function ArtefatoInput({ etapa, isPending, onSave }: {
+function ArtefatoInput({ etapa, isPending, onSave, label }: {
   etapa: { linkArtefato: string | null; etapaDef: { nome: string } };
   isPending: boolean;
   onSave: (link: string | null) => void;
+  label?: string;
 }) {
   const [editando, setEditando] = useState(false);
   const [valor, setValor]       = useState(etapa.linkArtefato ?? "");
@@ -612,7 +663,7 @@ function ArtefatoInput({ etapa, isPending, onSave }: {
   return (
     <Box sx={{ mt: 1.5, pt: 1.5, borderTop: "1px solid", borderColor: "divider" }}>
       <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ display: "block", mb: 0.75 }}>
-        Link do artefato ({etapa.etapaDef.nome})
+        {label ?? `Link do artefato (${etapa.etapaDef.nome})`}
       </Typography>
       {editando ? (
         <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
