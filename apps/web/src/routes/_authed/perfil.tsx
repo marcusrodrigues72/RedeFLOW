@@ -16,6 +16,7 @@ export const Route = createFileRoute("/_authed/perfil")({
 
 export default function PerfilPage() {
   const user    = useAuthStore((s) => s.user);
+  const isAdmin = user?.papelGlobal === "ADMIN";
   const { mutate, isPending } = useAtualizarPerfil();
 
   // Dados pessoais
@@ -132,26 +133,29 @@ export default function PerfilPage() {
           />
         </Box>
 
-        <Divider sx={{ my: 2.5 }} />
-
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
-          <EmailOutlinedIcon sx={{ color: "text.secondary", fontSize: 20 }} />
-          <Typography fontWeight={600}>Notificações por e-mail</Typography>
-        </Box>
-        <FormControlLabel
-          control={
-            <Switch
-              checked={notifEmail}
-              onChange={(e) => setNotifEmail(e.target.checked)}
-              color="primary"
+        {isAdmin && (
+          <>
+            <Divider sx={{ my: 2.5 }} />
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
+              <EmailOutlinedIcon sx={{ color: "text.secondary", fontSize: 20 }} />
+              <Typography fontWeight={600}>Notificações por e-mail</Typography>
+            </Box>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={notifEmail}
+                  onChange={(e) => setNotifEmail(e.target.checked)}
+                  color="primary"
+                />
+              }
+              label={
+                <Typography variant="body2">
+                  {notifEmail ? "Receber alertas de prazo por e-mail" : "Notificações por e-mail desativadas"}
+                </Typography>
+              }
             />
-          }
-          label={
-            <Typography variant="body2">
-              {notifEmail ? "Receber alertas de prazo por e-mail" : "Notificações por e-mail desativadas"}
-            </Typography>
-          }
-        />
+          </>
+        )}
 
         <Box sx={{ mt: 2.5, display: "flex", justifyContent: "flex-end" }}>
           <Button

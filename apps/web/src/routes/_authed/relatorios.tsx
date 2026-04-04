@@ -3,19 +3,24 @@ import {
   Box, Typography, Card, CardContent, LinearProgress,
   Chip, Skeleton, Alert, Table, TableHead, TableRow,
   TableCell, TableBody, Divider, Collapse, IconButton,
-  Tooltip,
+  Tooltip, Select, MenuItem, FormControl, InputLabel,
 } from "@mui/material";
-import TrendingUpIcon       from "@mui/icons-material/TrendingUp";
-import WarningAmberIcon     from "@mui/icons-material/WarningAmber";
-import AccountTreeIcon      from "@mui/icons-material/AccountTree";
+import TrendingUpIcon        from "@mui/icons-material/TrendingUp";
+import WarningAmberIcon      from "@mui/icons-material/WarningAmber";
+import AccountTreeIcon       from "@mui/icons-material/AccountTree";
+import ShowChartIcon         from "@mui/icons-material/ShowChart";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon   from "@mui/icons-material/KeyboardArrowUp";
 import OpenInNewIcon         from "@mui/icons-material/OpenInNew";
 import CheckCircleIcon       from "@mui/icons-material/CheckCircle";
 import { useState }          from "react";
 import type { ReactNode }    from "react";
-import { useProgressoCursos, usePipelineStatus, useAtrasosResponsavel } from "@/lib/api/relatorios";
-import { useDashboardStats } from "@/lib/api/cursos";
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
+  Legend, ResponsiveContainer, ReferenceLine,
+} from "recharts";
+import { useProgressoCursos, usePipelineStatus, useAtrasosResponsavel, useBurndown } from "@/lib/api/relatorios";
+import { useDashboardStats, useCursos } from "@/lib/api/cursos";
 import type { StatusOA }     from "shared";
 
 export const Route = createFileRoute("/_authed/relatorios")({
@@ -49,6 +54,8 @@ function RelatoriosPage() {
   const { data: pipeline,      isLoading: loadPipeline, isError: errPipeline } = usePipelineStatus();
   const { data: atrasos  = [], isLoading: loadAtrasos,  isError: errAtrasos  } = useAtrasosResponsavel();
   const { data: stats,         isLoading: loadStats                           } = useDashboardStats();
+  const { data: todosCursos = [] }                                              = useCursos();
+  const [burndownCursoId, setBurndownCursoId] = useState<string | null>(null);
 
   // KPIs usam a mesma fonte do Dashboard para consistência
   const totalOAs     = stats?.totalOAs    ?? 0;
@@ -163,6 +170,46 @@ function RelatoriosPage() {
               );
             })}
           </Box>
+        )}
+      </Section>
+
+      {/* ── Burndown de OAs ──────────────────────────────────────────────────── */}
+      <Section title="Burndown de OAs — Planejado vs. Real" icon={<ShowChartIcon sx={{ fontSize: 18 }} />} mb>
+        <Box sx={{ px: 3, pt: 2.5, pb: 1, display: "flex", alignItems: "center", gap: 2 }}>
+          <FormControl size="small" sx={{ minWidth: 280 }}>
+            <InputLabel>Selecione o curso</InputLabel>
+            <Select
+              value={burndownCursoId ?? ""}
+              label="Selecione o curso"
+              onChange={(e) => setBurndownCursoId(e.target.value || null)}
+            >
+              <MenuItem value=""><em>Escolha um curso…</em></MenuItem>
+              {todosCursos.map((c) => (
+                <MenuItem key={c.id} value={c.id}>{c.nome}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          {burndownCursoId && (
+            <Box sx={{ display: "flex", gap: 2 }}>
+              {[
+                { label: "Planejado (ideal)", color: "#94a3b8", dash: true },
+                { label: "Realizado",         color: "#2b7cee", dash: false },
+              ].map((l) => (
+                <Box key={l.label} sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                  <Box sx={{ width: 24, height: 2, bgcolor: l.color, borderTop: l.dash ? "2px dashed" : "2px solid", borderColor: l.color }} />
+                  <Typography variant="caption" color="text.secondary">{l.label}</Typography>
+                </Box>
+              ))}
+            </Box>
+          )}
+        </Box>
+        <Divider />
+        {!burndownCursoId ? (
+          <Box sx={{ p: 4, textAlign: "center" }}>
+            <Typography variant="body2" color="text.secondary">Selecione um curso para visualizar o burndown.</Typography>
+          </Box>
+        ) : (
+          <BurndownChart cursoId={burndownCursoId} />
         )}
       </Section>
 
@@ -285,6 +332,100 @@ function RelatoriosPage() {
           )}
         </Section>
       </Box>
+    </Box>
+  );
+}
+
+// ─── Burndown Chart ───────────────────────────────────────────────────────────
+
+function BurndownChart({ cursoId }: { cursoId: string }) {
+  const { data, isLoading, isError } = useBurndown(cursoId);
+
+  if (isLoading) return <LoadingRows n={5} />;
+  if (isError || !data) return <Alert severity="error" sx={{ m: 2 }}>Erro ao carregar burndown.</Alert>;
+  if (data.totalOAs === 0) return <Empty msg="Nenhum OA encontrado para este curso." />;
+
+  const hoje = new Date().toISOString().slice(0, 10);
+  const pct  = data.totalOAs > 0
+    ? Math.round(((data.series.find((p) => p.realizado !== null && p.data <= hoje)?.realizado ?? data.totalOAs) / data.totalOAs) * -1 + 100)
+    : 0;
+  const concluidos = data.series.reduceRight<number | null>((acc, p) => acc !== null ? acc : (p.realizado !== null ? data.totalOAs - p.realizado : null), null) ?? 0;
+
+  const formatX = (v: string) => {
+    const d = new Date(v + "T12:00:00");
+    return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  };
+
+  return (
+    <Box sx={{ px: 3, py: 2 }}>
+      {/* Mini KPIs */}
+      <Box sx={{ display: "flex", gap: 3, mb: 2.5 }}>
+        <Box>
+          <Typography variant="caption" color="text.secondary">Total de OAs</Typography>
+          <Typography fontWeight={800} sx={{ fontSize: "1.25rem", color: "#2b7cee" }}>{data.totalOAs}</Typography>
+        </Box>
+        <Box>
+          <Typography variant="caption" color="text.secondary">Concluídos</Typography>
+          <Typography fontWeight={800} sx={{ fontSize: "1.25rem", color: "#10b981" }}>{concluidos}</Typography>
+        </Box>
+        <Box>
+          <Typography variant="caption" color="text.secondary">Progresso</Typography>
+          <Typography fontWeight={800} sx={{ fontSize: "1.25rem", color: pct >= 70 ? "#10b981" : pct >= 40 ? "#f59e0b" : "#ef4444" }}>{pct}%</Typography>
+        </Box>
+        <Box>
+          <Typography variant="caption" color="text.secondary">Período</Typography>
+          <Typography variant="body2" fontWeight={600}>
+            {new Date(data.dataInicio + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+            {" → "}
+            {new Date(data.dataFim + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}
+          </Typography>
+        </Box>
+      </Box>
+
+      <ResponsiveContainer width="100%" height={280}>
+        <LineChart data={data.series} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+          <XAxis
+            dataKey="data"
+            tickFormatter={formatX}
+            tick={{ fontSize: 11, fill: "#94a3b8" }}
+            tickLine={false}
+            interval="preserveStartEnd"
+          />
+          <YAxis
+            tick={{ fontSize: 11, fill: "#94a3b8" }}
+            tickLine={false}
+            axisLine={false}
+            domain={[0, data.totalOAs]}
+            allowDecimals={false}
+            label={{ value: "OAs restantes", angle: -90, position: "insideLeft", offset: 12, style: { fontSize: 10, fill: "#94a3b8" } }}
+          />
+          <RTooltip
+            formatter={(v: number | null, name: string) =>
+              v !== null ? [v, name === "planejado" ? "Planejado" : "Realizado"] : ["-", name]
+            }
+            labelFormatter={(l: string) => new Date(l + "T12:00:00").toLocaleDateString("pt-BR")}
+            contentStyle={{ fontSize: 12, borderRadius: 8 }}
+          />
+          <ReferenceLine
+            x={hoje}
+            stroke="#ef4444"
+            strokeDasharray="4 2"
+            label={{ value: "Hoje", position: "top", fontSize: 10, fill: "#ef4444" }}
+          />
+          <Line
+            type="monotone" dataKey="planejado" name="planejado"
+            stroke="#94a3b8" strokeDasharray="6 3" strokeWidth={2}
+            dot={false} activeDot={{ r: 3 }}
+          />
+          <Line
+            type="monotone" dataKey="realizado" name="realizado"
+            stroke="#2b7cee" strokeWidth={2.5}
+            dot={false} activeDot={{ r: 4 }}
+            connectNulls={false}
+          />
+        </LineChart>
+      </ResponsiveContainer>
     </Box>
   );
 }

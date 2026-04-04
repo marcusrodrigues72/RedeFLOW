@@ -354,3 +354,20 @@ export interface MIResult {
   oasIgnorados: number;
   avisos?: string[];
 }
+
+// ─── Burndown ─────────────────────────────────────────────────────────────────
+
+export interface BurndownPonto {
+  data:       string;   // "YYYY-MM-DD"
+  planejado:  number;   // OAs restantes no ideal
+  realizado:  number | null; // OAs restantes real (null = data futura)
+}
+
+export interface RelatorioBurndown {
+  cursoId:    string;
+  cursoNome:  string;
+  dataInicio: string;
+  dataFim:    string;
+  totalOAs:   number;
+  series:     BurndownPonto[];
+}

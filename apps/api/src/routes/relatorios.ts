@@ -296,4 +296,98 @@ router.get("/alocacao", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /relatorios/burndown?cursoId=xxx
+router.get("/burndown", async (req, res, next) => {
+  try {
+    const { cursoId } = req.query as { cursoId?: string };
+    if (!cursoId) { res.status(400).json({ message: "cursoId é obrigatório." }); return; }
+
+    const usuarioId = req.usuario!.sub;
+    const isAdmin   = req.usuario!.papel === "ADMIN";
+
+    const curso = await prisma.curso.findFirst({
+      where: {
+        id: cursoId,
+        ...(isAdmin ? {} : { membros: { some: { usuarioId } } }),
+      },
+      select: { id: true, nome: true, dataInicio: true, dataFim: true },
+    });
+    if (!curso) { res.status(404).json({ message: "Curso não encontrado." }); return; }
+
+    // OAs com deadlineFinal e etapas (para calcular data real de conclusão)
+    const oas = await prisma.objetoAprendizagem.findMany({
+      where: { capitulo: { unidade: { cursoId } } },
+      select: {
+        deadlineFinal: true,
+        status:        true,
+        etapas: {
+          select: { deadlineReal: true },
+          where:  { deadlineReal: { not: null } },
+        },
+      },
+    });
+
+    const totalOAs = oas.length;
+    if (totalOAs === 0) {
+      res.json({ cursoId, cursoNome: curso.nome, dataInicio: null, dataFim: null, totalOAs: 0, series: [] });
+      return;
+    }
+
+    // Para cada OA concluído: data real = max(deadlineReal) entre suas etapas
+    const oaData = oas.map((oa) => ({
+      deadlineFinal: oa.deadlineFinal,
+      completedAt:   oa.status === "CONCLUIDO"
+        ? oa.etapas.reduce<Date | null>(
+            (max, e) => e.deadlineReal && (!max || e.deadlineReal > max) ? e.deadlineReal : max,
+            null,
+          )
+        : null,
+    }));
+
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
+    // Intervalo do burndown
+    const deadlines = oaData.filter((o) => o.deadlineFinal).map((o) => o.deadlineFinal!.getTime());
+    const startDate = new Date(curso.dataInicio?.getTime() ?? Math.min(...deadlines));
+    const endDate   = new Date(curso.dataFim?.getTime()   ?? Math.max(...deadlines));
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(0, 0, 0, 0);
+
+    const totalDays = Math.max(1, (endDate.getTime() - startDate.getTime()) / 86_400_000);
+    const lastPoint = new Date(Math.max(endDate.getTime(), hoje.getTime()));
+
+    // Gera pontos semanais (+ ponto inicial e final)
+    const points: Date[] = [new Date(startDate)];
+    const cur = new Date(startDate);
+    cur.setDate(cur.getDate() + 7);
+    while (cur <= lastPoint) {
+      points.push(new Date(cur));
+      cur.setDate(cur.getDate() + 7);
+    }
+    if (points[points.length - 1].getTime() < lastPoint.getTime()) {
+      points.push(new Date(lastPoint));
+    }
+
+    const series = points.map((date) => {
+      const daysElapsed = (date.getTime() - startDate.getTime()) / 86_400_000;
+      const planejado   = Math.max(0, Math.round(totalOAs * (1 - daysElapsed / totalDays)));
+
+      let realizado: number | null = null;
+      if (date <= hoje) {
+        const done = oaData.filter((o) => o.completedAt && o.completedAt <= date).length;
+        realizado  = totalOAs - done;
+      }
+
+      return { data: date.toISOString().slice(0, 10), planejado, realizado };
+    });
+
+    res.json({ cursoId, cursoNome: curso.nome,
+      dataInicio: startDate.toISOString().slice(0, 10),
+      dataFim:    endDate.toISOString().slice(0, 10),
+      totalOAs, series,
+    });
+  } catch (err) { next(err); }
+});
+
 export default router;
