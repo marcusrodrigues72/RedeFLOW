@@ -413,8 +413,16 @@ export async function persistMC(rows: MCRow[], cursoId: string): Promise<{ criad
       const capituloId = capituloCache.get(capKey)!;
 
       // ── OA já existe? ─────────────────────────────────────────────────────
-      const existing = await prisma.objetoAprendizagem.findUnique({ where: { codigo: row.codigo } });
-      if (existing) { ignorados++; continue; }
+      const existing = await prisma.objetoAprendizagem.findUnique({
+        where:  { codigo: row.codigo },
+        select: { id: true, capitulo: { select: { unidade: { select: { cursoId: true } } } } },
+      });
+      if (existing) {
+        if (existing.capitulo?.unidade?.cursoId === cursoId) { ignorados++; continue; }
+        // OA órfão de outro curso — remove para recriar neste curso
+        logger.warn({ codigo: row.codigo, cursoId }, "persistMC: removendo OA órfão de curso anterior");
+        await prisma.objetoAprendizagem.delete({ where: { id: existing.id } });
+      }
 
       // ── Status global do OA ──────────────────────────────────────────────
       let statusOA: "PENDENTE" | "EM_ANDAMENTO" | "CONCLUIDO" = "PENDENTE";
@@ -932,8 +940,19 @@ export async function persistMI(caps: MICapitulo[], cursoId: string, options: { 
         const letra = TIPO_LETRA[def.tipo] ?? "S";
         for (let n = 1; n <= def.quantidade; n++) {
           const codigo = `U${cap.unidade}C${cap.numero}O${def.oeNumero}${letra}${n}`;
-          const existing = await prisma.objetoAprendizagem.findUnique({ where: { codigo } });
-          if (existing) { oasIgnorados++; continue; }
+          const existing = await prisma.objetoAprendizagem.findUnique({
+            where:  { codigo },
+            select: { id: true, capitulo: { select: { unidade: { select: { cursoId: true } } } } },
+          });
+          if (existing) {
+            if (existing.capitulo?.unidade?.cursoId === cursoId) {
+              // Mesmo curso: OA já importado, pula normalmente
+              oasIgnorados++; continue;
+            }
+            // OA órfão de curso diferente (excluído sem cascade) — remove para recriar
+            logger.warn({ codigo, cursoId }, "persistMI: removendo OA órfão de curso anterior");
+            await prisma.objetoAprendizagem.delete({ where: { id: existing.id } });
+          }
 
           const oa = await prisma.objetoAprendizagem.create({
             data: {
