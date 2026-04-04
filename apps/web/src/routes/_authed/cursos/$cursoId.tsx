@@ -47,6 +47,7 @@ function CursoDetalhePage() {
   const { mutate: atualizar, isPending: atualizando } = useAtualizarCurso(cursoId);
   const { mutate: excluir,   isPending: excluindo   } = useExcluirCurso();
   const { mutate: exportar,  isPending: exportando  } = useExportarMC(cursoId, curso?.codigo ?? "");
+  const { data: oasDoCurso = [] }                     = useOAsByCurso(cursoId, {});
 
   if (isLoading) return <LoadingSkeleton />;
   if (isError || !curso) return (
@@ -59,8 +60,6 @@ function CursoDetalhePage() {
 
   const isAdmin = user?.papelGlobal === "ADMIN"
     || curso.membros.some((m) => m.usuarioId === user?.id && m.papel === "ADMIN");
-
-  const { data: oasDoCurso = [] } = useOAsByCurso(cursoId, {});
   const setupPendente = oasDoCurso.length > 0
     ? oasDoCurso.filter((oa) =>
         oa.etapas.some((e) => e.etapaDef.papel === "COORDENADOR_PRODUCAO" && e.status !== "CONCLUIDA")
