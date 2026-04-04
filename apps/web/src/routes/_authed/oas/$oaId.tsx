@@ -72,8 +72,26 @@ function OADetalhePage() {
   // Índice da etapa ativa (primeira não concluída)
   const etapaAtivaIdx = oa.etapas.findIndex((e) => e.status !== "CONCLUIDA");
 
+  const setupEtapa   = oa.etapas.find((e) => e.etapaDef.papel === "COORDENADOR_PRODUCAO");
+  const setupPendente = setupEtapa && setupEtapa.status !== "CONCLUIDA";
+
   return (
     <Box>
+      {/* Banner de Setup pendente */}
+      {setupPendente && (
+        <Alert
+          severity="warning"
+          sx={{ mb: 2.5 }}
+          action={
+            <Button component={Link} to={`/cursos/${curso.id}/setup-producao`} size="small" color="inherit" sx={{ fontWeight: 700, whiteSpace: "nowrap" }}>
+              Ir para Setup
+            </Button>
+          }
+        >
+          O Setup de Produção deste OA ainda não foi concluído. Configure templates, responsáveis e deadlines antes de iniciar a produção.
+        </Alert>
+      )}
+
       {/* Header */}
       <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", mb: 3 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>

@@ -264,6 +264,19 @@ export class OAController {
         });
       }
 
+      // Auto-ativa o curso quando o primeiro Setup de Produção é concluído
+      if (status === "CONCLUIDA" && oa) {
+        const etapaAtualizada = oa.etapas.find((e) => e.id === req.params["etapaId"]);
+        if (etapaAtualizada?.etapaDef.papel === "COORDENADOR_PRODUCAO") {
+          const { prisma: db } = await import("../lib/prisma.js");
+          const cursoId = oa.capitulo.unidade.cursoId;
+          const cursoAtual = await db.curso.findUnique({ where: { id: cursoId }, select: { status: true } });
+          if (cursoAtual?.status === "RASCUNHO") {
+            await db.curso.update({ where: { id: cursoId }, data: { status: "ATIVO" } });
+          }
+        }
+      }
+
       // Notifica responsável da próxima etapa quando a atual é concluída
       if (status === "CONCLUIDA" && oa) {
         const { prisma: db } = await import("../lib/prisma.js");

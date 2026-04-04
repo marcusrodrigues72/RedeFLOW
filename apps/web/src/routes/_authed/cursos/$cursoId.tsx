@@ -23,7 +23,7 @@ import PersonAddIcon   from "@mui/icons-material/PersonAdd";
 import SearchIcon      from "@mui/icons-material/Search";
 import InputAdornment  from "@mui/material/InputAdornment";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
-import { useCurso, useAdicionarMembro, useRemoverMembro, useAtualizarCurso, useExcluirCurso, useAtribuicaoPreview, useAtribuirResponsaveis, useExportarMC } from "@/lib/api/cursos";
+import { useCurso, useOAsByCurso, useAdicionarMembro, useRemoverMembro, useAtualizarCurso, useExcluirCurso, useAtribuicaoPreview, useAtribuirResponsaveis, useExportarMC } from "@/lib/api/cursos";
 import { useUsuarios } from "@/lib/api/usuarios";
 import { useAuthStore } from "@/stores/auth.store";
 import type { PapelEtapa } from "shared";
@@ -60,8 +60,33 @@ function CursoDetalhePage() {
   const isAdmin = user?.papelGlobal === "ADMIN"
     || curso.membros.some((m) => m.usuarioId === user?.id && m.papel === "ADMIN");
 
+  const { data: oasDoCurso = [] } = useOAsByCurso(cursoId, {});
+  const setupPendente = oasDoCurso.length > 0
+    ? oasDoCurso.filter((oa) =>
+        oa.etapas.some((e) => e.etapaDef.papel === "COORDENADOR_PRODUCAO" && e.status !== "CONCLUIDA")
+      ).length
+    : 0;
+  const totalComSetup = oasDoCurso.filter((oa) =>
+    oa.etapas.some((e) => e.etapaDef.papel === "COORDENADOR_PRODUCAO")
+  ).length;
+
   return (
     <Box>
+      {/* ── Banner de Setup de Produção ─────────────────────────────────────── */}
+      {setupPendente > 0 && (
+        <Alert
+          severity="warning"
+          sx={{ mb: 2.5 }}
+          action={
+            <Button component={Link} to={`/cursos/${cursoId}/setup-producao`} size="small" color="inherit" sx={{ fontWeight: 700, whiteSpace: "nowrap" }}>
+              Ir para Setup
+            </Button>
+          }
+        >
+          <strong>Setup de Produção pendente:</strong> {setupPendente} de {totalComSetup} OAs ainda não foram configurados.
+        </Alert>
+      )}
+
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", mb: 3 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>

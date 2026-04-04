@@ -100,7 +100,12 @@ function ImportarPage() {
       });
     } else {
       confirmarMINovo({ file: arquivo, codigo: codigo.trim(), nome: nome.trim(), dataInicio: dataInicio || undefined }, {
-        onSuccess: (data) => { setResultadoMI(data); setPasso(3); },
+        onSuccess: (data) => {
+          setResultadoMI(data);
+          setPasso(3);
+          // Redireciona para o Setup de Produção após 2s
+          setTimeout(() => navigate({ to: "/cursos/$cursoId/setup-producao", params: { cursoId: data.cursoId } }), 2000);
+        },
       });
     }
   };
