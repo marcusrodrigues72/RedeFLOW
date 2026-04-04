@@ -50,12 +50,16 @@ function fmtData(iso: string | null | undefined) {
 // ─── Página ───────────────────────────────────────────────────────────────────
 
 function RelatoriosPage() {
-  const { data: cursos   = [], isLoading: loadCursos,   isError: errCursos   } = useProgressoCursos();
-  const { data: pipeline,      isLoading: loadPipeline, isError: errPipeline } = usePipelineStatus();
-  const { data: atrasos  = [], isLoading: loadAtrasos,  isError: errAtrasos  } = useAtrasosResponsavel();
-  const { data: stats,         isLoading: loadStats                           } = useDashboardStats();
   const { data: todosCursos = [] }                                              = useCursos();
-  const [burndownCursoId, setBurndownCursoId] = useState<string | null>(null);
+  const [cursoId, setCursoId]                                                   = useState<string | null>(null);
+
+  const { data: todosProgresso = [], isLoading: loadCursos, isError: errCursos } = useProgressoCursos();
+  const { data: pipeline, isLoading: loadPipeline, isError: errPipeline }        = usePipelineStatus(cursoId);
+  const { data: atrasos  = [], isLoading: loadAtrasos,  isError: errAtrasos  }   = useAtrasosResponsavel(cursoId);
+  const { data: stats,         isLoading: loadStats                           }   = useDashboardStats();
+
+  // Filtra progresso ao curso selecionado (client-side)
+  const cursos = cursoId ? todosProgresso.filter((c) => c.id === cursoId) : todosProgresso;
 
   // KPIs usam a mesma fonte do Dashboard para consistência
   const totalOAs     = stats?.totalOAs    ?? 0;
@@ -63,12 +67,48 @@ function RelatoriosPage() {
   const concluidos   = stats?.oasConcluidos ?? 0;
   const totalAtrasos = stats?.oasAtrasados  ?? 0;
 
+  const cursoSelecionado = todosCursos.find((c) => c.id === cursoId);
+
   return (
     <Box>
-      <Typography sx={{ fontSize: "1.375rem", fontWeight: 800, mb: 0.5 }}>Relatórios</Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Visão gerencial da produção de conteúdo
-      </Typography>
+      <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", mb: 3, flexWrap: "wrap", gap: 2 }}>
+        <Box>
+          <Typography sx={{ fontSize: "1.375rem", fontWeight: 800, mb: 0.5 }}>Relatórios</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Visão gerencial da produção de conteúdo
+          </Typography>
+        </Box>
+
+        {/* ── Filtro global de curso ─────────────────────────────────────────── */}
+        <FormControl size="small" sx={{ minWidth: 300 }}>
+          <InputLabel>Filtrar por curso</InputLabel>
+          <Select
+            value={cursoId ?? ""}
+            label="Filtrar por curso"
+            onChange={(e) => setCursoId(e.target.value || null)}
+          >
+            <MenuItem value=""><em>Todos os cursos</em></MenuItem>
+            {todosCursos.map((c) => (
+              <MenuItem key={c.id} value={c.id}>{c.nome}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Box>
+
+      {cursoSelecionado && (
+        <Box sx={{ mb: 2.5, display: "flex", alignItems: "center", gap: 1 }}>
+          <Chip
+            label={cursoSelecionado.nome}
+            onDelete={() => setCursoId(null)}
+            color="primary"
+            size="small"
+            sx={{ fontWeight: 600 }}
+          />
+          <Typography variant="caption" color="text.secondary">
+            Todos os painéis estão filtrados para este curso.
+          </Typography>
+        </Box>
+      )}
 
       {/* ── KPIs ──────────────────────────────────────────────────────────────── */}
       <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2, mb: 3 }}>
@@ -85,7 +125,7 @@ function RelatoriosPage() {
       </Box>
 
       {/* ── Progresso por Curso ───────────────────────────────────────────────── */}
-      <Section title="Progresso por Curso" icon={<TrendingUpIcon sx={{ fontSize: 18 }} />} mb>
+      <Section title={cursoId ? "Progresso do Curso" : "Progresso por Curso"} icon={<TrendingUpIcon sx={{ fontSize: 18 }} />} mb>
         {errCursos ? (
           <Alert severity="error" sx={{ m: 2 }}>Erro ao carregar dados.</Alert>
         ) : loadCursos ? (
@@ -100,7 +140,6 @@ function RelatoriosPage() {
               return (
                 <Box key={curso.id}>
                   <Box sx={{ px: 3, py: 2.5 }}>
-                    {/* Linha 1: nome, badges, link, progresso */}
                     <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", mb: 1.5 }}>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
                         <Chip
@@ -140,7 +179,6 @@ function RelatoriosPage() {
                       </Box>
                     </Box>
 
-                    {/* Barra de progresso */}
                     <LinearProgress
                       variant="determinate" value={curso.progressoPct}
                       sx={{
@@ -149,7 +187,6 @@ function RelatoriosPage() {
                       }}
                     />
 
-                    {/* Linha 3: datas estimadas */}
                     {(curso.dataInicioEstimada || curso.dataFimEstimada) && (
                       <Box sx={{ display: "flex", gap: 3 }}>
                         {curso.dataInicioEstimada && (
@@ -175,41 +212,28 @@ function RelatoriosPage() {
 
       {/* ── Burndown de OAs ──────────────────────────────────────────────────── */}
       <Section title="Burndown de OAs — Planejado vs. Real" icon={<ShowChartIcon sx={{ fontSize: 18 }} />} mb>
-        <Box sx={{ px: 3, pt: 2.5, pb: 1, display: "flex", alignItems: "center", gap: 2 }}>
-          <FormControl size="small" sx={{ minWidth: 280 }}>
-            <InputLabel>Selecione o curso</InputLabel>
-            <Select
-              value={burndownCursoId ?? ""}
-              label="Selecione o curso"
-              onChange={(e) => setBurndownCursoId(e.target.value || null)}
-            >
-              <MenuItem value=""><em>Escolha um curso…</em></MenuItem>
-              {todosCursos.map((c) => (
-                <MenuItem key={c.id} value={c.id}>{c.nome}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          {burndownCursoId && (
-            <Box sx={{ display: "flex", gap: 2 }}>
+        {!cursoId ? (
+          <Box sx={{ p: 4, textAlign: "center" }}>
+            <Typography variant="body2" color="text.secondary">
+              Selecione um curso no filtro acima para visualizar o burndown.
+            </Typography>
+          </Box>
+        ) : (
+          <>
+            <Box sx={{ px: 3, pt: 2, pb: 1, display: "flex", gap: 2 }}>
               {[
                 { label: "Planejado (ideal)", color: "#94a3b8", dash: true },
                 { label: "Realizado",         color: "#2b7cee", dash: false },
               ].map((l) => (
                 <Box key={l.label} sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-                  <Box sx={{ width: 24, height: 2, bgcolor: l.color, borderTop: l.dash ? "2px dashed" : "2px solid", borderColor: l.color }} />
+                  <Box sx={{ width: 24, height: 2, borderTop: l.dash ? "2px dashed" : "2px solid", borderColor: l.color }} />
                   <Typography variant="caption" color="text.secondary">{l.label}</Typography>
                 </Box>
               ))}
             </Box>
-          )}
-        </Box>
-        <Divider />
-        {!burndownCursoId ? (
-          <Box sx={{ p: 4, textAlign: "center" }}>
-            <Typography variant="body2" color="text.secondary">Selecione um curso para visualizar o burndown.</Typography>
-          </Box>
-        ) : (
-          <BurndownChart cursoId={burndownCursoId} />
+            <Divider />
+            <BurndownChart cursoId={cursoId} />
+          </>
         )}
       </Section>
 

@@ -72,12 +72,12 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         }}
       >
         {/* Marca */}
-        <Box sx={{ px: 2.5, pt: 2, pb: 1.5 }}>
+        <Box sx={{ px: 2, pt: 2.5, pb: 2, display: "flex", justifyContent: "center" }}>
           <Box
             component="img"
             src="/redeflow_logo.png"
             alt="RedeFLOW"
-            sx={{ width: "100%", height: "auto", maxHeight: 52, objectFit: "contain", objectPosition: "left", borderRadius: 1.5 }}
+            sx={{ width: "80%", height: "auto", display: "block" }}
           />
         </Box>
 

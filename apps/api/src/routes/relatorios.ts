@@ -75,13 +75,27 @@ router.get("/progresso-cursos", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET /relatorios/pipeline-status
+// GET /relatorios/pipeline-status?cursoId=
 router.get("/pipeline-status", async (req, res, next) => {
   try {
     const usuarioId   = req.usuario!.sub;
     const isAdmin     = req.usuario!.papel === "ADMIN";
-    const cursosWhere = isAdmin ? {} : { membros: { some: { usuarioId } } };
-    const oaWhere     = { capitulo: { unidade: { curso: cursosWhere } } };
+    const { cursoId } = req.query as { cursoId?: string };
+
+    // Monta filtro de OAs acessíveis
+    let oaWhere: object;
+    if (cursoId) {
+      // Verifica acesso ao curso e filtra por ele
+      const curso = await prisma.curso.findFirst({
+        where: { id: cursoId, ...(isAdmin ? {} : { membros: { some: { usuarioId } } }) },
+        select: { id: true },
+      });
+      if (!curso) { res.status(404).json({ message: "Curso não encontrado." }); return; }
+      oaWhere = { capitulo: { unidade: { cursoId } } };
+    } else {
+      const cursosWhere = isAdmin ? {} : { membros: { some: { usuarioId } } };
+      oaWhere = { capitulo: { unidade: { curso: cursosWhere } } };
+    }
 
     // Prisma groupBy não suporta relation filters no where — busca IDs primeiro
     const oaIds = await prisma.objetoAprendizagem
@@ -94,13 +108,11 @@ router.get("/pipeline-status", async (req, res, next) => {
     }
 
     const [porStatusOA, porEtapaStatus, defs] = await Promise.all([
-      // Status dos OAs (nível de OA)
       prisma.objetoAprendizagem.groupBy({
         by:    ["status"],
         where: { id: { in: oaIds } },
         _count: { id: true },
       }),
-      // Status de cada instância de etapa, agrupado por (etapaDefId, status)
       prisma.etapaOA.groupBy({
         by:    ["etapaDefId", "status"],
         where: { oaId: { in: oaIds } },
@@ -113,17 +125,26 @@ router.get("/pipeline-status", async (req, res, next) => {
       }),
     ]);
 
-    const porEtapa = defs
-      .map((d) => {
-        const rows       = porEtapaStatus.filter((r) => r.etapaDefId === d.id);
-        const get        = (st: string) => rows.find((r) => r.status === st)?._count.id ?? 0;
-        const pendente   = get("PENDENTE");
-        const emAndamento = get("EM_ANDAMENTO");
-        const concluida  = get("CONCLUIDA");
-        const bloqueada  = get("BLOQUEADA");
-        return { etapa: d.nome, papel: d.papel, ordem: d.ordem, pendente, emAndamento, concluida, bloqueada, total: pendente + emAndamento + concluida + bloqueada };
-      })
-      .filter((e) => e.total > 0);
+    // Agrupa por nome (pode haver múltiplas defs com mesmo nome para diferentes tipoOA)
+    const byNome = new Map<string, { etapa: string; papel: string; ordem: number; pendente: number; emAndamento: number; concluida: number; bloqueada: number }>();
+    for (const d of defs) {
+      if (!byNome.has(d.nome)) {
+        byNome.set(d.nome, { etapa: d.nome, papel: d.papel, ordem: d.ordem, pendente: 0, emAndamento: 0, concluida: 0, bloqueada: 0 });
+      }
+      const entry = byNome.get(d.nome)!;
+      const rows  = porEtapaStatus.filter((r) => r.etapaDefId === d.id);
+      const get   = (st: string) => rows.find((r) => r.status === st)?._count.id ?? 0;
+      entry.pendente    += get("PENDENTE");
+      entry.emAndamento += get("EM_ANDAMENTO");
+      entry.concluida   += get("CONCLUIDA");
+      entry.bloqueada   += get("BLOQUEADA");
+      if (d.ordem < entry.ordem) entry.ordem = d.ordem;
+    }
+
+    const porEtapa = Array.from(byNome.values())
+      .map((e) => ({ ...e, total: e.pendente + e.emAndamento + e.concluida + e.bloqueada }))
+      .filter((e) => e.total > 0)
+      .sort((a, b) => a.ordem - b.ordem);
 
     res.json({
       porStatusOA: porStatusOA.map((e) => ({ status: e.status, total: e._count.id })),
@@ -132,19 +153,27 @@ router.get("/pipeline-status", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET /relatorios/atrasos-responsavel
+// GET /relatorios/atrasos-responsavel?cursoId=
 router.get("/atrasos-responsavel", async (req, res, next) => {
   try {
-    const usuarioId  = req.usuario!.sub;
-    const isAdmin    = req.usuario!.papel === "ADMIN";
-    const cursosWhere = isAdmin ? {} : { membros: { some: { usuarioId } } };
+    const usuarioId   = req.usuario!.sub;
+    const isAdmin     = req.usuario!.papel === "ADMIN";
+    const { cursoId } = req.query as { cursoId?: string };
+
+    let oaFilter: object;
+    if (cursoId) {
+      oaFilter = { capitulo: { unidade: { cursoId } } };
+    } else {
+      const cursosWhere = isAdmin ? {} : { membros: { some: { usuarioId } } };
+      oaFilter = { capitulo: { unidade: { curso: cursosWhere } } };
+    }
 
     const etapas = await prisma.etapaOA.findMany({
       where: {
         status: { in: ["PENDENTE", "EM_ANDAMENTO"] },
         deadlinePrevisto: { lt: new Date() },
         responsavelId: { not: null },
-        oa: { capitulo: { unidade: { curso: cursosWhere } } },
+        oa: oaFilter,
       },
       select: {
         responsavelId:   true,

@@ -16,17 +16,23 @@ export function useProgressoCursos() {
   });
 }
 
-export function usePipelineStatus() {
+export function usePipelineStatus(cursoId?: string | null) {
   return useQuery({
-    queryKey: relatorioKeys.pipelineStatus(),
-    queryFn:  () => api.get<RelatorioPipelineStatus>("/relatorios/pipeline-status").then((r) => r.data),
+    queryKey: [...relatorioKeys.pipelineStatus(), cursoId ?? "all"],
+    queryFn:  () => {
+      const url = cursoId ? `/relatorios/pipeline-status?cursoId=${cursoId}` : "/relatorios/pipeline-status";
+      return api.get<RelatorioPipelineStatus>(url).then((r) => r.data);
+    },
   });
 }
 
-export function useAtrasosResponsavel() {
+export function useAtrasosResponsavel(cursoId?: string | null) {
   return useQuery({
-    queryKey: relatorioKeys.atrasosResponsavel(),
-    queryFn:  () => api.get<RelatorioAtrasoResponsavel[]>("/relatorios/atrasos-responsavel").then((r) => r.data),
+    queryKey: [...relatorioKeys.atrasosResponsavel(), cursoId ?? "all"],
+    queryFn:  () => {
+      const url = cursoId ? `/relatorios/atrasos-responsavel?cursoId=${cursoId}` : "/relatorios/atrasos-responsavel";
+      return api.get<RelatorioAtrasoResponsavel[]>(url).then((r) => r.data);
+    },
   });
 }
 
