@@ -49,3 +49,9 @@ coverage/
 
 # TanStack Router — arquivo gerado, mas deve ser commitado para CI/CD
 # apps/web/src/routeTree.gen.ts
+
+# Temp files
+~$*
+*.tmp
+apps/web/.tanstack/
+Configuração para deploy.docx
