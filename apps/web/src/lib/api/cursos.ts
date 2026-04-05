@@ -389,6 +389,15 @@ export function useExcluirComentario(oaId: string) {
   });
 }
 
+export function useDuplicarCurso() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ cursoId, nome, codigo }: { cursoId: string; nome: string; codigo: string }) =>
+      api.post<{ id: string; codigo: string; nome: string }>(`/cursos/${cursoId}/duplicar`, { nome, codigo }).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: cursoKeys.list() }),
+  });
+}
+
 // Membros do curso
 export function useAdicionarMembro(cursoId: string) {
   const qc = useQueryClient();

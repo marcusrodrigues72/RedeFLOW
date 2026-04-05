@@ -16,7 +16,11 @@ import CheckIcon                from "@mui/icons-material/Check";
 import CloseIcon                from "@mui/icons-material/Close";
 import LinkIcon                 from "@mui/icons-material/Link";
 import EditIcon                 from "@mui/icons-material/Edit";
-import { useState }             from "react";
+import { useState, useRef, useCallback } from "react";
+import Popover                 from "@mui/material/Popover";
+import List                    from "@mui/material/List";
+import ListItemButton          from "@mui/material/ListItemButton";
+import ListItemText            from "@mui/material/ListItemText";
 import { useOA, useAtualizarEtapa, useComentariosOA, useAdicionarComentario, useExcluirComentario, useAuditLogOA } from "@/lib/api/cursos";
 import { useAuthStore }         from "@/stores/auth.store";
 import type { StatusEtapa, TipoOA, StatusOA, AuditLogEntry } from "shared";
@@ -286,7 +290,7 @@ function OADetalhePage() {
         />
 
         {/* Comentários */}
-        <ComentariosCard oaId={oaId} />
+        <ComentariosCard oaId={oaId} membros={curso.membros} />
 
         {/* Painel lateral */}
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -426,12 +430,72 @@ function DeadlineLabel({ etapa, isAdmin, isPending, onSave }: {
 
 // ─── Comentários ──────────────────────────────────────────────────────────────
 
-function ComentariosCard({ oaId }: { oaId: string }) {
+type MembroSimples = { usuarioId: string; usuario: { id: string; nome: string } };
+
+/** Highlights @mentions in comment text with a blue span */
+function TextoComMencoes({ texto }: { texto: string }) {
+  const parts = texto.split(/(@[\w\u00C0-\u017F]+(?:\s[\w\u00C0-\u017F]+)*)/g);
+  return (
+    <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+      {parts.map((p, i) =>
+        p.startsWith("@")
+          ? <Box key={i} component="span" sx={{ color: "primary.main", fontWeight: 600 }}>{p}</Box>
+          : p
+      )}
+    </Typography>
+  );
+}
+
+function ComentariosCard({ oaId, membros }: { oaId: string; membros: MembroSimples[] }) {
   const meId                                           = useAuthStore((s) => s.user?.id);
   const { data: comentarios = [], isLoading }          = useComentariosOA(oaId);
   const { mutate: adicionar, isPending: adicionando }  = useAdicionarComentario(oaId);
   const { mutate: excluir }                            = useExcluirComentario(oaId);
   const [texto, setTexto]                              = useState("");
+
+  // Mention popover state
+  const inputRef                   = useRef<HTMLTextAreaElement>(null);
+  const anchorRef                  = useRef<HTMLDivElement>(null);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionStart, setMentionStart] = useState(0);
+
+  const sugestoes = mentionQuery !== null
+    ? membros
+        .filter((m) => m.usuario.nome.toLowerCase().includes(mentionQuery.toLowerCase()) && mentionQuery.length > 0)
+        .slice(0, 6)
+    : [];
+
+  const handleTextoChange = useCallback((valor: string) => {
+    setTexto(valor);
+    const el = inputRef.current;
+    if (!el) return;
+    const cursor = el.selectionStart ?? valor.length;
+    // Find last @ before cursor
+    const before = valor.slice(0, cursor);
+    const match  = before.match(/@([\w\u00C0-\u017F]*)$/);
+    if (match) {
+      setMentionQuery(match[1] ?? "");
+      setMentionStart(cursor - (match[1]?.length ?? 0) - 1);
+    } else {
+      setMentionQuery(null);
+    }
+  }, []);
+
+  const inserirMencao = (nome: string) => {
+    const antes  = texto.slice(0, mentionStart);
+    const depois = texto.slice(mentionStart + 1 + (mentionQuery?.length ?? 0));
+    const novo   = `${antes}@${nome} ${depois}`;
+    setTexto(novo);
+    setMentionQuery(null);
+    // restore focus
+    setTimeout(() => {
+      const el = inputRef.current;
+      if (!el) return;
+      const pos = antes.length + nome.length + 2; // @nome + space
+      el.setSelectionRange(pos, pos);
+      el.focus();
+    }, 0);
+  };
 
   const handleEnviar = () => {
     const t = texto.trim();
@@ -471,7 +535,7 @@ function ComentariosCard({ oaId }: { oaId: string }) {
                       </Tooltip>
                     )}
                   </Box>
-                  <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>{c.texto}</Typography>
+                  <TextoComMencoes texto={c.texto} />
                 </Box>
               </Box>
             ))}
@@ -479,12 +543,22 @@ function ComentariosCard({ oaId }: { oaId: string }) {
         )}
 
         <Divider sx={{ mb: 2 }} />
-        <Box sx={{ display: "flex", gap: 1, alignItems: "flex-end" }}>
+        <Box ref={anchorRef} sx={{ display: "flex", gap: 1, alignItems: "flex-end" }}>
           <TextField
             multiline maxRows={4} size="small" fullWidth
-            placeholder="Escreva um comentário..."
-            value={texto} onChange={(e) => setTexto(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleEnviar(); } }}
+            placeholder="Escreva um comentário… use @ para mencionar alguém"
+            value={texto}
+            onChange={(e) => handleTextoChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") { setMentionQuery(null); return; }
+              if (sugestoes.length > 0 && (e.key === "Enter" || e.key === "Tab")) {
+                e.preventDefault();
+                inserirMencao(sugestoes[0]!.usuario.nome);
+                return;
+              }
+              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleEnviar(); }
+            }}
+            slotProps={{ input: { inputRef } }}
           />
           <IconButton
             color="primary" disabled={!texto.trim() || adicionando}
@@ -493,6 +567,34 @@ function ComentariosCard({ oaId }: { oaId: string }) {
             <SendIcon sx={{ fontSize: 20 }} />
           </IconButton>
         </Box>
+
+        {/* Mention autocomplete popover */}
+        <Popover
+          open={sugestoes.length > 0}
+          anchorEl={anchorRef.current}
+          onClose={() => setMentionQuery(null)}
+          anchorOrigin={{ vertical: "top", horizontal: "left" }}
+          transformOrigin={{ vertical: "bottom", horizontal: "left" }}
+          disableAutoFocus
+          disableEnforceFocus
+          PaperProps={{ sx: { width: anchorRef.current?.offsetWidth ?? 300, maxHeight: 220, overflow: "auto", borderRadius: 2, boxShadow: "0 4px 20px rgba(0,0,0,0.12)" } }}
+        >
+          <List dense disablePadding>
+            {sugestoes.map((m, i) => (
+              <ListItemButton
+                key={m.usuarioId}
+                selected={i === 0}
+                onClick={() => inserirMencao(m.usuario.nome)}
+                sx={{ py: 0.75, px: 2 }}
+              >
+                <Avatar sx={{ width: 24, height: 24, bgcolor: "primary.light", fontSize: "0.65rem", mr: 1.5 }}>
+                  {m.usuario.nome[0]?.toUpperCase()}
+                </Avatar>
+                <ListItemText primary={m.usuario.nome} primaryTypographyProps={{ variant: "body2", fontWeight: 600 }} />
+              </ListItemButton>
+            ))}
+          </List>
+        </Popover>
       </CardContent>
     </Card>
   );

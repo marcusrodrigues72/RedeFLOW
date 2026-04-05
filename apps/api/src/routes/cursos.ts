@@ -42,6 +42,159 @@ router.get("/:id/exportar-mc", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── Duplicar curso ────────────────────────────────────────────────────────────
+
+const duplicarSchema = z.object({
+  nome:   z.string().min(2).max(200),
+  codigo: z.string().min(2).max(50),
+});
+
+router.post("/:id/duplicar", async (req, res, next) => {
+  try {
+    if (req.usuario!.papel !== "ADMIN") {
+      res.status(403).json({ message: "Apenas administradores podem duplicar cursos." }); return;
+    }
+
+    const { nome, codigo } = duplicarSchema.parse(req.body);
+
+    // Verifica conflito de código
+    const existe = await prisma.curso.findUnique({ where: { codigo }, select: { id: true } });
+    if (existe) { res.status(409).json({ message: `Já existe um curso com o código "${codigo}".` }); return; }
+
+    // Carrega estrutura completa do original
+    const original = await prisma.curso.findUnique({
+      where:   { id: req.params["id"] as string },
+      include: {
+        membros:  { select: { usuarioId: true, papel: true } },
+        unidades: {
+          orderBy:  { numero: "asc" },
+          include: {
+            capitulos: {
+              orderBy: { numero: "asc" },
+              include: {
+                objetivos: { orderBy: { numero: "asc" } },
+                oas: {
+                  orderBy: { numero: "asc" },
+                  include: { etapas: { orderBy: { ordem: "asc" } } },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!original) { res.status(404).json({ message: "Curso não encontrado." }); return; }
+
+    // Cria o novo curso numa transação
+    const novo = await prisma.$transaction(async (tx) => {
+      const curso = await tx.curso.create({
+        data: {
+          codigo,
+          nome,
+          descricao:        original.descricao,
+          chTotalPlanejada: original.chTotalPlanejada,
+          status:           "RASCUNHO",
+        },
+      });
+
+      // Copia membros
+      if (original.membros.length > 0) {
+        await tx.cursoMembro.createMany({
+          data: original.membros.map((m) => ({
+            cursoId:   curso.id,
+            usuarioId: m.usuarioId,
+            papel:     m.papel,
+          })),
+          skipDuplicates: true,
+        });
+      }
+
+      // Copia estrutura pedagógica (unidades → capítulos → objetivos → OAs → etapas)
+      for (const unidade of original.unidades) {
+        const novaUnidade = await tx.unidade.create({
+          data: {
+            cursoId:      curso.id,
+            numero:       unidade.numero,
+            nome:         unidade.nome,
+            chSincrona:   unidade.chSincrona,
+            chAssincrona: unidade.chAssincrona,
+            chAtividades: unidade.chAtividades,
+          },
+        });
+
+        for (const cap of unidade.capitulos) {
+          const novoCap = await tx.capitulo.create({
+            data: {
+              unidadeId:          novaUnidade.id,
+              numero:             cap.numero,
+              nome:               cap.nome,
+              conteudoResumo:     cap.conteudoResumo,
+              periodoDias:        cap.periodoDias,
+              ferramentas:        cap.ferramentas,
+              atividadeFormativa: cap.atividadeFormativa,
+              atividadeSomativa:  cap.atividadeSomativa,
+              feedback:           cap.feedback,
+              chSincrona:         cap.chSincrona,
+              chAssincrona:       cap.chAssincrona,
+              chAtividades:       cap.chAtividades,
+            },
+          });
+
+          // Objetivos educacionais
+          if (cap.objetivos.length > 0) {
+            await tx.objetivoEducacional.createMany({
+              data: cap.objetivos.map((obj) => ({
+                capituloId: novoCap.id,
+                numero:     obj.numero,
+                descricao:  obj.descricao,
+                nivelBloom: obj.nivelBloom,
+                papeisAtores: obj.papeisAtores,
+              })),
+            });
+          }
+
+          // OAs — reinicia status/links/deadlines
+          for (const oa of cap.oas) {
+            // Gera novo código substituindo o prefixo do curso
+            const novoCodigoOA = oa.codigo.replace(original.codigo, codigo);
+
+            const novoOA = await tx.objetoAprendizagem.create({
+              data: {
+                capituloId: novoCap.id,
+                codigo:     novoCodigoOA,
+                tipo:       oa.tipo,
+                numero:     oa.numero,
+                titulo:     oa.titulo,
+                descricao:  oa.descricao,
+                // Dados de produção zerados
+                status:      "PENDENTE",
+                progressoPct: 0,
+              },
+            });
+
+            // Etapas — copia definição, zera tudo de produção
+            if (oa.etapas.length > 0) {
+              await tx.etapaOA.createMany({
+                data: oa.etapas.map((e) => ({
+                  oaId:       novoOA.id,
+                  etapaDefId: e.etapaDefId,
+                  ordem:      e.ordem,
+                  status:     "PENDENTE" as const,
+                })),
+              });
+            }
+          }
+        }
+      }
+
+      return curso;
+    });
+
+    res.status(201).json({ id: novo.id, codigo: novo.codigo, nome: novo.nome });
+  } catch (err) { next(err); }
+});
+
 // Importação MC — duas etapas
 router.post("/:id/importar/preview",   uploadExcel, ctrl.importarPreview);
 router.post("/:id/importar/confirmar", uploadExcel, ctrl.importarConfirmar);

@@ -3,14 +3,16 @@ import {
   Box, Typography, Grid2 as Grid, Card, CardContent, CardActionArea,
   Button, TextField, InputAdornment, Chip, LinearProgress, Avatar,
   AvatarGroup, Skeleton, Dialog, DialogTitle, DialogContent,
-  DialogActions, Tooltip,
+  DialogActions, Tooltip, Alert, IconButton,
 } from "@mui/material";
 import AddIcon          from "@mui/icons-material/Add";
 import SearchIcon       from "@mui/icons-material/Search";
 import FileUploadIcon   from "@mui/icons-material/FileUpload";
 import SchoolIcon       from "@mui/icons-material/School";
+import ContentCopyIcon  from "@mui/icons-material/ContentCopy";
 import { useState }     from "react";
-import { useCursos, useCriarCurso } from "@/lib/api/cursos";
+import { useCursos, useCriarCurso, useDuplicarCurso } from "@/lib/api/cursos";
+import { useAuthStore } from "@/stores/auth.store";
 import type { CursoResumo, StatusCurso } from "shared";
 
 export const Route = createFileRoute("/_authed/cursos/")({
@@ -26,10 +28,13 @@ const STATUS_LABELS: Record<StatusCurso, { label: string; color: string; bg: str
 function CursosPage() {
   const { data: cursos = [], isLoading } = useCursos();
   const navigate                         = useNavigate();
+  const user                             = useAuthStore((s) => s.user);
+  const isAdmin                          = user?.papelGlobal === "ADMIN";
 
-  const [search,       setSearch]       = useState("");
-  const [filtroStatus, setFiltroStatus] = useState<StatusCurso | "TODOS">("TODOS");
-  const [abrirNovo,    setAbrirNovo]    = useState(false);
+  const [search,          setSearch]          = useState("");
+  const [filtroStatus,    setFiltroStatus]    = useState<StatusCurso | "TODOS">("TODOS");
+  const [abrirNovo,       setAbrirNovo]       = useState(false);
+  const [cursoDuplicar,   setCursoDuplicar]   = useState<CursoResumo | null>(null);
 
   const cursosFiltrados = cursos.filter((c) => {
     const matchSearch = c.nome.toLowerCase().includes(search.toLowerCase())
@@ -116,28 +121,53 @@ function CursosPage() {
         <Grid container spacing={2.5}>
           {cursosFiltrados.map((curso) => (
             <Grid key={curso.id} size={{ xs: 12, sm: 6, md: 4 }}>
-              <CursoCard curso={curso} />
+              <CursoCard
+                curso={curso}
+                isAdmin={isAdmin}
+                onDuplicar={() => setCursoDuplicar(curso)}
+              />
             </Grid>
           ))}
         </Grid>
       )}
 
-      {/* ── Dialog Novo Curso ─────────────────────────────────────────────── */}
+      {/* ── Dialogs ─────────────────────────────────────────────────────────── */}
       <NovoCursoDialog
         open={abrirNovo}
         onClose={() => setAbrirNovo(false)}
         onSuccess={(id) => navigate({ to: `/cursos/${id}` })}
+      />
+      <DuplicarCursoDialog
+        curso={cursoDuplicar}
+        onClose={() => setCursoDuplicar(null)}
+        onSuccess={(id) => { setCursoDuplicar(null); navigate({ to: `/cursos/${id}` }); }}
       />
     </Box>
   );
 }
 
 // ─── Curso Card ───────────────────────────────────────────────────────────────
-function CursoCard({ curso }: { curso: CursoResumo }) {
+function CursoCard({ curso, isAdmin, onDuplicar }: { curso: CursoResumo; isAdmin: boolean; onDuplicar: () => void }) {
   const s = STATUS_LABELS[curso.status] ?? STATUS_LABELS.RASCUNHO;
 
   return (
-    <Card sx={{ height: "100%", "&:hover": { boxShadow: "0 4px 20px 0 rgb(0 0 0 / 0.08)" }, transition: "box-shadow 0.2s" }}>
+    <Card sx={{ height: "100%", "&:hover": { boxShadow: "0 4px 20px 0 rgb(0 0 0 / 0.08)" }, transition: "box-shadow 0.2s", position: "relative" }}>
+      {isAdmin && (
+        <Tooltip title="Duplicar curso">
+          <IconButton
+            size="small"
+            onClick={(e) => { e.stopPropagation(); onDuplicar(); }}
+            sx={{
+              position: "absolute", top: 8, right: 8, zIndex: 2,
+              color: "text.disabled", bgcolor: "background.paper",
+              "&:hover": { color: "primary.main", bgcolor: "#eff6ff" },
+              boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+            }}
+          >
+            <ContentCopyIcon sx={{ fontSize: 16 }} />
+          </IconButton>
+        </Tooltip>
+      )}
       <CardActionArea component={Link} to={`/cursos/${curso.id}`} sx={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "stretch", p: 0 }}>
         <CardContent sx={{ p: 3, flex: 1, display: "flex", flexDirection: "column" }}>
           {/* Top row */}
@@ -183,6 +213,81 @@ function CursoCard({ curso }: { curso: CursoResumo }) {
         </CardContent>
       </CardActionArea>
     </Card>
+  );
+}
+
+// ─── Dialog Duplicar Curso ────────────────────────────────────────────────────
+function DuplicarCursoDialog({ curso, onClose, onSuccess }: {
+  curso: CursoResumo | null;
+  onClose: () => void;
+  onSuccess: (id: string) => void;
+}) {
+  const { mutate, isPending } = useDuplicarCurso();
+  const [codigo, setCodigo]   = useState("");
+  const [nome,   setNome]     = useState("");
+  const [erro,   setErro]     = useState<string | null>(null);
+
+  const handleOpen = () => {
+    if (curso) {
+      setCodigo(`${curso.codigo}-v2`);
+      setNome(`${curso.nome} (Cópia)`);
+      setErro(null);
+    }
+  };
+
+  return (
+    <Dialog
+      open={!!curso}
+      onClose={onClose}
+      TransitionProps={{ onEnter: handleOpen }}
+      maxWidth="sm"
+      fullWidth
+      PaperProps={{ sx: { borderRadius: 3 } }}
+    >
+      <DialogTitle sx={{ fontWeight: 700 }}>
+        Duplicar Curso
+      </DialogTitle>
+      <DialogContent sx={{ pt: "12px !important" }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
+          Cria uma cópia da estrutura do curso <strong>{curso?.nome}</strong> — unidades, capítulos, OAs e pipeline — sem dados de produção (responsáveis, deadlines e links zerados).
+        </Typography>
+        {erro && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setErro(null)}>{erro}</Alert>}
+        <TextField
+          fullWidth label="Código do novo curso" placeholder="ex: MICRO-GERAL-01-v2"
+          value={codigo} onChange={(e) => setCodigo(e.target.value)}
+          sx={{ mb: 2 }}
+        />
+        <TextField
+          fullWidth label="Nome do novo curso"
+          value={nome} onChange={(e) => setNome(e.target.value)}
+        />
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 3 }}>
+        <Button onClick={onClose} disabled={isPending}>Cancelar</Button>
+        <Button
+          variant="contained"
+          startIcon={<ContentCopyIcon />}
+          disabled={isPending || !codigo.trim() || !nome.trim()}
+          onClick={() => {
+            if (!curso) return;
+            setErro(null);
+            mutate(
+              { cursoId: curso.id, nome: nome.trim(), codigo: codigo.trim() },
+              {
+                onSuccess: (novo) => onSuccess(novo.id),
+                onError: (err: unknown) => {
+                  const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+                  setErro(msg ?? "Erro ao duplicar curso.");
+                },
+              }
+            );
+          }}
+          sx={{ fontWeight: 700 }}
+        >
+          {isPending ? "Duplicando…" : "Duplicar Curso"}
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 

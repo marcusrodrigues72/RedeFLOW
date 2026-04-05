@@ -35,15 +35,61 @@ router.get("/:id/comentarios", async (req, res, next) => {
 router.post("/:id/comentarios", async (req, res, next) => {
   try {
     const { texto, etapaOaId } = comentarioSchema.parse(req.body);
+    const oaId = req.params["id"] as string;
+
+    // Extrai @menções do texto e resolve IDs de usuários do mesmo curso
+    const nomesMencionados = [...new Set(
+      [...texto.matchAll(/@([\w\u00C0-\u017F]+(?:\s[\w\u00C0-\u017F]+)*)/g)].map((m) => m[1]!.trim())
+    )];
+
+    let mencoes: string[] = [];
+    if (nomesMencionados.length > 0) {
+      // Busca membros do curso que contenham o OA
+      const oa = await prisma.objetoAprendizagem.findUnique({
+        where:  { id: oaId },
+        select: { capitulo: { select: { unidade: { select: { cursoId: true } } } } },
+      });
+      if (oa) {
+        const cursoId = oa.capitulo.unidade.cursoId;
+        const membros = await prisma.cursoMembro.findMany({
+          where:   { cursoId },
+          include: { usuario: { select: { id: true, nome: true } } },
+        });
+        mencoes = membros
+          .filter((m) => nomesMencionados.some((n) => m.usuario.nome.toLowerCase().startsWith(n.toLowerCase())))
+          .map((m) => m.usuario.id);
+      }
+    }
+
     const comentario = await prisma.comentario.create({
       data: {
         texto,
-        oaId:      req.params["id"] as string,
+        oaId,
         etapaOaId: etapaOaId ?? null,
         autorId:   req.usuario!.sub,
+        mencoes,
       },
       include: { autor: { select: { id: true, nome: true, fotoUrl: true } } },
     });
+
+    // Notificações in-app para mencionados (exceto o próprio autor)
+    const autorId = req.usuario!.sub;
+    const idsNotificar = [...new Set(mencoes)].filter((id) => id !== autorId);
+    if (idsNotificar.length > 0) {
+      const autor = await prisma.usuario.findUnique({ where: { id: autorId }, select: { nome: true } });
+      await prisma.notificacao.createMany({
+        data: idsNotificar.map((usuarioId) => ({
+          usuarioId,
+          tipo:         "MENCAO",
+          titulo:       `${autor?.nome ?? "Alguém"} mencionou você em um comentário`,
+          corpo:        texto.slice(0, 120),
+          entidadeTipo: "OA",
+          entidadeId:   oaId,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
     res.status(201).json(comentario);
   } catch (err) { next(err); }
 });
