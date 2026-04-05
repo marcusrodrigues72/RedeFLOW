@@ -461,16 +461,13 @@ function ComentariosCard({ oaId, membros }: { oaId: string; membros: MembroSimpl
 
   const sugestoes = mentionQuery !== null
     ? membros
-        .filter((m) => m.usuario.nome.toLowerCase().includes(mentionQuery.toLowerCase()) && mentionQuery.length > 0)
+        .filter((m) => mentionQuery === "" || m.usuario.nome.toLowerCase().includes(mentionQuery.toLowerCase()))
         .slice(0, 6)
     : [];
 
-  const handleTextoChange = useCallback((valor: string) => {
+  const handleTextoChange = useCallback((valor: string, cursor: number) => {
     setTexto(valor);
-    const el = inputRef.current;
-    if (!el) return;
-    const cursor = el.selectionStart ?? valor.length;
-    // Find last @ before cursor
+    // Find last @ before cursor position (read from event, not from ref)
     const before = valor.slice(0, cursor);
     const match  = before.match(/@([\w\u00C0-\u017F]*)$/);
     if (match) {
@@ -548,7 +545,7 @@ function ComentariosCard({ oaId, membros }: { oaId: string; membros: MembroSimpl
             multiline maxRows={4} size="small" fullWidth
             placeholder="Escreva um comentário… use @ para mencionar alguém"
             value={texto}
-            onChange={(e) => handleTextoChange(e.target.value)}
+            onChange={(e) => handleTextoChange(e.target.value, e.target.selectionStart ?? e.target.value.length)}
             onKeyDown={(e) => {
               if (e.key === "Escape") { setMentionQuery(null); return; }
               if (sugestoes.length > 0 && (e.key === "Enter" || e.key === "Tab")) {
