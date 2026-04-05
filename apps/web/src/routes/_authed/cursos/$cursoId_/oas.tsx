@@ -1191,7 +1191,7 @@ function PipelinePanel({ oa }: { oa: OADrawerOA }) {
 
 // ─── Comentários Panel ────────────────────────────────────────────────────────
 
-function ComentariosPanel({ oaId, membros }: { oaId: string; membros: CursoMembro[] }) {
+function ComentariosPanel({ oaId }: { oaId: string; membros?: CursoMembro[] }) {
   const user                             = useAuthStore((s) => s.user);
   const { data: comentarios = [], isLoading } = useComentariosOA(oaId);
   const { mutate: adicionar, isPending: enviando } = useAdicionarComentario(oaId);
@@ -1312,7 +1312,7 @@ function HistoricoPanel({ oaId }: { oaId: string }) {
 
   return (
     <Box sx={{ px: 3, py: 2 }}>
-      {logs.map((log, idx) => (
+      {logs.map((log) => (
         <Box key={log.id} sx={{ display: "flex", gap: 2, mb: 2, alignItems: "flex-start" }}>
           <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "primary.main", mt: 0.75, flexShrink: 0 }} />
           <Box sx={{ flex: 1 }}>
