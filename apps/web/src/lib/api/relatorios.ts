@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { RelatorioCurso, RelatorioPipelineStatus, RelatorioAtrasoResponsavel, RelatorioAlocacao, RelatorioBurndown } from "shared";
+import type { RelatorioCurso, RelatorioPipelineStatus, RelatorioAtrasoResponsavel, RelatorioAlocacao, RelatorioBurndown, RelatorioDesvio } from "shared";
 
 export const relatorioKeys = {
   progressoCursos:    () => ["relatorios", "progresso-cursos"]    as const,
@@ -49,4 +49,31 @@ export function useBurndown(cursoId: string | null) {
     queryFn:  () => api.get<RelatorioBurndown>(`/relatorios/burndown?cursoId=${cursoId}`).then((r) => r.data),
     enabled:  !!cursoId,
   });
+}
+
+export function useDesvioDeadline(cursoId?: string | null) {
+  return useQuery({
+    queryKey: ["relatorios", "desvio-deadline", cursoId ?? "all"],
+    queryFn:  () => {
+      const url = cursoId ? `/relatorios/desvio-deadline?cursoId=${cursoId}` : "/relatorios/desvio-deadline";
+      return api.get<RelatorioDesvio>(url).then((r) => r.data);
+    },
+  });
+}
+
+/** Dispara download de .xlsx autenticado */
+export function downloadRelatorio(endpoint: string, cursoId?: string | null) {
+  const stored = localStorage.getItem("redeflow-auth");
+  const token  = stored ? (JSON.parse(stored)?.state?.accessToken ?? "") : "";
+  const base   = (import.meta.env.VITE_API_URL as string | undefined) ?? "";
+  const url    = `${base}${endpoint}${cursoId ? `?cursoId=${cursoId}` : ""}`;
+  fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    .then((r) => r.blob())
+    .then((blob) => {
+      const a = document.createElement("a");
+      a.href  = URL.createObjectURL(blob);
+      a.download = (endpoint.split("/").pop() ?? "relatorio") + ".xlsx";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
 }

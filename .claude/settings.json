@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(open -a Postgres)",
+      "Read(//Applications/**)",
+      "Bash(pnpm build:*)",
+      "Bash(npx prisma@5 migrate deploy)",
+      "Bash(npx prisma@5 generate)",
+      "Bash(npx prisma@5 generate --schema=prisma/schema.prisma)",
+      "Bash(npx tsc:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(pnpm --filter shared build)",
+      "Bash(pnpm add:*)",
+      "Bash(node -e \"const r = require\\(''apps/web/node_modules/recharts''\\); console.log\\(Object.keys\\(r\\).filter\\(k => [''LineChart'',''Line'',''XAxis'',''YAxis'',''CartesianGrid'',''ResponsiveContainer'',''ReferenceLine''].includes\\(k\\)\\).join\\('',''\\)\\)\")",
+      "Bash(pnpm --filter web exec tsc --noEmit)"
+    ],
+    "additionalDirectories": [
+      "/Users/marcusrodrigues/Projetos/Redeflow/apps/api/prisma/migrations"
+    ]
+  }
+}

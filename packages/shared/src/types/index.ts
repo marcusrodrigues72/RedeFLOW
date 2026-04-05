@@ -297,6 +297,32 @@ export interface RelatorioAlocacao {
   porResponsavel:  ResponsavelAlocacao[];
 }
 
+// ─── Desvio de Deadline ───────────────────────────────────────────────────────
+
+export interface DesvioDeadlineItem {
+  oaId:             string;
+  oaCodigo:         string;
+  etapa:            string;
+  responsavel:      string | null;
+  deadlinePrevisto: string;
+  deadlineReal:     string;
+  desvioDias:       number;
+}
+
+export interface DesvioDeadlineResumo {
+  etapa:       string;
+  total:       number;
+  noPrazo:     number;
+  adiantado:   number;
+  atrasado:    number;
+  desvioMedio: number;
+}
+
+export interface RelatorioDesvio {
+  items:  DesvioDeadlineItem[];
+  resumo: DesvioDeadlineResumo[];
+}
+
 // ─── Audit Log ────────────────────────────────────────────────────────────────
 
 export interface AuditLogEntry {

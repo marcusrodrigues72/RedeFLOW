@@ -1,6 +1,161 @@
 import * as XLSX from "xlsx";
 import { prisma } from "../lib/prisma.js";
 
+// ─── Export: Atrasos por Responsável ──────────────────────────────────────────
+
+export async function exportAtrasos(cursoId?: string): Promise<Buffer> {
+  const oaFilter = cursoId
+    ? { capitulo: { unidade: { cursoId } } }
+    : {};
+
+  const etapas = await prisma.etapaOA.findMany({
+    where: {
+      status:           { in: ["PENDENTE", "EM_ANDAMENTO"] },
+      deadlinePrevisto: { lt: new Date() },
+      responsavelId:    { not: null },
+      oa:               oaFilter,
+    },
+    select: {
+      deadlinePrevisto: true,
+      responsavel:      { select: { nome: true, email: true } },
+      etapaDef:         { select: { nome: true } },
+      oa: {
+        select: {
+          codigo: true,
+          capitulo: { select: { unidade: { select: { curso: { select: { nome: true, codigo: true } } } } } },
+        },
+      },
+    },
+    orderBy: { deadlinePrevisto: "asc" },
+  });
+
+  const hoje = new Date();
+  const rows = etapas.map((e) => {
+    const dias = e.deadlinePrevisto
+      ? Math.ceil((hoje.getTime() - new Date(e.deadlinePrevisto).getTime()) / 86_400_000)
+      : 0;
+    return [
+      e.responsavel?.nome ?? "",
+      e.responsavel?.email ?? "",
+      e.oa.capitulo.unidade.curso.nome,
+      e.oa.codigo,
+      e.etapaDef.nome,
+      fmtDate(e.deadlinePrevisto),
+      dias,
+    ];
+  });
+
+  const headers = ["Responsável", "E-mail", "Curso", "OA", "Etapa", "Deadline", "Dias em Atraso"];
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  ws["!cols"] = [{ wch: 24 }, { wch: 30 }, { wch: 30 }, { wch: 16 }, { wch: 24 }, { wch: 14 }, { wch: 16 }];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Atrasos");
+  return XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+}
+
+// ─── Export: Progresso por Curso ──────────────────────────────────────────────
+
+export async function exportProgressoCursos(cursoId?: string): Promise<Buffer> {
+  const cursos = await prisma.curso.findMany({
+    where: cursoId ? { id: cursoId } : {},
+    select: { id: true, nome: true, codigo: true, status: true },
+    orderBy: { nome: "asc" },
+  });
+
+  type AggRow = { cursoId: string; total: bigint; concluidos: bigint; atrasados: bigint };
+  const cursoIds = cursos.map((c) => c.id);
+  const aggs = cursoIds.length > 0
+    ? await prisma.$queryRaw<AggRow[]>`
+        SELECT u."cursoId",
+               COUNT(DISTINCT oa.id)                                                       AS total,
+               COUNT(DISTINCT CASE WHEN oa.status = 'CONCLUIDO'          THEN oa.id END)  AS concluidos,
+               COUNT(DISTINCT CASE WHEN e.status IN ('PENDENTE','EM_ANDAMENTO')
+                                    AND e."deadlinePrevisto" < NOW()      THEN e.id  END)  AS atrasados
+        FROM "unidades" u
+        JOIN "capitulos" c              ON c."unidadeId"  = u.id
+        JOIN "objetos_aprendizagem" oa  ON oa."capituloId" = c.id
+        LEFT JOIN "etapas_oa" e         ON e."oaId"        = oa.id
+        WHERE u."cursoId" = ANY(${cursoIds})
+        GROUP BY u."cursoId"
+      `
+    : [];
+
+  const aggMap = new Map(aggs.map((r) => [r.cursoId, r]));
+
+  const STATUS_LABEL: Record<string, string> = { ATIVO: "Ativo", RASCUNHO: "Rascunho", ARQUIVADO: "Arquivado" };
+  const rows = cursos.map((c) => {
+    const agg     = aggMap.get(c.id);
+    const total   = Number(agg?.total     ?? 0);
+    const concl   = Number(agg?.concluidos ?? 0);
+    const atraso  = Number(agg?.atrasados  ?? 0);
+    const pct     = total > 0 ? Math.round((concl / total) * 100) : 0;
+    return [c.codigo, c.nome, STATUS_LABEL[c.status] ?? c.status, total, concl, atraso, `${pct}%`];
+  });
+
+  const headers = ["Código", "Curso", "Status", "Total OAs", "Concluídos", "Atrasados", "Progresso"];
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  ws["!cols"] = [{ wch: 14 }, { wch: 36 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Progresso");
+  return XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+}
+
+// ─── Export: Desvio Deadline ──────────────────────────────────────────────────
+
+export async function exportDesvio(cursoId?: string): Promise<Buffer> {
+  const oaFilter = cursoId
+    ? { capitulo: { unidade: { cursoId } } }
+    : {};
+
+  const etapas = await prisma.etapaOA.findMany({
+    where: {
+      deadlinePrevisto: { not: null },
+      deadlineReal:     { not: null },
+      oa:               oaFilter,
+    },
+    select: {
+      deadlinePrevisto: true,
+      deadlineReal:     true,
+      status:           true,
+      responsavel:      { select: { nome: true } },
+      etapaDef:         { select: { nome: true } },
+      oa: {
+        select: {
+          codigo: true,
+          capitulo: { select: { unidade: { select: { curso: { select: { nome: true } } } } } },
+        },
+      },
+    },
+    orderBy: { deadlineReal: "asc" },
+  });
+
+  const rows = etapas.map((e) => {
+    const prev  = e.deadlinePrevisto!;
+    const real  = e.deadlineReal!;
+    const desvio = Math.round((real.getTime() - prev.getTime()) / 86_400_000);
+    return [
+      e.oa.capitulo.unidade.curso.nome,
+      e.oa.codigo,
+      e.etapaDef.nome,
+      e.responsavel?.nome ?? "—",
+      fmtDate(prev),
+      fmtDate(real),
+      desvio,
+      desvio > 0 ? "Em atraso" : desvio < 0 ? "Adiantado" : "No prazo",
+    ];
+  });
+
+  const headers = ["Curso", "OA", "Etapa", "Responsável", "DL Previsto", "DL Real", "Desvio (dias)", "Situação"];
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  ws["!cols"] = [{ wch: 30 }, { wch: 16 }, { wch: 24 }, { wch: 22 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Desvio de Deadline");
+  return XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+}
+
 // ─── Mapeamentos de saída ─────────────────────────────────────────────────────
 
 const TIPO_LABEL: Record<string, string> = {

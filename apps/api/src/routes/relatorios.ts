@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { authenticate } from "../middlewares/authenticate.js";
 import { prisma } from "../lib/prisma.js";
+import { exportAtrasos, exportProgressoCursos, exportDesvio } from "../services/exportService.js";
 
 const router = Router();
 router.use(authenticate);
@@ -427,6 +428,106 @@ router.get("/burndown", async (req, res, next) => {
       dataFim:    endDate.toISOString().slice(0, 10),
       totalOAs, series,
     });
+  } catch (err) { next(err); }
+});
+
+// GET /relatorios/desvio-deadline?cursoId=
+router.get("/desvio-deadline", async (req, res, next) => {
+  try {
+    const usuarioId   = req.usuario!.sub;
+    const isAdmin     = req.usuario!.papel === "ADMIN";
+    const { cursoId } = req.query as { cursoId?: string };
+
+    let oaFilter: object;
+    if (cursoId) {
+      const curso = await prisma.curso.findFirst({
+        where: { id: cursoId, ...(isAdmin ? {} : { membros: { some: { usuarioId } } }) },
+        select: { id: true },
+      });
+      if (!curso) { res.status(404).json({ message: "Curso não encontrado." }); return; }
+      oaFilter = { capitulo: { unidade: { cursoId } } };
+    } else {
+      const cursosWhere = isAdmin ? {} : { membros: { some: { usuarioId } } };
+      oaFilter = { capitulo: { unidade: { curso: cursosWhere } } };
+    }
+
+    const etapas = await prisma.etapaOA.findMany({
+      where: { deadlinePrevisto: { not: null }, deadlineReal: { not: null }, oa: oaFilter },
+      select: {
+        deadlinePrevisto: true,
+        deadlineReal:     true,
+        etapaDef:         { select: { nome: true, papel: true } },
+        responsavel:      { select: { nome: true } },
+        oa:               { select: { id: true, codigo: true } },
+      },
+      orderBy: { deadlineReal: "asc" },
+    });
+
+    const items = etapas.map((e) => {
+      const prev   = e.deadlinePrevisto!;
+      const real   = e.deadlineReal!;
+      const desvio = Math.round((real.getTime() - prev.getTime()) / 86_400_000);
+      return {
+        oaId:             e.oa.id,
+        oaCodigo:         e.oa.codigo,
+        etapa:            e.etapaDef.nome,
+        responsavel:      e.responsavel?.nome ?? null,
+        deadlinePrevisto: prev.toISOString(),
+        deadlineReal:     real.toISOString(),
+        desvioDias:       desvio,
+      };
+    });
+
+    // Resumo por etapa
+    const porEtapa = new Map<string, { etapa: string; total: number; noP: number; adiant: number; atrasado: number; desvioMedio: number; soma: number }>();
+    for (const it of items) {
+      if (!porEtapa.has(it.etapa)) porEtapa.set(it.etapa, { etapa: it.etapa, total: 0, noP: 0, adiant: 0, atrasado: 0, desvioMedio: 0, soma: 0 });
+      const e = porEtapa.get(it.etapa)!;
+      e.total++;
+      e.soma += it.desvioDias;
+      if (it.desvioDias > 0) e.atrasado++;
+      else if (it.desvioDias < 0) e.adiant++;
+      else e.noP++;
+    }
+    const resumo = Array.from(porEtapa.values()).map((e) => ({
+      etapa: e.etapa, total: e.total, noPrazo: e.noP, adiantado: e.adiant, atrasado: e.atrasado,
+      desvioMedio: e.total > 0 ? Math.round(e.soma / e.total) : 0,
+    }));
+
+    res.json({ items, resumo });
+  } catch (err) { next(err); }
+});
+
+// GET /relatorios/export/atrasos?cursoId=
+router.get("/export/atrasos", async (req, res, next) => {
+  try {
+    const { cursoId } = req.query as { cursoId?: string };
+    const buf = await exportAtrasos(cursoId);
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", "attachment; filename=\"atrasos.xlsx\"");
+    res.send(buf);
+  } catch (err) { next(err); }
+});
+
+// GET /relatorios/export/progresso?cursoId=
+router.get("/export/progresso", async (req, res, next) => {
+  try {
+    const { cursoId } = req.query as { cursoId?: string };
+    const buf = await exportProgressoCursos(cursoId);
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", "attachment; filename=\"progresso-cursos.xlsx\"");
+    res.send(buf);
+  } catch (err) { next(err); }
+});
+
+// GET /relatorios/export/desvio?cursoId=
+router.get("/export/desvio", async (req, res, next) => {
+  try {
+    const { cursoId } = req.query as { cursoId?: string };
+    const buf = await exportDesvio(cursoId);
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", "attachment; filename=\"desvio-deadline.xlsx\"");
+    res.send(buf);
   } catch (err) { next(err); }
 });
 

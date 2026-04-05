@@ -106,7 +106,7 @@ export class OAController {
       // Busca estado anterior para audit log (antes do update)
       const etapaAntes = await db.etapaOA.findUnique({
         where:  { id: req.params["etapaId"] as string },
-        select: { status: true, responsavelId: true, responsavelSecundarioId: true, deadlinePrevisto: true, etapaDef: { select: { nome: true } } },
+        select: { status: true, responsavelId: true, responsavelSecundarioId: true, deadlinePrevisto: true, deadlineReal: true, etapaDef: { select: { nome: true } } },
       });
 
       // Valida predecessora: só bloqueia CONCLUIDA se a etapa anterior não estiver CONCLUIDA (ADMINs são isentos)
@@ -150,11 +150,17 @@ export class OAController {
         }
       }
 
+      // Auto-preenche deadlineReal com hoje ao concluir (se não fornecido explicitamente)
+      const deadlineRealFinal =
+        deadlineReal !== undefined ? deadlineReal :
+        (status === "CONCLUIDA" && !etapaAntes?.deadlineReal) ? new Date().toISOString() :
+        undefined;
+
       const etapa = await oaRepository.updateEtapa(req.params["etapaId"] as string, {
         status,
         responsavelId,
         responsavelSecundarioId,
-        deadlineReal:     deadlineReal     ? new Date(deadlineReal)     : deadlineReal     === null ? null : undefined,
+        deadlineReal:     deadlineRealFinal ? new Date(deadlineRealFinal) : deadlineRealFinal === null ? null : undefined,
         deadlinePrevisto: deadlinePrevisto ? new Date(deadlinePrevisto) : deadlinePrevisto === null ? null : undefined,
         linkArtefato:     linkArtefato !== undefined ? linkArtefato : undefined,
         templateGerado:     templateGerado     !== undefined ? templateGerado     : undefined,

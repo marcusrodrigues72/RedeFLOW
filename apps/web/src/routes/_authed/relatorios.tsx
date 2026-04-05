@@ -3,23 +3,25 @@ import {
   Box, Typography, Card, CardContent, LinearProgress,
   Chip, Skeleton, Alert, Table, TableHead, TableRow,
   TableCell, TableBody, Divider, Collapse, IconButton,
-  Tooltip, Select, MenuItem, FormControl, InputLabel,
+  Tooltip, Select, MenuItem, FormControl, InputLabel, Button,
 } from "@mui/material";
 import TrendingUpIcon        from "@mui/icons-material/TrendingUp";
 import WarningAmberIcon      from "@mui/icons-material/WarningAmber";
 import AccountTreeIcon       from "@mui/icons-material/AccountTree";
 import ShowChartIcon         from "@mui/icons-material/ShowChart";
+import SwapVertIcon          from "@mui/icons-material/SwapVert";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon   from "@mui/icons-material/KeyboardArrowUp";
 import OpenInNewIcon         from "@mui/icons-material/OpenInNew";
 import CheckCircleIcon       from "@mui/icons-material/CheckCircle";
+import DownloadIcon          from "@mui/icons-material/Download";
 import { useState }          from "react";
 import type { ReactNode }    from "react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
   ResponsiveContainer, ReferenceLine,
 } from "recharts";
-import { useProgressoCursos, usePipelineStatus, useAtrasosResponsavel, useBurndown } from "@/lib/api/relatorios";
+import { useProgressoCursos, usePipelineStatus, useAtrasosResponsavel, useBurndown, useDesvioDeadline, downloadRelatorio } from "@/lib/api/relatorios";
 import { useDashboardStats, useCursos } from "@/lib/api/cursos";
 import type { StatusOA }     from "shared";
 
@@ -57,6 +59,7 @@ function RelatoriosPage() {
   const { data: pipeline, isLoading: loadPipeline, isError: errPipeline }        = usePipelineStatus(cursoId);
   const { data: atrasos  = [], isLoading: loadAtrasos,  isError: errAtrasos  }   = useAtrasosResponsavel(cursoId);
   const { data: stats,         isLoading: loadStats                           }   = useDashboardStats();
+  const { data: desvio,        isLoading: loadDesvio,   isError: errDesvio   }   = useDesvioDeadline(cursoId);
 
   // Filtra progresso ao curso selecionado (client-side)
   const cursos = cursoId ? todosProgresso.filter((c) => c.id === cursoId) : todosProgresso;
@@ -125,7 +128,8 @@ function RelatoriosPage() {
       </Box>
 
       {/* ── Progresso por Curso ───────────────────────────────────────────────── */}
-      <Section title={cursoId ? "Progresso do Curso" : "Progresso por Curso"} icon={<TrendingUpIcon sx={{ fontSize: 18 }} />} mb>
+      <Section title={cursoId ? "Progresso do Curso" : "Progresso por Curso"} icon={<TrendingUpIcon sx={{ fontSize: 18 }} />} mb
+        onExport={() => downloadRelatorio("/relatorios/export/progresso", cursoId)}>
         {errCursos ? (
           <Alert severity="error" sx={{ m: 2 }}>Erro ao carregar dados.</Alert>
         ) : loadCursos ? (
@@ -237,11 +241,68 @@ function RelatoriosPage() {
         )}
       </Section>
 
+      {/* ── Desvio Deadline ───────────────────────────────────────────────────── */}
+      <Section title="Desvio de Deadline — Previsto vs. Real" icon={<SwapVertIcon sx={{ fontSize: 18 }} />} mb
+        onExport={() => downloadRelatorio("/relatorios/export/desvio", cursoId)}>
+        {errDesvio ? (
+          <Alert severity="error" sx={{ m: 2 }}>Erro ao carregar dados.</Alert>
+        ) : loadDesvio ? (
+          <LoadingRows n={4} />
+        ) : !desvio || desvio.resumo.length === 0 ? (
+          <Empty msg="Nenhuma etapa com deadline real registrado ainda." />
+        ) : (
+          <Box>
+            {/* Resumo por etapa */}
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ bgcolor: "#f8fafc" }}>
+                  {["Etapa", "Total", "No Prazo", "Adiantado", "Atrasado", "Desvio Médio"].map((h) => (
+                    <TableCell key={h} sx={{ fontWeight: 700, fontSize: "0.72rem", color: "text.secondary", py: 1.25, whiteSpace: "nowrap" }}>{h}</TableCell>
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {desvio.resumo.map((r) => (
+                  <TableRow key={r.etapa} sx={{ "&:hover": { bgcolor: "action.hover" } }}>
+                    <TableCell sx={{ py: 1.5, fontWeight: 600, fontSize: "0.82rem" }}>{r.etapa}</TableCell>
+                    <TableCell align="center">
+                      <Typography variant="caption" fontWeight={700}>{r.total}</Typography>
+                    </TableCell>
+                    <TableCell align="center">
+                      {r.noPrazo > 0
+                        ? <Chip label={r.noPrazo} size="small" sx={{ height: 20, fontSize: "0.72rem", fontWeight: 700, bgcolor: "#f0fdf4", color: "#10b981" }} />
+                        : <Typography variant="caption" color="text.disabled">—</Typography>}
+                    </TableCell>
+                    <TableCell align="center">
+                      {r.adiantado > 0
+                        ? <Chip label={r.adiantado} size="small" sx={{ height: 20, fontSize: "0.72rem", fontWeight: 700, bgcolor: "#eff6ff", color: "#2b7cee" }} />
+                        : <Typography variant="caption" color="text.disabled">—</Typography>}
+                    </TableCell>
+                    <TableCell align="center">
+                      {r.atrasado > 0
+                        ? <Chip label={r.atrasado} size="small" sx={{ height: 20, fontSize: "0.72rem", fontWeight: 700, bgcolor: "#fff5f5", color: "#ef4444" }} />
+                        : <Typography variant="caption" color="text.disabled">—</Typography>}
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" fontWeight={700}
+                        sx={{ color: r.desvioMedio > 5 ? "#ef4444" : r.desvioMedio > 0 ? "#f59e0b" : r.desvioMedio < 0 ? "#2b7cee" : "#10b981" }}>
+                        {r.desvioMedio > 0 ? `+${r.desvioMedio}d` : `${r.desvioMedio}d`}
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Box>
+        )}
+      </Section>
+
       {/* ── Grid inferior ─────────────────────────────────────────────────────── */}
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "3fr 2fr" }, gap: 3 }}>
 
         {/* ── Pipeline por Etapa ──────────────────────────────────────────────── */}
-        <Section title="Pipeline por Etapa" icon={<AccountTreeIcon sx={{ fontSize: 18 }} />}>
+        <Section title="Pipeline por Etapa" icon={<AccountTreeIcon sx={{ fontSize: 18 }} />}
+          onExport={() => downloadRelatorio("/relatorios/export/atrasos", cursoId)}>
           {errPipeline ? (
             <Alert severity="error" sx={{ m: 2 }}>Erro ao carregar dados.</Alert>
           ) : loadPipeline ? (
@@ -344,7 +405,8 @@ function RelatoriosPage() {
         </Section>
 
         {/* ── Atrasos por Responsável ──────────────────────────────────────────── */}
-        <Section title="Atrasos por Responsável" icon={<WarningAmberIcon sx={{ fontSize: 18, color: "#ef4444" }} />}>
+        <Section title="Atrasos por Responsável" icon={<WarningAmberIcon sx={{ fontSize: 18, color: "#ef4444" }} />}
+          onExport={() => downloadRelatorio("/relatorios/export/atrasos", cursoId)}>
           {errAtrasos ? (
             <Alert severity="error" sx={{ m: 2 }}>Erro ao carregar dados.</Alert>
           ) : loadAtrasos ? (
@@ -561,7 +623,7 @@ function KpiCard({ label, value, color, sub }: { label: string; value: number; c
   );
 }
 
-function Section({ title, icon, children, mb }: { title: string; icon?: ReactNode; children: ReactNode; mb?: boolean }) {
+function Section({ title, icon, children, mb, onExport }: { title: string; icon?: ReactNode; children: ReactNode; mb?: boolean; onExport?: () => void }) {
   return (
     <Card sx={{ mb: mb ? 3 : 0 }}>
       <CardContent sx={{ p: 0, pb: "0 !important" }}>
@@ -569,6 +631,13 @@ function Section({ title, icon, children, mb }: { title: string; icon?: ReactNod
           borderBottom: "1px solid", borderColor: "divider" }}>
           {icon && <Box sx={{ color: "text.secondary", display: "flex" }}>{icon}</Box>}
           <Typography variant="h6" sx={{ fontWeight: 700, fontSize: "0.95rem" }}>{title}</Typography>
+          {onExport && (
+            <Tooltip title="Exportar .xlsx">
+              <IconButton size="small" onClick={onExport} sx={{ ml: "auto", color: "text.disabled", "&:hover": { color: "primary.main" } }}>
+                <DownloadIcon sx={{ fontSize: 18 }} />
+              </IconButton>
+            </Tooltip>
+          )}
         </Box>
         {children}
       </CardContent>
