@@ -4,15 +4,20 @@ import {
   Select, MenuItem, FormControl, Skeleton, Alert, LinearProgress,
   Table, TableHead, TableRow, TableCell, TableBody,
   Tabs, Tab, Tooltip, ToggleButtonGroup, ToggleButton,
+  Drawer, IconButton, CircularProgress, Divider, Avatar,
 } from "@mui/material";
 import ArrowBackIcon     from "@mui/icons-material/ArrowBack";
 import SearchIcon        from "@mui/icons-material/Search";
 import TableRowsIcon     from "@mui/icons-material/TableRows";
 import ViewKanbanIcon    from "@mui/icons-material/ViewKanban";
 import ViewTimelineIcon  from "@mui/icons-material/ViewTimeline";
-import SettingsIcon from "@mui/icons-material/Settings";
-import { useState, useCallback } from "react";
-import { useOAsByCurso, useCurso, useAtualizarEtapaGeral } from "@/lib/api/cursos";
+import SettingsIcon      from "@mui/icons-material/Settings";
+import CloseIcon         from "@mui/icons-material/Close";
+import OpenInNewIcon     from "@mui/icons-material/OpenInNew";
+import SendIcon          from "@mui/icons-material/Send";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import { useState, useCallback, useRef } from "react";
+import { useOAsByCurso, useCurso, useAtualizarEtapaGeral, useComentariosOA, useAdicionarComentario, useExcluirComentario, useAuditLogOA } from "@/lib/api/cursos";
 import { useAuthStore } from "@/stores/auth.store";
 import type { StatusOA, TipoOA, StatusEtapa } from "shared";
 
@@ -101,6 +106,7 @@ function OAsPage() {
   const [filtroResponsavel,   setFiltroResponsavel] = useState("");
   const [filtroStatusEtapa,   setFiltroStatusEtapa] = useState("");
   const [visao,               setVisao]           = useState<Visao>("lista");
+  const [selectedOaId,        setSelectedOaId]    = useState<string | null>(null);
   const { mutate: atualizarEtapa }                = useAtualizarEtapaGeral();
   const user                                      = useAuthStore((s) => s.user);
   const isAdmin = user?.papelGlobal === "ADMIN" ||
@@ -311,12 +317,25 @@ function OAsPage() {
           </CardContent>
         </Card>
       ) : visao === "lista" ? (
-        <ListaView grupos={grupos} onStatusChange={handleStatusChange} />
+        <ListaView grupos={grupos} onStatusChange={handleStatusChange} onSelect={setSelectedOaId} />
       ) : visao === "kanban" ? (
-        <KanbanView oas={oasFiltrados} />
+        <KanbanView oas={oasFiltrados} onSelect={setSelectedOaId} />
       ) : (
-        <GanttView oas={oasFiltrados} />
+        <GanttView oas={oasFiltrados} onSelect={setSelectedOaId} />
       )}
+
+      {/* ── Drawer de detalhes do OA ── */}
+      {selectedOaId && (() => {
+        const selectedOa = oas.find((o) => o.id === selectedOaId) ?? null;
+        if (!selectedOa) return null;
+        return (
+          <OADrawer
+            oa={selectedOa}
+            membros={curso?.membros ?? []}
+            onClose={() => setSelectedOaId(null)}
+          />
+        );
+      })()}
     </Box>
   );
 }
@@ -352,9 +371,11 @@ function DataCell({ iso, concluida = false }: { iso: string | null | undefined; 
 function ListaView({
   grupos,
   onStatusChange,
+  onSelect,
 }: {
   grupos: Record<string, ReturnType<typeof useOAsByCurso>["data"]>;
   onStatusChange: (oa: any, status: StatusOA) => void;
+  onSelect: (oaId: string) => void;
 }) {
   return (
     <>
@@ -428,7 +449,8 @@ function ListaView({
                           <DataCell iso={oa.deadlineFinal} concluida={concluida} />
                         </TableCell>
                         <TableCell align="right">
-                          <Button component={Link} to={`/oas/${oa.id}`} size="small" variant="outlined"
+                          <Button size="small" variant="outlined"
+                            onClick={() => onSelect(oa.id)}
                             sx={{ fontSize: "0.7rem", py: 0.25 }}>
                             Detalhes
                           </Button>
@@ -465,7 +487,7 @@ function effectiveStatus(oa: NonNullable<ReturnType<typeof useOAsByCurso>["data"
 
 type OAKanban = NonNullable<ReturnType<typeof useOAsByCurso>["data"]>[0];
 
-function KanbanView({ oas }: { oas: OAKanban[] }) {
+function KanbanView({ oas, onSelect }: { oas: OAKanban[]; onSelect: (oaId: string) => void }) {
   const { mutate: atualizarEtapa } = useAtualizarEtapaGeral();
   const [overCol,    setOverCol]    = useState<StatusOA | null>(null);
   // mapa oaId → status otimista; limpo após refetch ou revertido em erro
@@ -575,7 +597,7 @@ function KanbanView({ oas }: { oas: OAKanban[] }) {
                         </Typography>
                       </Box>
                       <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 0.75 }}>
-                        <Button component={Link} to={`/oas/${oa.id}`} size="small"
+                        <Button size="small" onClick={() => onSelect(oa.id)}
                           sx={{ fontSize: "0.65rem", py: 0, px: 1, minWidth: 0 }}>
                           Abrir
                         </Button>
@@ -602,7 +624,7 @@ function KanbanView({ oas }: { oas: OAKanban[] }) {
 
 type OAItem = NonNullable<ReturnType<typeof useOAsByCurso>["data"]>[0];
 
-function GanttView({ oas }: { oas: OAItem[] }) {
+function GanttView({ oas, onSelect }: { oas: OAItem[]; onSelect: (oaId: string) => void }) {
   const [zoom, setZoom] = useState<"mes" | "semana">("mes");
 
   // Coleta todas as datas relevantes para calcular o range
@@ -771,12 +793,16 @@ function GanttView({ oas }: { oas: OAItem[] }) {
                       "&:hover": { bgcolor: "action.hover" },
                     }}>
                       {/* Rótulo */}
-                      <Box sx={{
-                        width: LABEL_W, flexShrink: 0,
-                        borderRight: "1px solid", borderColor: "divider",
-                        display: "flex", alignItems: "center", gap: 1,
-                        px: 1.5, overflow: "hidden",
-                      }}>
+                      <Box
+                        onClick={() => onSelect(oa.id)}
+                        sx={{
+                          width: LABEL_W, flexShrink: 0,
+                          borderRight: "1px solid", borderColor: "divider",
+                          display: "flex", alignItems: "center", gap: 1,
+                          px: 1.5, overflow: "hidden",
+                          cursor: "pointer",
+                          "&:hover": { bgcolor: "action.hover" },
+                        }}>
                         <Typography sx={{
                           fontFamily: "monospace", fontWeight: 600, fontSize: "0.75rem",
                           whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
@@ -942,6 +968,366 @@ function GanttView({ oas }: { oas: OAItem[] }) {
           </Box>
         </Box>
       </Card>
+    </Box>
+  );
+}
+
+// ─── OA Drawer ────────────────────────────────────────────────────────────────
+
+type OADrawerOA = NonNullable<ReturnType<typeof useOAsByCurso>["data"]>[0];
+type CursoMembro = { usuarioId: string; papel: string; usuario: { id: string; nome: string; fotoUrl: string | null } };
+
+function OADrawer({
+  oa,
+  membros,
+  onClose,
+}: {
+  oa: OADrawerOA;
+  membros: CursoMembro[];
+  onClose: () => void;
+}) {
+  const [tab, setTab] = useState(0);
+  const tc = TIPO_CONFIG[oa.tipo];
+  const sc = STATUS_CONFIG[oa.status];
+  const etapaAtual = oa.etapas.find((e) => e.status !== "CONCLUIDA");
+
+  return (
+    <Drawer
+      anchor="right"
+      open
+      onClose={onClose}
+      PaperProps={{ sx: { width: { xs: "100vw", sm: 700 }, display: "flex", flexDirection: "column" } }}
+    >
+      {/* ── Header ── */}
+      <Box sx={{
+        px: 3, py: 2, flexShrink: 0,
+        borderBottom: "1px solid", borderColor: "divider",
+        display: "flex", alignItems: "center", gap: 1.5,
+      }}>
+        <Typography sx={{ fontFamily: "monospace", fontWeight: 800, fontSize: "0.95rem" }}>
+          {oa.codigo}
+        </Typography>
+        <Chip label={tc.label} size="small"
+          sx={{ height: 20, fontSize: "0.7rem", bgcolor: `${tc.color}18`, color: tc.color, fontWeight: 600 }} />
+        <Chip label={sc.label} size="small"
+          sx={{ height: 20, fontSize: "0.7rem", bgcolor: sc.bg, color: sc.color, fontWeight: 600 }} />
+        <Box sx={{ flex: 1 }} />
+        <Tooltip title="Abrir página completa">
+          <IconButton component={Link} to={`/oas/${oa.id}`} size="small" target="_blank">
+            <OpenInNewIcon sx={{ fontSize: 18 }} />
+          </IconButton>
+        </Tooltip>
+        <IconButton size="small" onClick={onClose} aria-label="Fechar">
+          <CloseIcon sx={{ fontSize: 18 }} />
+        </IconButton>
+      </Box>
+
+      {/* ── Info básica ── */}
+      <Box sx={{ px: 3, py: 1.5, flexShrink: 0, borderBottom: "1px solid", borderColor: "divider" }}>
+        {oa.titulo && (
+          <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>{oa.titulo}</Typography>
+        )}
+        <Typography variant="caption" color="text.secondary">
+          U{oa.capitulo.unidade.numero} · {oa.capitulo.unidade.nome}
+          {" › "}
+          C{oa.capitulo.numero} · {oa.capitulo.nome}
+        </Typography>
+        <Box sx={{ display: "flex", gap: 3, mt: 1, flexWrap: "wrap" }}>
+          <Box>
+            <Typography variant="caption" color="text.disabled" sx={{ display: "block", mb: 0.25 }}>Etapa atual</Typography>
+            <Typography variant="caption" color="text.primary" fontWeight={600}>
+              {etapaAtual?.etapaDef.nome ?? "Concluído"}
+            </Typography>
+          </Box>
+          <Box>
+            <Typography variant="caption" color="text.disabled" sx={{ display: "block", mb: 0.25 }}>Responsável</Typography>
+            <Typography variant="caption" color={etapaAtual?.responsavel ? "text.primary" : "text.disabled"} fontWeight={600}>
+              {etapaAtual?.responsavel?.nome ?? "Não atribuído"}
+            </Typography>
+          </Box>
+          <Box>
+            <Typography variant="caption" color="text.disabled" sx={{ display: "block", mb: 0.25 }}>Deadline final</Typography>
+            <Typography variant="caption"
+              sx={{ color: isAtrasado(oa.deadlineFinal, oa.status === "CONCLUIDO") ? "#ef4444" : "text.primary", fontWeight: 600 }}>
+              {fmtData(oa.deadlineFinal)}
+            </Typography>
+          </Box>
+          <Box>
+            <Typography variant="caption" color="text.disabled" sx={{ display: "block", mb: 0.25 }}>Progresso</Typography>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <LinearProgress variant="determinate" value={oa.progressoPct}
+                sx={{ width: 80, height: 5, borderRadius: 3 }} />
+              <Typography variant="caption" fontWeight={600}>{oa.progressoPct}%</Typography>
+            </Box>
+          </Box>
+        </Box>
+        {(oa.linkObjeto || oa.linkObjetoFinal) && (
+          <Box sx={{ display: "flex", gap: 2, mt: 1, flexWrap: "wrap" }}>
+            {oa.linkObjeto && (
+              <Typography variant="caption">
+                <Box component="a" href={oa.linkObjeto} target="_blank" rel="noreferrer"
+                  sx={{ color: "primary.main", textDecoration: "none", "&:hover": { textDecoration: "underline" } }}>
+                  Link do objeto
+                </Box>
+              </Typography>
+            )}
+            {oa.linkObjetoFinal && (
+              <Typography variant="caption">
+                <Box component="a" href={oa.linkObjetoFinal} target="_blank" rel="noreferrer"
+                  sx={{ color: "primary.main", textDecoration: "none", "&:hover": { textDecoration: "underline" } }}>
+                  Link final
+                </Box>
+              </Typography>
+            )}
+          </Box>
+        )}
+      </Box>
+
+      {/* ── Tabs ── */}
+      <Tabs
+        value={tab}
+        onChange={(_, v) => setTab(v)}
+        sx={{ px: 3, borderBottom: "1px solid", borderColor: "divider", flexShrink: 0, minHeight: 44 }}
+      >
+        <Tab label="Pipeline"    sx={{ minHeight: 44, fontWeight: 600, fontSize: "0.825rem" }} />
+        <Tab label="Comentários" sx={{ minHeight: 44, fontWeight: 600, fontSize: "0.825rem" }} />
+        <Tab label="Histórico"   sx={{ minHeight: 44, fontWeight: 600, fontSize: "0.825rem" }} />
+      </Tabs>
+
+      {/* ── Tab content ── */}
+      <Box sx={{ flex: 1, overflowY: "auto" }}>
+        {tab === 0 && <PipelinePanel oa={oa} />}
+        {tab === 1 && <ComentariosPanel oaId={oa.id} membros={membros} />}
+        {tab === 2 && <HistoricoPanel oaId={oa.id} />}
+      </Box>
+    </Drawer>
+  );
+}
+
+// ─── Pipeline Panel ───────────────────────────────────────────────────────────
+
+function PipelinePanel({ oa }: { oa: OADrawerOA }) {
+  return (
+    <Box sx={{ p: 3 }}>
+      {oa.etapas.map((etapa, idx) => {
+        const color  = ETAPA_STATUS_COLOR[etapa.status] ?? "#cbd5e1";
+        const label  = ETAPA_STATUS_LABEL[etapa.status] ?? etapa.status;
+        const atrasado = !["CONCLUIDA"].includes(etapa.status) && isAtrasado(etapa.deadlinePrevisto);
+        const concluida = etapa.status === "CONCLUIDA";
+        return (
+          <Box key={etapa.id}>
+            {idx > 0 && (
+              <Box sx={{ ml: 1.75, width: 2, height: 16, bgcolor: "divider" }} />
+            )}
+            <Box sx={{
+              display: "flex", alignItems: "flex-start", gap: 2,
+              p: 1.5, borderRadius: 2,
+              bgcolor: etapa.status === "EM_ANDAMENTO" ? "#fffbeb" : "transparent",
+              border: etapa.status === "EM_ANDAMENTO" ? "1px solid #fef3c7" : "1px solid transparent",
+            }}>
+              {/* Indicador de status */}
+              <Box sx={{
+                width: 16, height: 16, borderRadius: "50%", flexShrink: 0, mt: 0.25,
+                bgcolor: color,
+                boxShadow: concluida ? "none" : `0 0 0 3px ${color}30`,
+              }} />
+
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5, flexWrap: "wrap" }}>
+                  <Typography variant="body2" fontWeight={600} sx={{ opacity: concluida ? 0.6 : 1 }}>
+                    {etapa.etapaDef.nome}
+                  </Typography>
+                  <Chip label={label} size="small"
+                    sx={{ height: 18, fontSize: "0.65rem", bgcolor: `${color}18`, color }} />
+                  {atrasado && (
+                    <Chip label="Atrasada" size="small"
+                      sx={{ height: 18, fontSize: "0.65rem", bgcolor: "#fef2f2", color: "#ef4444", fontWeight: 700 }} />
+                  )}
+                  {etapa.etapaDef.temArtefato && (
+                    <Chip label="Entregável" size="small"
+                      sx={{ height: 18, fontSize: "0.65rem", bgcolor: "#eff6ff", color: "#2b7cee" }} />
+                  )}
+                </Box>
+
+                <Box sx={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
+                  <Box>
+                    <Typography variant="caption" color="text.disabled">Responsável</Typography>
+                    <Typography variant="caption" color={etapa.responsavel ? "text.primary" : "text.disabled"} sx={{ display: "block", fontWeight: 500 }}>
+                      {etapa.responsavel?.nome ?? "—"}
+                    </Typography>
+                  </Box>
+                  {etapa.responsavelSecundario && (
+                    <Box>
+                      <Typography variant="caption" color="text.disabled">Secundário</Typography>
+                      <Typography variant="caption" color="text.primary" sx={{ display: "block", fontWeight: 500 }}>
+                        {etapa.responsavelSecundario.nome}
+                      </Typography>
+                    </Box>
+                  )}
+                  <Box>
+                    <Typography variant="caption" color="text.disabled">Deadline previsto</Typography>
+                    <Typography variant="caption"
+                      sx={{ display: "block", fontWeight: 500, color: atrasado ? "#ef4444" : "text.primary" }}>
+                      {fmtData(etapa.deadlinePrevisto)}
+                    </Typography>
+                  </Box>
+                  {etapa.deadlineReal && (
+                    <Box>
+                      <Typography variant="caption" color="text.disabled">Concluída em</Typography>
+                      <Typography variant="caption" color="#10b981" sx={{ display: "block", fontWeight: 500 }}>
+                        {fmtData(etapa.deadlineReal)}
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+              </Box>
+            </Box>
+          </Box>
+        );
+      })}
+    </Box>
+  );
+}
+
+// ─── Comentários Panel ────────────────────────────────────────────────────────
+
+function ComentariosPanel({ oaId, membros }: { oaId: string; membros: CursoMembro[] }) {
+  const user                             = useAuthStore((s) => s.user);
+  const { data: comentarios = [], isLoading } = useComentariosOA(oaId);
+  const { mutate: adicionar, isPending: enviando } = useAdicionarComentario(oaId);
+  const { mutate: excluir }              = useExcluirComentario(oaId);
+  const [texto, setTexto]                = useState("");
+  const textareaRef                      = useRef<HTMLTextAreaElement | null>(null);
+  const isAdmin                          = user?.papelGlobal === "ADMIN";
+
+  const enviar = () => {
+    const t = texto.trim();
+    if (!t) return;
+    adicionar({ texto: t }, { onSuccess: () => setTexto("") });
+  };
+
+  if (isLoading) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+        <CircularProgress size={24} />
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      {/* Lista */}
+      <Box sx={{ flex: 1, overflowY: "auto", px: 3, pt: 2, pb: 1 }}>
+        {comentarios.length === 0 ? (
+          <Typography variant="body2" color="text.disabled" sx={{ textAlign: "center", py: 4 }}>
+            Nenhum comentário ainda.
+          </Typography>
+        ) : (
+          comentarios.map((c) => {
+            const isOwn  = c.autor.id === user?.id;
+            const canDel = isOwn || isAdmin;
+            const initials = c.autor.nome?.[0]?.toUpperCase() ?? "?";
+            return (
+              <Box key={c.id} sx={{ display: "flex", gap: 1.5, mb: 2, alignItems: "flex-start" }}>
+                <Avatar sx={{ width: 30, height: 30, fontSize: "0.75rem", bgcolor: "primary.main", flexShrink: 0 }}>
+                  {initials}
+                </Avatar>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.25 }}>
+                    <Typography variant="caption" fontWeight={700}>{c.autor.nome}</Typography>
+                    <Typography variant="caption" color="text.disabled">
+                      {new Date(c.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                    </Typography>
+                    {canDel && (
+                      <IconButton size="small" sx={{ ml: "auto", p: 0.25 }} onClick={() => excluir(c.id)}>
+                        <DeleteOutlineIcon sx={{ fontSize: 14, color: "text.disabled" }} />
+                      </IconButton>
+                    )}
+                  </Box>
+                  <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}>
+                    {c.texto.split(/(@\w[\w\u00C0-\u017F]*)/).map((part, i) =>
+                      part.startsWith("@") ? (
+                        <Box component="span" key={i} sx={{ color: "primary.main", fontWeight: 600 }}>{part}</Box>
+                      ) : part
+                    )}
+                  </Typography>
+                </Box>
+              </Box>
+            );
+          })
+        )}
+      </Box>
+
+      <Divider />
+
+      {/* Input */}
+      <Box sx={{ px: 3, py: 2, display: "flex", gap: 1.5, alignItems: "flex-end", flexShrink: 0 }}>
+        <TextField
+          multiline
+          maxRows={4}
+          fullWidth
+          size="small"
+          placeholder="Escreva um comentário..."
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          inputRef={textareaRef}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(); }
+          }}
+          sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+        />
+        <IconButton
+          color="primary"
+          disabled={!texto.trim() || enviando}
+          onClick={enviar}
+          sx={{ flexShrink: 0 }}
+        >
+          {enviando ? <CircularProgress size={18} /> : <SendIcon sx={{ fontSize: 20 }} />}
+        </IconButton>
+      </Box>
+    </Box>
+  );
+}
+
+// ─── Histórico Panel ──────────────────────────────────────────────────────────
+
+function HistoricoPanel({ oaId }: { oaId: string }) {
+  const { data: logs = [], isLoading } = useAuditLogOA(oaId);
+
+  if (isLoading) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+        <CircularProgress size={24} />
+      </Box>
+    );
+  }
+
+  if (logs.length === 0) {
+    return (
+      <Typography variant="body2" color="text.disabled" sx={{ textAlign: "center", py: 4 }}>
+        Nenhum registro de histórico.
+      </Typography>
+    );
+  }
+
+  return (
+    <Box sx={{ px: 3, py: 2 }}>
+      {logs.map((log, idx) => (
+        <Box key={log.id} sx={{ display: "flex", gap: 2, mb: 2, alignItems: "flex-start" }}>
+          <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "primary.main", mt: 0.75, flexShrink: 0 }} />
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.25 }}>
+              {new Date(log.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}
+              {log.usuario && (
+                <Box component="span" sx={{ ml: 1, fontWeight: 700, color: "text.primary" }}>· {log.usuario.nome}</Box>
+              )}
+            </Typography>
+            <Typography variant="body2" color="text.primary">
+              {log.acao}
+            </Typography>
+          </Box>
+        </Box>
+      ))}
     </Box>
   );
 }
