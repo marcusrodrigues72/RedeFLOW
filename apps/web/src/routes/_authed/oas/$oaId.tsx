@@ -462,9 +462,11 @@ function ComentariosCard({ oaId, membros }: { oaId: string; membros: MembroSimpl
         .slice(0, 6)
     : [];
 
-  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const val    = e.target.value;
-    const cursor = e.target.selectionStart ?? val.length;
+  // Use onInput (native) to reliably get selectionStart on every keystroke
+  const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLTextAreaElement;
+    const val    = target.value;
+    const cursor = target.selectionStart ?? val.length;
     setTexto(val);
     const before = val.slice(0, cursor);
     const match  = before.match(/@([\w\u00C0-\u017F]*)$/);
@@ -488,7 +490,7 @@ function ComentariosCard({ oaId, membros }: { oaId: string; membros: MembroSimpl
   const handleEnviar = () => {
     const t = texto.trim();
     if (!t) return;
-    adicionar({ texto: t }, { onSuccess: () => setTexto("") });
+    adicionar({ texto: t }, { onSuccess: () => { setTexto(""); setMentionQuery(null); } });
   };
 
   return (
@@ -532,59 +534,51 @@ function ComentariosCard({ oaId, membros }: { oaId: string; membros: MembroSimpl
 
         <Divider sx={{ mb: 2 }} />
 
-        {/* Input area — position:relative so the suggestions Paper anchors here */}
-        <Box sx={{ position: "relative" }}>
-          {sugestoes.length > 0 && (
-            <Paper
-              elevation={4}
-              sx={{
-                position: "absolute", bottom: "100%", left: 0, right: 40,
-                mb: 0.5, borderRadius: 2, overflow: "hidden", zIndex: 1300,
-                maxHeight: 220, overflowY: "auto",
-              }}
-            >
-              <List dense disablePadding>
-                {sugestoes.map((m, i) => (
-                  <ListItemButton
-                    key={m.usuarioId}
-                    selected={i === 0}
-                    onMouseDown={(e) => { e.preventDefault(); inserirMencao(m.usuario.nome); }}
-                    sx={{ py: 0.75, px: 2 }}
-                  >
-                    <Avatar sx={{ width: 24, height: 24, bgcolor: "primary.light", fontSize: "0.65rem", mr: 1.5 }}>
-                      {m.usuario.nome[0]?.toUpperCase()}
-                    </Avatar>
-                    <ListItemText primary={m.usuario.nome} primaryTypographyProps={{ variant: "body2", fontWeight: 600 }} />
-                  </ListItemButton>
-                ))}
-              </List>
-            </Paper>
-          )}
+        {/* Sugestões de menção — renderizadas em fluxo normal, acima do input */}
+        {sugestoes.length > 0 && (
+          <Paper elevation={3} sx={{ mb: 1, borderRadius: 2, overflow: "hidden" }}>
+            <List dense disablePadding>
+              {sugestoes.map((m, i) => (
+                <ListItemButton
+                  key={m.usuarioId}
+                  selected={i === 0}
+                  onMouseDown={(e) => { e.preventDefault(); inserirMencao(m.usuario.nome); }}
+                  sx={{ py: 0.75, px: 2 }}
+                >
+                  <Avatar sx={{ width: 24, height: 24, bgcolor: "primary.light", fontSize: "0.65rem", mr: 1.5 }}>
+                    {m.usuario.nome[0]?.toUpperCase()}
+                  </Avatar>
+                  <ListItemText primary={m.usuario.nome} primaryTypographyProps={{ variant: "body2", fontWeight: 600 }} />
+                </ListItemButton>
+              ))}
+            </List>
+          </Paper>
+        )}
 
-          <Box sx={{ display: "flex", gap: 1, alignItems: "flex-end" }}>
-            <TextField
-              multiline maxRows={4} size="small" fullWidth
-              placeholder="Escreva um comentário… use @ para mencionar alguém"
-              value={texto}
-              onChange={handleChange}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") { setMentionQuery(null); return; }
-                if (sugestoes.length > 0 && (e.key === "Enter" || e.key === "Tab")) {
-                  e.preventDefault();
-                  inserirMencao(sugestoes[0]!.usuario.nome);
-                  return;
-                }
-                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleEnviar(); }
-              }}
-              inputRef={inputRef}
-            />
-            <IconButton
-              color="primary" disabled={!texto.trim() || adicionando}
-              onClick={handleEnviar} sx={{ mb: 0.25 }}
-            >
-              <SendIcon sx={{ fontSize: 20 }} />
-            </IconButton>
-          </Box>
+        <Box sx={{ display: "flex", gap: 1, alignItems: "flex-end" }}>
+          <TextField
+            multiline maxRows={4} size="small" fullWidth
+            placeholder="Escreva um comentário… use @ para mencionar alguém"
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            onInput={handleInput}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") { setMentionQuery(null); return; }
+              if (sugestoes.length > 0 && (e.key === "Enter" || e.key === "Tab")) {
+                e.preventDefault();
+                inserirMencao(sugestoes[0]!.usuario.nome);
+                return;
+              }
+              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleEnviar(); }
+            }}
+            inputRef={inputRef}
+          />
+          <IconButton
+            color="primary" disabled={!texto.trim() || adicionando}
+            onClick={handleEnviar} sx={{ mb: 0.25 }}
+          >
+            <SendIcon sx={{ fontSize: 20 }} />
+          </IconButton>
         </Box>
       </CardContent>
     </Card>
