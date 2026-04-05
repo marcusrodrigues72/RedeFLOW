@@ -92,12 +92,15 @@ function matchDeadline(oa: Parameters<typeof deadlineEfetivo>[0], filtro: Filtro
 function OAsPage() {
   const { cursoId }                               = Route.useParams();
   const { data: curso }                           = useCurso(cursoId);
-  const [search,          setSearch]              = useState("");
-  const [filtroStatus,    setFiltroStatus]        = useState("");
-  const [filtroTipo,      setFiltroTipo]          = useState("");
-  const [filtroUnidade,   setFiltroUnidade]       = useState("");
-  const [filtroDeadline,  setFiltroDeadline]      = useState<FiltroDeadline>("");
-  const [visao,           setVisao]               = useState<Visao>("lista");
+  const [search,              setSearch]          = useState("");
+  const [filtroStatus,        setFiltroStatus]    = useState("");
+  const [filtroTipo,          setFiltroTipo]      = useState("");
+  const [filtroUnidade,       setFiltroUnidade]   = useState("");
+  const [filtroCapitulo,      setFiltroCapitulo]  = useState("");
+  const [filtroDeadline,      setFiltroDeadline]  = useState<FiltroDeadline>("");
+  const [filtroResponsavel,   setFiltroResponsavel] = useState("");
+  const [filtroStatusEtapa,   setFiltroStatusEtapa] = useState("");
+  const [visao,               setVisao]           = useState<Visao>("lista");
   const { mutate: atualizarEtapa }                = useAtualizarEtapaGeral();
   const user                                      = useAuthStore((s) => s.user);
   const isAdmin = user?.papelGlobal === "ADMIN" ||
@@ -112,11 +115,36 @@ function OAsPage() {
     new Map(oas.map((oa) => [oa.capitulo.unidade.numero, oa.capitulo.unidade])).values()
   ).sort((a, b) => a.numero - b.numero);
 
-  const oasFiltrados = oas.filter((oa) =>
-    (!search        || oa.codigo.toLowerCase().includes(search.toLowerCase())) &&
-    (!filtroUnidade || String(oa.capitulo.unidade.numero) === filtroUnidade) &&
-    matchDeadline(oa, filtroDeadline)
-  );
+  // Capítulos da unidade selecionada
+  const capitulos = Array.from(
+    new Map(
+      oas
+        .filter((oa) => !filtroUnidade || String(oa.capitulo.unidade.numero) === filtroUnidade)
+        .map((oa) => [`${oa.capitulo.unidade.numero}:${oa.capitulo.numero}`, oa.capitulo])
+    ).values()
+  ).sort((a, b) => a.numero - b.numero);
+
+  // Responsáveis únicos com etapas neste curso
+  const responsaveis = Array.from(
+    new Map(
+      oas.flatMap((oa) =>
+        oa.etapas
+          .filter((e) => e.responsavel)
+          .map((e) => [e.responsavel!.id, e.responsavel!])
+      )
+    ).values()
+  ).sort((a, b) => a.nome.localeCompare(b.nome));
+
+  const oasFiltrados = oas.filter((oa) => {
+    const q = search.toLowerCase();
+    if (search && !oa.codigo.toLowerCase().includes(q) && !(oa.titulo ?? "").toLowerCase().includes(q)) return false;
+    if (filtroUnidade  && String(oa.capitulo.unidade.numero) !== filtroUnidade) return false;
+    if (filtroCapitulo && `${oa.capitulo.unidade.numero}:${oa.capitulo.numero}` !== filtroCapitulo) return false;
+    if (filtroResponsavel && !oa.etapas.some((e) => e.responsavel?.id === filtroResponsavel || e.responsavelSecundario?.id === filtroResponsavel)) return false;
+    if (filtroStatusEtapa && !oa.etapas.some((e) => e.status === filtroStatusEtapa)) return false;
+    if (!matchDeadline(oa, filtroDeadline)) return false;
+    return true;
+  });
 
   const grupos = oasFiltrados.reduce<Record<string, typeof oasFiltrados>>((acc, oa) => {
     const key = `U${oa.capitulo.unidade.numero} — ${oa.capitulo.unidade.nome} / C${oa.capitulo.numero} — ${oa.capitulo.nome}`;
@@ -170,12 +198,15 @@ function OAsPage() {
       </Tabs>
 
       {/* ── Filtros ── */}
-      <Box sx={{ display: "flex", gap: 2, mb: 3, flexWrap: "wrap" }}>
+      <Box sx={{ display: "flex", gap: 2, mb: 3, flexWrap: "wrap", alignItems: "center" }}>
+        {/* Busca: código ou título */}
         <TextField
-          placeholder="Buscar por código..." size="small" value={search}
-          onChange={(e) => setSearch(e.target.value)} sx={{ minWidth: 220 }}
+          placeholder="Buscar código ou título..." size="small" value={search}
+          onChange={(e) => setSearch(e.target.value)} sx={{ minWidth: 230 }}
           slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 18, color: "text.disabled" }} /></InputAdornment> } }}
         />
+
+        {/* Status do OA */}
         <FormControl size="small" sx={{ minWidth: 150 }}>
           <Select value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)} displayEmpty>
             <MenuItem value="">Todos os status</MenuItem>
@@ -184,7 +215,9 @@ function OAsPage() {
             ))}
           </Select>
         </FormControl>
-        <FormControl size="small" sx={{ minWidth: 160 }}>
+
+        {/* Tipo */}
+        <FormControl size="small" sx={{ minWidth: 150 }}>
           <Select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)} displayEmpty>
             <MenuItem value="">Todos os tipos</MenuItem>
             {(Object.keys(TIPO_CONFIG) as TipoOA[]).map((t) => (
@@ -192,20 +225,60 @@ function OAsPage() {
             ))}
           </Select>
         </FormControl>
-        <FormControl size="small" sx={{ minWidth: 180 }}>
-          <Select value={filtroUnidade} onChange={(e) => setFiltroUnidade(e.target.value)} displayEmpty>
+
+        {/* Unidade */}
+        <FormControl size="small" sx={{ minWidth: 170 }}>
+          <Select value={filtroUnidade} onChange={(e) => { setFiltroUnidade(e.target.value); setFiltroCapitulo(""); }} displayEmpty>
             <MenuItem value="">Todas as unidades</MenuItem>
             {unidades.map((u) => (
               <MenuItem key={u.numero} value={String(u.numero)}>U{u.numero} — {u.nome}</MenuItem>
             ))}
           </Select>
         </FormControl>
+
+        {/* Capítulo — dependente da unidade */}
+        {capitulos.length > 0 && (
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <Select value={filtroCapitulo} onChange={(e) => setFiltroCapitulo(e.target.value)} displayEmpty>
+              <MenuItem value="">Todos os capítulos</MenuItem>
+              {capitulos.map((c) => (
+                <MenuItem key={c.id} value={`${c.unidade.numero}:${c.numero}`}>
+                  C{c.numero} — {c.nome}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
+
+        {/* Responsável */}
+        {responsaveis.length > 0 && (
+          <FormControl size="small" sx={{ minWidth: 170 }}>
+            <Select value={filtroResponsavel} onChange={(e) => setFiltroResponsavel(e.target.value)} displayEmpty>
+              <MenuItem value="">Todos responsáveis</MenuItem>
+              {responsaveis.map((r) => (
+                <MenuItem key={r.id} value={r.id}>{r.nome}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
+
+        {/* Status de etapa */}
         <FormControl size="small" sx={{ minWidth: 170 }}>
+          <Select value={filtroStatusEtapa} onChange={(e) => setFiltroStatusEtapa(e.target.value)} displayEmpty>
+            <MenuItem value="">Status de etapa</MenuItem>
+            {(Object.keys(ETAPA_STATUS_LABEL) as StatusEtapa[]).map((s) => (
+              <MenuItem key={s} value={s}>{ETAPA_STATUS_LABEL[s]}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        {/* Deadline */}
+        <FormControl size="small" sx={{ minWidth: 160 }}>
           <Select
             value={filtroDeadline}
             onChange={(e) => setFiltroDeadline(e.target.value as FiltroDeadline)}
             displayEmpty
-            sx={ filtroDeadline === "vencido" ? { color: "#ef4444", fontWeight: 700 } : {} }
+            sx={filtroDeadline === "vencido" ? { color: "#ef4444", fontWeight: 700 } : {}}
           >
             <MenuItem value="">Todos os prazos</MenuItem>
             <MenuItem value="vencido" sx={{ color: "#ef4444", fontWeight: 600 }}>⚠ Vencido</MenuItem>
@@ -213,6 +286,14 @@ function OAsPage() {
             <MenuItem value="mes">Vence este mês</MenuItem>
           </Select>
         </FormControl>
+
+        {/* Limpar filtros */}
+        {(search || filtroStatus || filtroTipo || filtroUnidade || filtroCapitulo || filtroResponsavel || filtroStatusEtapa || filtroDeadline) && (
+          <Button size="small" variant="text" sx={{ color: "text.disabled", fontWeight: 600 }}
+            onClick={() => { setSearch(""); setFiltroStatus(""); setFiltroTipo(""); setFiltroUnidade(""); setFiltroCapitulo(""); setFiltroResponsavel(""); setFiltroStatusEtapa(""); setFiltroDeadline(""); }}>
+            Limpar filtros
+          </Button>
+        )}
       </Box>
 
       {/* ── Conteúdo ── */}

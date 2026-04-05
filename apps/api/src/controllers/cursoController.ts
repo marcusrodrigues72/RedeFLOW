@@ -174,9 +174,10 @@ export class CursoController {
       const result = await persistMC(rows, cursoId);
 
       res.json({
-        message:  `Importação concluída: ${result.criados} OAs criados, ${result.ignorados} ignorados.`,
-        criados:  result.criados,
-        ignorados: result.ignorados,
+        message:    `Importação concluída: ${result.criados} OAs criados, ${result.atualizados} atualizados, ${result.ignorados} ignorados.`,
+        criados:    result.criados,
+        atualizados: result.atualizados,
+        ignorados:  result.ignorados,
       });
     } catch (err) { next(err); }
   };

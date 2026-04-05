@@ -371,7 +371,7 @@ export function buildPreview(rows: MCRow[]): ImportPreview {
 
 // ─── Persistência ─────────────────────────────────────────────────────────────
 
-export async function persistMC(rows: MCRow[], cursoId: string): Promise<{ criados: number; ignorados: number }> {
+export async function persistMC(rows: MCRow[], cursoId: string): Promise<{ criados: number; atualizados: number; ignorados: number }> {
   // Busca etapas definição
   const etapasDef = await prisma.etapaDefinicao.findMany({ where: { ativo: true } });
 
@@ -380,12 +380,39 @@ export async function persistMC(rows: MCRow[], cursoId: string): Promise<{ criad
       e.papel === papel && (e.tipoOA === null || e.tipoOA === tipo)
     );
 
-  let criados = 0;
-  let ignorados = 0;
+  // Carrega membros do curso para resolver nomes → IDs
+  const membros = await prisma.cursoMembro.findMany({
+    where:   { cursoId },
+    include: { usuario: { select: { id: true, nome: true } } },
+  });
+  const resolveResponsavel = (nome: string): string | null => {
+    if (!nome?.trim()) return null;
+    const n = nome.trim().toLowerCase();
+    const m = membros.find((mb) =>
+      mb.usuario.nome.toLowerCase() === n ||
+      mb.usuario.nome.toLowerCase().startsWith(n)
+    );
+    return m?.usuarioId ?? null;
+  };
+
+  let criados    = 0;
+  let atualizados = 0;
+  let ignorados  = 0;
 
   // Cache unidades e capítulos para evitar N+1
-  const unidadeCache = new Map<number, string>();
+  const unidadeCache  = new Map<number, string>();
   const capituloCache = new Map<string, string>();
+
+  // Dados de etapas a sincronizar por papel (sem COORDENADOR_PRODUCAO — não vem na MC)
+  const etapasMC = (row: MCRow) => [
+    { papel: "CONTEUDISTA",          status: row.conteudiostaStatus, dl: row.conteudistaDL,  resp: row.conteudistaNome, ordem: 1 },
+    { papel: "DESIGNER_INSTRUCIONAL",status: row.diStatus,           dl: row.diDL,           resp: row.diNome,          ordem: 2 },
+    { papel: "PROFESSOR_ATOR",       status: row.profAtorStatus,     dl: row.profAtorDL,     resp: row.profAtorNome,    ordem: 3 },
+    { papel: "PROFESSOR_TECNICO",    status: row.profTecStatus,      dl: row.profTecDL,      resp: row.profTecNome,     ordem: 4 },
+    { papel: "ACESSIBILIDADE",       status: row.acessStatus,        dl: row.acessDL,        resp: row.acessNome,       ordem: 5 },
+    { papel: "PRODUTOR_FINAL",       status: row.prodStatus,         dl: row.prodDL,         resp: row.prodNome,        ordem: 6 },
+    { papel: "VALIDADOR_FINAL",      status: row.validStatus,        dl: row.validDL,        resp: row.validadorNome,   ordem: 7 },
+  ];
 
   for (const row of rows) {
     try {
@@ -412,57 +439,86 @@ export async function persistMC(rows: MCRow[], cursoId: string): Promise<{ criad
       }
       const capituloId = capituloCache.get(capKey)!;
 
-      // ── OA já existe? ─────────────────────────────────────────────────────
-      const existing = await prisma.objetoAprendizagem.findUnique({
-        where:  { codigo: row.codigo },
-        select: { id: true, capitulo: { select: { unidade: { select: { cursoId: true } } } } },
-      });
-      if (existing) {
-        if (existing.capitulo?.unidade?.cursoId === cursoId) { ignorados++; continue; }
-        // OA órfão de outro curso — remove para recriar neste curso
-        logger.warn({ codigo: row.codigo, cursoId }, "persistMC: removendo OA órfão de curso anterior");
-        await prisma.objetoAprendizagem.delete({ where: { id: existing.id } });
-      }
-
       // ── Status global do OA ──────────────────────────────────────────────
       let statusOA: "PENDENTE" | "EM_ANDAMENTO" | "CONCLUIDO" = "PENDENTE";
       if (row.progressoPct >= 100) statusOA = "CONCLUIDO";
       else if (row.progressoPct > 0) statusOA = "EM_ANDAMENTO";
 
+      // ── OA já existe? ─────────────────────────────────────────────────────
+      const existing = await prisma.objetoAprendizagem.findUnique({
+        where:   { codigo: row.codigo },
+        select:  {
+          id: true,
+          capitulo: { select: { unidade: { select: { cursoId: true } } } },
+          etapas:   { include: { etapaDef: true }, orderBy: { ordem: "asc" } },
+        },
+      });
+
+      if (existing) {
+        if (existing.capitulo?.unidade?.cursoId !== cursoId) {
+          // OA órfão de outro curso — remove para recriar neste curso
+          logger.warn({ codigo: row.codigo, cursoId }, "persistMC: removendo OA órfão de curso anterior");
+          await prisma.objetoAprendizagem.delete({ where: { id: existing.id } });
+          // Continua para criar abaixo
+        } else {
+          // ── ATUALIZA OA existente ────────────────────────────────────────
+          await prisma.objetoAprendizagem.update({
+            where: { id: existing.id },
+            data: {
+              status:          statusOA,
+              progressoPct:    Math.round(row.progressoPct),
+              linkObjeto:      row.linkObjeto   || null,
+              linkObjetoFinal: row.linkFinal    || null,
+              deadlineFinal:   row.validDL,
+            },
+          });
+
+          // Atualiza etapas existentes por papel
+          for (const upd of etapasMC(row)) {
+            const etapa = existing.etapas.find((e) => e.etapaDef.papel === upd.papel);
+            if (!etapa) continue;
+            const responsavelId = resolveResponsavel(upd.resp);
+            await prisma.etapaOA.update({
+              where: { id: etapa.id },
+              data: {
+                status:          upd.status as any,
+                deadlinePrevisto: upd.dl,
+                deadlineReal:    upd.status === "CONCLUIDA" ? upd.dl : null,
+                ...(responsavelId ? { responsavelId } : {}),
+              },
+            });
+          }
+
+          atualizados++;
+          continue;
+        }
+      }
+
       // ── Cria OA ───────────────────────────────────────────────────────────
       const oa = await prisma.objetoAprendizagem.create({
         data: {
           capituloId,
-          codigo:       row.codigo,
-          tipo:         row.tipo as any,
-          numero:       parseInt(row.codigo.match(/\d+$/)?.[0] ?? "1"),
-          status:       statusOA,
-          progressoPct: Math.round(row.progressoPct),
-          linkObjeto:   row.linkObjeto || null,
-          linkObjetoFinal: row.linkFinal || null,
-          deadlineFinal: row.validDL,
+          codigo:          row.codigo,
+          tipo:            row.tipo as any,
+          numero:          parseInt(row.codigo.match(/\d+$/)?.[0] ?? "1"),
+          status:          statusOA,
+          progressoPct:    Math.round(row.progressoPct),
+          linkObjeto:      row.linkObjeto || null,
+          linkObjetoFinal: row.linkFinal  || null,
+          deadlineFinal:   row.validDL,
         },
       });
 
       // ── Cria EtapaOAs ─────────────────────────────────────────────────────
       const etapasParaCriar = [
-        { papel: "COORDENADOR_PRODUCAO", status: "PENDENTE",             dl: null as Date | null, ordem: 0 },
-        { papel: "CONTEUDISTA",          status: row.conteudiostaStatus, dl: row.conteudistaDL, ordem: 1 },
-        { papel: "DESIGNER_INSTRUCIONAL",status: row.diStatus,           dl: row.diDL,          ordem: 2 },
-        ...(row.tipo === "VIDEO"
-          ? [{ papel: "PROFESSOR_ATOR",  status: row.profAtorStatus,     dl: row.profAtorDL,    ordem: 3 }]
-          : []
-        ),
-        { papel: "PROFESSOR_TECNICO",    status: row.profTecStatus,      dl: row.profTecDL,     ordem: 4 },
-        { papel: "ACESSIBILIDADE",       status: row.acessStatus,        dl: row.acessDL,       ordem: 5 },
-        { papel: "PRODUTOR_FINAL",       status: row.prodStatus,         dl: row.prodDL,        ordem: 6 },
-        { papel: "VALIDADOR_FINAL",      status: row.validStatus,        dl: row.validDL,       ordem: 7 },
+        { papel: "COORDENADOR_PRODUCAO", status: "PENDENTE", dl: null as Date | null, ordem: 0 },
+        ...etapasMC(row),
       ];
 
       for (const etapa of etapasParaCriar) {
         const def = getEtapaDef(etapa.papel, row.tipo);
         if (!def) continue;
-
+        const responsavelId = 'resp' in etapa ? resolveResponsavel((etapa as any).resp) : null;
         await prisma.etapaOA.create({
           data: {
             oaId:             oa.id,
@@ -471,6 +527,7 @@ export async function persistMC(rows: MCRow[], cursoId: string): Promise<{ criad
             deadlinePrevisto: etapa.dl,
             deadlineReal:     etapa.status === "CONCLUIDA" ? etapa.dl : null,
             ordem:            etapa.ordem,
+            ...(responsavelId ? { responsavelId } : {}),
           },
         });
       }
@@ -482,7 +539,7 @@ export async function persistMC(rows: MCRow[], cursoId: string): Promise<{ criad
     }
   }
 
-  return { criados, ignorados };
+  return { criados, atualizados, ignorados };
 }
 
 // ─── Parse MI ─────────────────────────────────────────────────────────────────
