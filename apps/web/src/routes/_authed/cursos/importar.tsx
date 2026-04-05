@@ -18,7 +18,7 @@ import {
   useImportarPreview, useImportarConfirmar,
   useImportarMINovoPreview, useImportarMINovoCurso,
 } from "@/lib/api/cursos";
-import type { ImportPreview, MIPreview, MIResult } from "shared";
+import type { ImportPreview, ImportResult, MIPreview, MIResult } from "shared";
 
 export const Route = createFileRoute("/_authed/cursos/importar")({
   component: ImportarPage,
@@ -51,7 +51,7 @@ function ImportarPage() {
   const [arquivo,    setArquivo]    = useState<File | null>(null);
   const [previewMC,  setPreviewMC]  = useState<ImportPreview | null>(null);
   const [previewMI,  setPreviewMI]  = useState<MIPreview | null>(null);
-  const [resultadoMC, setResultadoMC] = useState<{ criados: number; ignorados: number } | null>(null);
+  const [resultadoMC, setResultadoMC] = useState<ImportResult | null>(null);
   const [resultadoMI, setResultadoMI] = useState<MIResult | null>(null);
   const [dragOver,   setDragOver]   = useState(false);
 
@@ -92,11 +92,11 @@ function ImportarPage() {
     }
   };
 
-  const confirmarImport = () => {
+  const confirmarImport = (novosUsuarios: { nomeNaPlanilha: string; email: string }[] = []) => {
     if (!arquivo) return;
     if (tipoImport === "MC") {
-      confirmarMC(arquivo, {
-        onSuccess: (data) => { setResultadoMC({ criados: data.criados, ignorados: data.ignorados }); setPasso(3); },
+      confirmarMC({ file: arquivo, novosUsuarios }, {
+        onSuccess: (data) => { setResultadoMC(data); setPasso(3); },
       });
     } else {
       confirmarMINovo({ file: arquivo, codigo: codigo.trim(), nome: nome.trim(), dataInicio: dataInicio || undefined }, {
@@ -308,8 +308,10 @@ function ImportarPage() {
 
       {/* ── PASSO 2: Revisão MC ──────────────────────────────────────────────── */}
       {passo === 2 && tipoImport === "MC" && previewMC && (
-        <PreviewMC preview={previewMC} erro={!!errPreviewMC} loadConfirm={loadConfirmMC}
-          onVoltar={() => setPasso(0)} onConfirmar={confirmarImport} />
+        <PreviewMC
+          preview={previewMC} erro={!!errPreviewMC} loadConfirm={loadConfirmMC}
+          onVoltar={() => setPasso(0)} onConfirmar={confirmarImport}
+        />
       )}
 
       {/* ── PASSO 2: Revisão MI ──────────────────────────────────────────────── */}
@@ -340,10 +342,55 @@ function ImportarPage() {
             <Typography sx={{ fontSize: "1.5rem", fontWeight: 800, mb: 1 }}>Importação Concluída!</Typography>
 
             {tipoImport === "MC" && resultadoMC && (
-              <Typography color="text.secondary" sx={{ mb: 3 }}>
-                <strong>{resultadoMC.criados}</strong> OAs atualizados.
-                {resultadoMC.ignorados > 0 && ` ${resultadoMC.ignorados} já existiam e foram ignorados.`}
-              </Typography>
+              <>
+                <Box sx={{ display: "flex", gap: 2, justifyContent: "center", mb: 3, flexWrap: "wrap" }}>
+                  {[
+                    { label: "OAs criados",      value: resultadoMC.criados,     color: "#10b981" },
+                    { label: "OAs atualizados",  value: resultadoMC.atualizados, color: "#2b7cee" },
+                    ...(resultadoMC.ignorados > 0
+                      ? [{ label: "OAs ignorados", value: resultadoMC.ignorados, color: "#94a3b8" }]
+                      : []),
+                  ].map((s) => (
+                    <Paper key={s.label} sx={{ px: 3, py: 2, borderRadius: 2, textAlign: "center", minWidth: 110 }}>
+                      <Typography sx={{ fontSize: "1.75rem", fontWeight: 900, color: s.color }}>{s.value}</Typography>
+                      <Typography variant="caption" color="text.secondary">{s.label}</Typography>
+                    </Paper>
+                  ))}
+                </Box>
+
+                {/* Novos usuários cadastrados */}
+                {resultadoMC.novosUsuariosCriados?.length > 0 && (
+                  <Alert severity="success" sx={{ mb: 2, textAlign: "left" }}>
+                    <Typography variant="body2" fontWeight={700} sx={{ mb: 1 }}>
+                      {resultadoMC.novosUsuariosCriados.length} usuário{resultadoMC.novosUsuariosCriados.length > 1 ? "s" : ""} cadastrado{resultadoMC.novosUsuariosCriados.length > 1 ? "s" : ""} e adicionado{resultadoMC.novosUsuariosCriados.length > 1 ? "s" : ""} ao time:
+                    </Typography>
+                    {resultadoMC.novosUsuariosCriados.map((u) => (
+                      <Box key={u.email} sx={{ mb: 0.75, pl: 1, borderLeft: "3px solid #10b981" }}>
+                        <Typography variant="body2" fontWeight={600}>{u.nome}</Typography>
+                        <Typography variant="caption" color="text.secondary">{u.email}</Typography>
+                        {u.senhaTemporaria !== "(usuário já existia no sistema)" && (
+                          <Typography variant="caption" sx={{ display: "block", color: "#059669", fontFamily: "monospace", fontWeight: 700 }}>
+                            Senha temporária: {u.senhaTemporaria}
+                          </Typography>
+                        )}
+                      </Box>
+                    ))}
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
+                      Compartilhe as senhas temporárias com os novos usuários. Eles devem alterá-las no primeiro acesso.
+                    </Typography>
+                  </Alert>
+                )}
+
+                {/* Avisos de nomes ainda não resolvidos */}
+                {resultadoMC.avisos?.length > 0 && (
+                  <Alert severity="warning" sx={{ mb: 2, textAlign: "left" }}>
+                    <Typography variant="body2" fontWeight={700} sx={{ mb: 0.5 }}>Responsáveis não atribuídos:</Typography>
+                    <ul style={{ margin: "4px 0 0", paddingLeft: 20 }}>
+                      {resultadoMC.avisos.map((a, i) => <li key={i}><Typography variant="caption">{a}</Typography></li>)}
+                    </ul>
+                  </Alert>
+                )}
+              </>
             )}
 
             {tipoImport === "MI" && resultadoMI && (
@@ -406,10 +453,40 @@ function ImportarPage() {
 }
 
 // ─── Preview MC ───────────────────────────────────────────────────────────────
+
+type ResolucaoUsuario = { acao: "ignorar" | "cadastrar"; email: string };
+
 function PreviewMC({ preview, erro, loadConfirm, onVoltar, onConfirmar }: {
   preview: ImportPreview; erro: boolean; loadConfirm: boolean;
-  onVoltar: () => void; onConfirmar: () => void;
+  onVoltar: () => void;
+  onConfirmar: (novosUsuarios: { nomeNaPlanilha: string; email: string }[]) => void;
 }) {
+  const [resolucao, setResolucao] = useState<Record<string, ResolucaoUsuario>>(() =>
+    Object.fromEntries((preview.responsaveisNaoEncontrados ?? []).map((n) => [n, { acao: "ignorar", email: "" }]))
+  );
+
+  const setAcao  = (nome: string, acao: "ignorar" | "cadastrar") =>
+    setResolucao((prev) => ({ ...prev, [nome]: { ...prev[nome]!, acao } }));
+  const setEmail = (nome: string, email: string) =>
+    setResolucao((prev) => ({ ...prev, [nome]: { ...prev[nome]!, email } }));
+
+  const emailInvalido = (email: string) => email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const temEmailInvalido = Object.values(resolucao).some(
+    (v) => v.acao === "cadastrar" && !!emailInvalido(v.email)
+  );
+  const temCadastrarSemEmail = Object.values(resolucao).some(
+    (v) => v.acao === "cadastrar" && !v.email.trim()
+  );
+
+  const handleConfirmar = () => {
+    const novosUsuarios = Object.entries(resolucao)
+      .filter(([, v]) => v.acao === "cadastrar" && v.email.trim())
+      .map(([nomeNaPlanilha, v]) => ({ nomeNaPlanilha, email: v.email.trim() }));
+    onConfirmar(novosUsuarios);
+  };
+
+  const naoEncontrados = preview.responsaveisNaoEncontrados ?? [];
+
   return (
     <Box>
       {erro && <Alert severity="error" sx={{ mb: 2 }}>Erro ao analisar arquivo. Verifique o formato.</Alert>}
@@ -425,9 +502,78 @@ function PreviewMC({ preview, erro, loadConfirm, onVoltar, onConfirmar }: {
           </Paper>
         ))}
       </Box>
+
       {preview.avisos.length > 0 && (
         <Alert severity="warning" sx={{ mb: 2 }}>{preview.avisos.map((a, i) => <div key={i}>{a}</div>)}</Alert>
       )}
+
+      {/* ── Responsáveis não encontrados ── */}
+      {naoEncontrados.length > 0 && (
+        <Card sx={{ mb: 3, border: "1px solid #fef3c7" }}>
+          <CardContent sx={{ p: 0, pb: "0 !important" }}>
+            <Box sx={{ px: 2.5, py: 2, borderBottom: "1px solid", borderColor: "divider", bgcolor: "#fffbeb", display: "flex", alignItems: "center", gap: 1 }}>
+              <Typography fontWeight={700} sx={{ color: "#92400e" }}>
+                {naoEncontrados.length} responsável{naoEncontrados.length > 1 ? "is" : ""} não encontrado{naoEncontrados.length > 1 ? "s" : ""} no time
+              </Typography>
+              <Chip label={naoEncontrados.length} size="small" sx={{ height: 18, fontSize: "0.65rem", bgcolor: "#fef3c7", color: "#92400e", fontWeight: 700 }} />
+            </Box>
+            <Box sx={{ px: 2.5, py: 1.5, bgcolor: "#fffbeb" }}>
+              <Typography variant="caption" color="text.secondary">
+                Os nomes abaixo estão na planilha mas não foram encontrados no time do projeto.
+                Cadastre-os agora para que fiquem atribuídos às etapas, ou ignore para deixar sem responsável.
+              </Typography>
+            </Box>
+            {naoEncontrados.map((nome) => {
+              const estado = resolucao[nome] ?? { acao: "ignorar", email: "" };
+              const isCadastrar = estado.acao === "cadastrar";
+              const emailErr = isCadastrar && estado.email.trim() ? !!emailInvalido(estado.email) : false;
+              return (
+                <Box key={nome} sx={{
+                  px: 2.5, py: 1.75, borderTop: "1px solid", borderColor: "divider",
+                  display: "flex", alignItems: "flex-start", gap: 2, flexWrap: "wrap",
+                }}>
+                  {/* Nome da planilha */}
+                  <Box sx={{ minWidth: 200, pt: 0.5 }}>
+                    <Typography variant="body2" fontWeight={600}>{nome}</Typography>
+                    <Typography variant="caption" color="text.disabled">nome na planilha</Typography>
+                  </Box>
+
+                  {/* Toggle ação */}
+                  <ToggleButtonGroup
+                    value={estado.acao}
+                    exclusive
+                    size="small"
+                    onChange={(_, v) => { if (v) setAcao(nome, v); }}
+                  >
+                    <ToggleButton value="ignorar" sx={{ px: 2, fontSize: "0.75rem" }}>
+                      Ignorar
+                    </ToggleButton>
+                    <ToggleButton value="cadastrar" sx={{ px: 2, fontSize: "0.75rem" }}>
+                      Cadastrar usuário
+                    </ToggleButton>
+                  </ToggleButtonGroup>
+
+                  {/* Campo de e-mail (somente quando "cadastrar") */}
+                  {isCadastrar && (
+                    <TextField
+                      size="small"
+                      label="E-mail"
+                      placeholder="usuario@exemplo.com"
+                      value={estado.email}
+                      onChange={(e) => setEmail(nome, e.target.value)}
+                      error={emailErr}
+                      helperText={emailErr ? "E-mail inválido" : "Usuário criado com senha temporária"}
+                      sx={{ flex: 1, minWidth: 240 }}
+                    />
+                  )}
+                </Box>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Amostra de OAs ── */}
       <Card sx={{ mb: 3 }}>
         <CardContent sx={{ p: 0, pb: "0 !important" }}>
           <Box sx={{ p: 2.5, borderBottom: "1px solid", borderColor: "divider" }}>
@@ -462,10 +608,17 @@ function PreviewMC({ preview, erro, loadConfirm, onVoltar, onConfirmar }: {
           </Table>
         </CardContent>
       </Card>
+
       <Box sx={{ display: "flex", justifyContent: "space-between" }}>
         <Button onClick={onVoltar} startIcon={<ArrowBackIcon />}>Voltar</Button>
-        <Button variant="contained" onClick={onConfirmar} disabled={loadConfirm} sx={{ fontWeight: 700 }}>
-          {loadConfirm ? <CircularProgress size={20} sx={{ color: "white" }} /> : `Confirmar e Importar ${preview.totalOAs} OAs`}
+        <Button
+          variant="contained" onClick={handleConfirmar}
+          disabled={loadConfirm || temEmailInvalido || temCadastrarSemEmail}
+          sx={{ fontWeight: 700 }}
+        >
+          {loadConfirm
+            ? <CircularProgress size={20} sx={{ color: "white" }} />
+            : `Confirmar e Importar ${preview.totalOAs} OAs`}
         </Button>
       </Box>
     </Box>

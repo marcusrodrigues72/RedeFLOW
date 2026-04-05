@@ -1,8 +1,10 @@
 import type { Request, Response, NextFunction } from "express";
 import { CursoService } from "../services/cursoService.js";
-import { parseBuffer, buildPreview, persistMC, parseMI, buildMIPreview, persistMI } from "../services/importService.js";
+import { parseBuffer, buildPreview, persistMC, parseMI, buildMIPreview, persistMI, extractNomesResponsaveis } from "../services/importService.js";
 import { prisma } from "../lib/prisma.js";
 import { z } from "zod";
+import bcrypt from "bcryptjs";
+import { randomBytes } from "crypto";
 
 const criarCursoSchema = z.object({
   codigo:           z.string().min(2).max(20),
@@ -67,15 +69,29 @@ export class CursoController {
 
   // ── Importação ─────────────────────────────────────────────────────────────
 
-  /** Faz o parse e retorna um preview SEM salvar no banco. */
+  /** Faz o parse e retorna um preview SEM salvar no banco. Inclui responsáveis não encontrados no time. */
   importarPreview = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.file) { res.status(400).json({ message: "Nenhum arquivo enviado." }); return; }
 
+      const cursoId = req.params["id"] as string;
       const rows    = parseBuffer(req.file.buffer, req.file.originalname);
       const preview = buildPreview(rows);
 
-      // Guarda as rows na sessão temporária via header (para simplicidade, usa o próprio body no confirmar)
+      // Resolve responsáveis contra os membros do curso
+      const membros = await prisma.cursoMembro.findMany({
+        where:   { cursoId },
+        include: { usuario: { select: { id: true, nome: true } } },
+      });
+      const todosNomes = extractNomesResponsaveis(rows);
+      preview.responsaveisNaoEncontrados = todosNomes.filter((nome) => {
+        const n = nome.toLowerCase();
+        return !membros.some((m) =>
+          m.usuario.nome.toLowerCase() === n ||
+          m.usuario.nome.toLowerCase().startsWith(n)
+        );
+      });
+
       res.json(preview);
     } catch (err) { next(err); }
   };
@@ -159,7 +175,7 @@ export class CursoController {
     } catch (err) { next(err); }
   };
 
-  /** Recebe o arquivo novamente e persiste no banco. */
+  /** Recebe o arquivo + novos usuários opcionais, cria-os e persiste a MC no banco. */
   importarConfirmar = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.file) { res.status(400).json({ message: "Nenhum arquivo enviado." }); return; }
@@ -170,14 +186,63 @@ export class CursoController {
       const curso = await this.service.buscarPorId(cursoId, req.usuario!.sub);
       if (!curso) { res.status(404).json({ message: "Curso não encontrado." }); return; }
 
+      // ── Cria novos usuários e adiciona ao time, se solicitado ──────────────
+      type NovoUsuarioInput = { nomeNaPlanilha: string; email: string };
+      type NovoUsuarioCriado = { nomeNaPlanilha: string; nome: string; email: string; senhaTemporaria: string };
+
+      const novosUsuariosCriados: NovoUsuarioCriado[] = [];
+      const novosUsuariosRaw = req.body?.novosUsuarios;
+
+      if (novosUsuariosRaw) {
+        const lista: NovoUsuarioInput[] = typeof novosUsuariosRaw === "string"
+          ? JSON.parse(novosUsuariosRaw)
+          : novosUsuariosRaw;
+
+        for (const nu of lista) {
+          if (!nu.email?.trim() || !nu.nomeNaPlanilha?.trim()) continue;
+
+          const emailNorm = nu.email.trim().toLowerCase();
+          const nome      = nu.nomeNaPlanilha.trim();
+
+          // Cria usuário se ainda não existir
+          let usuario = await prisma.usuario.findUnique({ where: { email: emailNorm }, select: { id: true, nome: true } });
+          let senhaTemporaria = "(usuário já existia no sistema)";
+
+          if (!usuario) {
+            const pwd   = randomBytes(5).toString("hex"); // ex: "a1b2c3d4e5"
+            const hash  = await bcrypt.hash(pwd, 12);
+            usuario = await prisma.usuario.create({
+              data:   { nome, email: emailNorm, senhaHash: hash, papelGlobal: "COLABORADOR" },
+              select: { id: true, nome: true },
+            });
+            senhaTemporaria = pwd;
+          }
+
+          // Adiciona ao time do curso se ainda não for membro
+          const jaMembro = await prisma.cursoMembro.findUnique({
+            where: { cursoId_usuarioId: { cursoId, usuarioId: usuario.id } },
+          });
+          if (!jaMembro) {
+            await prisma.cursoMembro.create({
+              data: { cursoId, usuarioId: usuario.id, papel: "COLABORADOR" },
+            });
+          }
+
+          novosUsuariosCriados.push({ nomeNaPlanilha: nu.nomeNaPlanilha, nome: usuario.nome, email: emailNorm, senhaTemporaria });
+        }
+      }
+
+      // ── Executa importação (membros já incluem os recém-criados) ───────────
       const rows   = parseBuffer(req.file.buffer, req.file.originalname);
       const result = await persistMC(rows, cursoId);
 
       res.json({
-        message:    `Importação concluída: ${result.criados} OAs criados, ${result.atualizados} atualizados, ${result.ignorados} ignorados.`,
-        criados:    result.criados,
-        atualizados: result.atualizados,
-        ignorados:  result.ignorados,
+        message:             `Importação concluída: ${result.criados} OAs criados, ${result.atualizados} atualizados, ${result.ignorados} ignorados.`,
+        criados:             result.criados,
+        atualizados:         result.atualizados,
+        ignorados:           result.ignorados,
+        avisos:              result.avisos,
+        novosUsuariosCriados,
       });
     } catch (err) { next(err); }
   };

@@ -117,6 +117,21 @@ export interface ImportPreview {
   unidades: { numero: number; totalOAs: number }[];
   amostra: MCRow[];
   avisos: string[];
+  responsaveisNaoEncontrados: string[];
+}
+
+/** Retorna todos os nomes únicos de responsáveis presentes nas linhas da MC */
+export function extractNomesResponsaveis(rows: MCRow[]): string[] {
+  const nomes = new Set<string>();
+  for (const row of rows) {
+    for (const nome of [
+      row.conteudistaNome, row.diNome, row.profAtorNome,
+      row.profTecNome, row.acessNome, row.prodNome, row.validadorNome,
+    ]) {
+      if (nome?.trim()) nomes.add(nome.trim());
+    }
+  }
+  return Array.from(nomes).sort();
 }
 
 // ─── Tipos MI ─────────────────────────────────────────────────────────────────
@@ -366,12 +381,15 @@ export function buildPreview(rows: MCRow[]): ImportPreview {
     unidades: Array.from(unidadeMap.entries()).map(([numero, totalOAs]) => ({ numero, totalOAs })),
     amostra: rows.slice(0, 5),
     avisos: [...new Set(avisos)].slice(0, 10),
+    responsaveisNaoEncontrados: [], // preenchido pelo controller após comparar com membros do curso
   };
 }
 
 // ─── Persistência ─────────────────────────────────────────────────────────────
 
-export async function persistMC(rows: MCRow[], cursoId: string): Promise<{ criados: number; atualizados: number; ignorados: number }> {
+export async function persistMC(rows: MCRow[], cursoId: string): Promise<{ criados: number; atualizados: number; ignorados: number; avisos: string[] }> {
+  const avisosMC: string[] = [];
+
   // Busca etapas definição
   const etapasDef = await prisma.etapaDefinicao.findMany({ where: { ativo: true } });
 
@@ -385,6 +403,7 @@ export async function persistMC(rows: MCRow[], cursoId: string): Promise<{ criad
     where:   { cursoId },
     include: { usuario: { select: { id: true, nome: true } } },
   });
+  const nomesNaoResolvidos = new Set<string>();
   const resolveResponsavel = (nome: string): string | null => {
     if (!nome?.trim()) return null;
     const n = nome.trim().toLowerCase();
@@ -392,6 +411,7 @@ export async function persistMC(rows: MCRow[], cursoId: string): Promise<{ criad
       mb.usuario.nome.toLowerCase() === n ||
       mb.usuario.nome.toLowerCase().startsWith(n)
     );
+    if (!m) nomesNaoResolvidos.add(nome.trim());
     return m?.usuarioId ?? null;
   };
 
@@ -539,7 +559,11 @@ export async function persistMC(rows: MCRow[], cursoId: string): Promise<{ criad
     }
   }
 
-  return { criados, atualizados, ignorados };
+  for (const nome of nomesNaoResolvidos) {
+    avisosMC.push(`Responsável "${nome}" não encontrado no time do projeto — etapas atribuídas a este nome ficaram sem responsável.`);
+  }
+
+  return { criados, atualizados, ignorados, avisos: avisosMC };
 }
 
 // ─── Parse MI ─────────────────────────────────────────────────────────────────

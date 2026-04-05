@@ -463,9 +463,12 @@ export function useRemoverMembro(cursoId: string) {
 export function useImportarConfirmar(cursoId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (file: File) => {
+    mutationFn: ({ file, novosUsuarios }: { file: File; novosUsuarios?: { nomeNaPlanilha: string; email: string }[] }) => {
       const fd = new FormData();
       fd.append("arquivo", file);
+      if (novosUsuarios && novosUsuarios.length > 0) {
+        fd.append("novosUsuarios", JSON.stringify(novosUsuarios));
+      }
       return api.post<ImportResult>(`/cursos/${cursoId}/importar/confirmar`, fd, {
         headers: { "Content-Type": "multipart/form-data" },
       }).then((r) => r.data);

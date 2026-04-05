@@ -344,12 +344,23 @@ export interface ImportPreview {
   unidades: { numero: number; totalOAs: number }[];
   amostra: { codigo: string; tipo: string; progressoPct: number; unidade: number; capitulo: number }[];
   avisos: string[];
+  responsaveisNaoEncontrados: string[];
+}
+
+export interface NovoUsuarioCriado {
+  nomeNaPlanilha:  string;
+  nome:            string;
+  email:           string;
+  senhaTemporaria: string;
 }
 
 export interface ImportResult {
-  message: string;
-  criados: number;
-  ignorados: number;
+  message:             string;
+  criados:             number;
+  atualizados:         number;
+  ignorados:           number;
+  avisos:              string[];
+  novosUsuariosCriados: NovoUsuarioCriado[];
 }
 
 export interface MIPreview {
