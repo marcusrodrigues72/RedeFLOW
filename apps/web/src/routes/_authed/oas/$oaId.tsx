@@ -16,8 +16,8 @@ import CheckIcon                from "@mui/icons-material/Check";
 import CloseIcon                from "@mui/icons-material/Close";
 import LinkIcon                 from "@mui/icons-material/Link";
 import EditIcon                 from "@mui/icons-material/Edit";
-import { useState, useRef, useCallback } from "react";
-import Popover                 from "@mui/material/Popover";
+import { useState, useRef } from "react";
+import Paper                   from "@mui/material/Paper";
 import List                    from "@mui/material/List";
 import ListItemButton          from "@mui/material/ListItemButton";
 import ListItemText            from "@mui/material/ListItemText";
@@ -452,23 +452,21 @@ function ComentariosCard({ oaId, membros }: { oaId: string; membros: MembroSimpl
   const { mutate: adicionar, isPending: adicionando }  = useAdicionarComentario(oaId);
   const { mutate: excluir }                            = useExcluirComentario(oaId);
   const [texto, setTexto]                              = useState("");
-
-  // Mention popover state
-  const inputRef                   = useRef<HTMLTextAreaElement>(null);
-  const anchorRef                  = useRef<HTMLDivElement>(null);
-  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
-  const [mentionStart, setMentionStart] = useState(0);
+  const [mentionQuery, setMentionQuery]                = useState<string | null>(null);
+  const [mentionStart, setMentionStart]                = useState(0);
+  const inputRef                                       = useRef<HTMLTextAreaElement>(null);
 
   const sugestoes = mentionQuery !== null
     ? membros
-        .filter((m) => mentionQuery === "" || m.usuario.nome.toLowerCase().includes(mentionQuery.toLowerCase()))
+        .filter((m) => !mentionQuery || m.usuario.nome.toLowerCase().includes(mentionQuery.toLowerCase()))
         .slice(0, 6)
     : [];
 
-  const handleTextoChange = useCallback((valor: string, cursor: number) => {
-    setTexto(valor);
-    // Find last @ before cursor position (read from event, not from ref)
-    const before = valor.slice(0, cursor);
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val    = e.target.value;
+    const cursor = e.target.selectionStart ?? val.length;
+    setTexto(val);
+    const before = val.slice(0, cursor);
     const match  = before.match(/@([\w\u00C0-\u017F]*)$/);
     if (match) {
       setMentionQuery(match[1] ?? "");
@@ -476,7 +474,7 @@ function ComentariosCard({ oaId, membros }: { oaId: string; membros: MembroSimpl
     } else {
       setMentionQuery(null);
     }
-  }, []);
+  };
 
   const inserirMencao = (nome: string) => {
     const antes  = texto.slice(0, mentionStart);
@@ -484,14 +482,7 @@ function ComentariosCard({ oaId, membros }: { oaId: string; membros: MembroSimpl
     const novo   = `${antes}@${nome} ${depois}`;
     setTexto(novo);
     setMentionQuery(null);
-    // restore focus
-    setTimeout(() => {
-      const el = inputRef.current;
-      if (!el) return;
-      const pos = antes.length + nome.length + 2; // @nome + space
-      el.setSelectionRange(pos, pos);
-      el.focus();
-    }, 0);
+    setTimeout(() => inputRef.current?.focus(), 0);
   };
 
   const handleEnviar = () => {
@@ -540,58 +531,61 @@ function ComentariosCard({ oaId, membros }: { oaId: string; membros: MembroSimpl
         )}
 
         <Divider sx={{ mb: 2 }} />
-        <Box ref={anchorRef} sx={{ display: "flex", gap: 1, alignItems: "flex-end" }}>
-          <TextField
-            multiline maxRows={4} size="small" fullWidth
-            placeholder="Escreva um comentário… use @ para mencionar alguém"
-            value={texto}
-            onChange={(e) => handleTextoChange(e.target.value, e.target.selectionStart ?? e.target.value.length)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") { setMentionQuery(null); return; }
-              if (sugestoes.length > 0 && (e.key === "Enter" || e.key === "Tab")) {
-                e.preventDefault();
-                inserirMencao(sugestoes[0]!.usuario.nome);
-                return;
-              }
-              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleEnviar(); }
-            }}
-            slotProps={{ input: { inputRef } }}
-          />
-          <IconButton
-            color="primary" disabled={!texto.trim() || adicionando}
-            onClick={handleEnviar} sx={{ mb: 0.25 }}
-          >
-            <SendIcon sx={{ fontSize: 20 }} />
-          </IconButton>
-        </Box>
 
-        {/* Mention autocomplete popover */}
-        <Popover
-          open={sugestoes.length > 0}
-          anchorEl={anchorRef.current}
-          onClose={() => setMentionQuery(null)}
-          anchorOrigin={{ vertical: "top", horizontal: "left" }}
-          transformOrigin={{ vertical: "bottom", horizontal: "left" }}
-          disableAutoFocus
-          disableEnforceFocus
-          PaperProps={{ sx: { width: anchorRef.current?.offsetWidth ?? 300, maxHeight: 220, overflow: "auto", borderRadius: 2, boxShadow: "0 4px 20px rgba(0,0,0,0.12)" } }}
-        >
-          <List dense disablePadding>
-            {sugestoes.map((m, i) => (
-              <ListItemButton
-                key={m.usuarioId}
-                selected={i === 0}
-                onClick={() => inserirMencao(m.usuario.nome)}
-                sx={{ py: 0.75, px: 2 }}
-              >
-                <Avatar sx={{ width: 24, height: 24, bgcolor: "primary.light", fontSize: "0.65rem", mr: 1.5 }}>
-                  {m.usuario.nome[0]?.toUpperCase()}
-                </Avatar>
-                <ListItemText primary={m.usuario.nome} primaryTypographyProps={{ variant: "body2", fontWeight: 600 }} />
-              </ListItemButton>
-            ))}
-          </List>
-        </Popover>
+        {/* Input area — position:relative so the suggestions Paper anchors here */}
+        <Box sx={{ position: "relative" }}>
+          {sugestoes.length > 0 && (
+            <Paper
+              elevation={4}
+              sx={{
+                position: "absolute", bottom: "100%", left: 0, right: 40,
+                mb: 0.5, borderRadius: 2, overflow: "hidden", zIndex: 1300,
+                maxHeight: 220, overflowY: "auto",
+              }}
+            >
+              <List dense disablePadding>
+                {sugestoes.map((m, i) => (
+                  <ListItemButton
+                    key={m.usuarioId}
+                    selected={i === 0}
+                    onMouseDown={(e) => { e.preventDefault(); inserirMencao(m.usuario.nome); }}
+                    sx={{ py: 0.75, px: 2 }}
+                  >
+                    <Avatar sx={{ width: 24, height: 24, bgcolor: "primary.light", fontSize: "0.65rem", mr: 1.5 }}>
+                      {m.usuario.nome[0]?.toUpperCase()}
+                    </Avatar>
+                    <ListItemText primary={m.usuario.nome} primaryTypographyProps={{ variant: "body2", fontWeight: 600 }} />
+                  </ListItemButton>
+                ))}
+              </List>
+            </Paper>
+          )}
+
+          <Box sx={{ display: "flex", gap: 1, alignItems: "flex-end" }}>
+            <TextField
+              multiline maxRows={4} size="small" fullWidth
+              placeholder="Escreva um comentário… use @ para mencionar alguém"
+              value={texto}
+              onChange={handleChange}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") { setMentionQuery(null); return; }
+                if (sugestoes.length > 0 && (e.key === "Enter" || e.key === "Tab")) {
+                  e.preventDefault();
+                  inserirMencao(sugestoes[0]!.usuario.nome);
+                  return;
+                }
+                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleEnviar(); }
+              }}
+              inputRef={inputRef}
+            />
+            <IconButton
+              color="primary" disabled={!texto.trim() || adicionando}
+              onClick={handleEnviar} sx={{ mb: 0.25 }}
+            >
+              <SendIcon sx={{ fontSize: 20 }} />
+            </IconButton>
+          </Box>
+        </Box>
       </CardContent>
     </Card>
   );
