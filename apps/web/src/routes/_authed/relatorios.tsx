@@ -21,7 +21,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
   ResponsiveContainer, ReferenceLine,
 } from "recharts";
-import { useProgressoCursos, usePipelineStatus, useAtrasosResponsavel, useBurndown, useDesvioDeadline, downloadRelatorio } from "@/lib/api/relatorios";
+import { useProgressoCursos, usePipelineStatus, useAtrasosResponsavel, useBurndown, useDesvioDeadline, useProgressoUnidades, downloadRelatorio } from "@/lib/api/relatorios";
 import { useDashboardStats, useCursos } from "@/lib/api/cursos";
 import type { StatusOA }     from "shared";
 
@@ -59,7 +59,8 @@ function RelatoriosPage() {
   const { data: pipeline, isLoading: loadPipeline, isError: errPipeline }        = usePipelineStatus(cursoId);
   const { data: atrasos  = [], isLoading: loadAtrasos,  isError: errAtrasos  }   = useAtrasosResponsavel(cursoId);
   const { data: stats,         isLoading: loadStats                           }   = useDashboardStats();
-  const { data: desvio,        isLoading: loadDesvio,   isError: errDesvio   }   = useDesvioDeadline(cursoId);
+  const { data: desvio,          isLoading: loadDesvio,    isError: errDesvio    } = useDesvioDeadline(cursoId);
+  const { data: unidades = [],   isLoading: loadUnidades,  isError: errUnidades  } = useProgressoUnidades(cursoId);
 
   // Filtra progresso ao curso selecionado (client-side)
   const cursos = cursoId ? todosProgresso.filter((c) => c.id === cursoId) : todosProgresso;
@@ -211,6 +212,30 @@ function RelatoriosPage() {
               );
             })}
           </Box>
+        )}
+      </Section>
+
+      {/* ── Progresso por Unidade (RF-M6-02) ─────────────────────────────────── */}
+      <Section
+        title="Progresso por Unidade"
+        icon={<TrendingUpIcon sx={{ fontSize: 18 }} />}
+        mb
+        onExport={cursoId ? () => downloadRelatorio("/relatorios/export/progresso-unidades", cursoId) : undefined}
+      >
+        {!cursoId ? (
+          <Box sx={{ p: 4, textAlign: "center" }}>
+            <Typography variant="body2" color="text.secondary">
+              Selecione um curso no filtro acima para visualizar o progresso por unidade.
+            </Typography>
+          </Box>
+        ) : errUnidades ? (
+          <Alert severity="error" sx={{ m: 2 }}>Erro ao carregar dados.</Alert>
+        ) : loadUnidades ? (
+          <LoadingRows n={4} />
+        ) : unidades.length === 0 ? (
+          <Empty msg="Nenhuma unidade encontrada para este curso." />
+        ) : (
+          <ProgressoUnidadesChart unidades={unidades} />
         )}
       </Section>
 
@@ -606,6 +631,162 @@ function AtrasosTable({ atrasos }: { atrasos: { nome: string; email: string; tot
         })}
       </TableBody>
     </Table>
+  );
+}
+
+// ─── Progresso por Unidade com drill-down para capítulos ──────────────────────
+
+import type { RelatorioUnidadeProgresso } from "shared";
+
+function ProgressoUnidadesChart({ unidades }: { unidades: RelatorioUnidadeProgresso[] }) {
+  const [expanded, setExpanded] = useState<number | null>(null);
+
+  const toggle = (num: number) => setExpanded((prev) => (prev === num ? null : num));
+
+  return (
+    <Box>
+      {/* Legenda */}
+      <Box sx={{ px: 3, pt: 2, pb: 1.5, display: "flex", gap: 3, flexWrap: "wrap", alignItems: "center" }}>
+        {[
+          { label: "Concluído",    color: "#10b981" },
+          { label: "Em progresso", color: "#2b7cee" },
+          { label: "Pendente",     color: "#e2e8f0" },
+        ].map((l) => (
+          <Box key={l.label} sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+            <Box sx={{ width: 12, height: 12, borderRadius: 1, bgcolor: l.color }} />
+            <Typography variant="caption" color="text.secondary">{l.label}</Typography>
+          </Box>
+        ))}
+        <Typography variant="caption" color="text.disabled" sx={{ ml: "auto" }}>
+          Clique em uma unidade para ver os capítulos
+        </Typography>
+      </Box>
+
+      <Divider />
+
+      {unidades.map((u, idx) => {
+        const isOpen   = expanded === u.numero;
+        const barColor = u.progressoPct >= 80 ? "#10b981" : u.progressoPct >= 40 ? "#2b7cee" : "#f59e0b";
+
+        return (
+          <Box key={u.numero}>
+            {/* ── Linha da Unidade ── */}
+            <Box
+              onClick={() => toggle(u.numero)}
+              sx={{
+                px: 3, py: 2, cursor: "pointer",
+                "&:hover": { bgcolor: "action.hover" },
+                display: "flex", alignItems: "center", gap: 2,
+              }}
+            >
+              {/* Expander */}
+              <IconButton size="small" sx={{ p: 0.25, flexShrink: 0 }}>
+                {isOpen
+                  ? <KeyboardArrowUpIcon fontSize="small" />
+                  : <KeyboardArrowDownIcon fontSize="small" />}
+              </IconButton>
+
+              {/* Label */}
+              <Box sx={{ width: 220, flexShrink: 0 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Chip
+                    label={`U${u.numero}`}
+                    size="small"
+                    sx={{ height: 20, fontSize: "0.68rem", fontWeight: 700,
+                      bgcolor: `${barColor}18`, color: barColor }}
+                  />
+                  <Typography variant="body2" fontWeight={700} noWrap>{u.nome}</Typography>
+                </Box>
+                <Typography variant="caption" color="text.disabled">
+                  {u.concluidos}/{u.totalOAs} OAs
+                  {u.atrasados > 0 && (
+                    <Box component="span" sx={{ ml: 1, color: "#ef4444", fontWeight: 700 }}>
+                      · {u.atrasados} atrasado{u.atrasados > 1 ? "s" : ""}
+                    </Box>
+                  )}
+                </Typography>
+              </Box>
+
+              {/* Barra de progresso */}
+              <Box sx={{ flex: 1, display: "flex", alignItems: "center", gap: 1.5 }}>
+                <Box sx={{ flex: 1, height: 10, borderRadius: 5, bgcolor: "#f1f5f9", overflow: "hidden" }}>
+                  <Box sx={{
+                    height: "100%", borderRadius: 5,
+                    width: `${u.progressoPct}%`,
+                    bgcolor: barColor,
+                    transition: "width 0.4s ease",
+                  }} />
+                </Box>
+                <Typography variant="body2" fontWeight={800}
+                  sx={{ minWidth: 40, textAlign: "right", color: barColor }}>
+                  {u.progressoPct}%
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* ── Drill-down: Capítulos ── */}
+            <Collapse in={isOpen} unmountOnExit>
+              <Box sx={{ bgcolor: "#fafbfc", borderTop: "1px solid", borderBottom: "1px solid", borderColor: "divider" }}>
+                {u.capitulos.map((c) => {
+                  const cColor = c.progressoPct >= 80 ? "#10b981" : c.progressoPct >= 40 ? "#2b7cee" : "#f59e0b";
+                  return (
+                    <Box
+                      key={c.numero}
+                      sx={{
+                        px: 3, py: 1.25, pl: 7,
+                        display: "flex", alignItems: "center", gap: 2,
+                        borderBottom: "1px solid", borderColor: "divider",
+                        "&:last-child": { borderBottom: 0 },
+                        "&:hover": { bgcolor: "action.hover" },
+                      }}
+                    >
+                      {/* Label */}
+                      <Box sx={{ width: 200, flexShrink: 0 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          <Typography variant="caption"
+                            sx={{ fontFamily: "monospace", fontWeight: 700, color: "text.disabled" }}>
+                            C{c.numero}
+                          </Typography>
+                          <Typography variant="caption" fontWeight={600} noWrap color="text.primary">
+                            {c.nome}
+                          </Typography>
+                        </Box>
+                        <Typography variant="caption" color="text.disabled">
+                          {c.concluidos}/{c.totalOAs} OAs
+                          {c.atrasados > 0 && (
+                            <Box component="span" sx={{ ml: 1, color: "#ef4444", fontWeight: 700 }}>
+                              · {c.atrasados} atrasado{c.atrasados > 1 ? "s" : ""}
+                            </Box>
+                          )}
+                        </Typography>
+                      </Box>
+
+                      {/* Barra do capítulo */}
+                      <Box sx={{ flex: 1, display: "flex", alignItems: "center", gap: 1.5 }}>
+                        <Box sx={{ flex: 1, height: 7, borderRadius: 4, bgcolor: "#e2e8f0", overflow: "hidden" }}>
+                          <Box sx={{
+                            height: "100%", borderRadius: 4,
+                            width: `${c.progressoPct}%`,
+                            bgcolor: cColor,
+                            transition: "width 0.4s ease",
+                          }} />
+                        </Box>
+                        <Typography variant="caption" fontWeight={700}
+                          sx={{ minWidth: 36, textAlign: "right", color: cColor }}>
+                          {c.progressoPct}%
+                        </Typography>
+                      </Box>
+                    </Box>
+                  );
+                })}
+              </Box>
+            </Collapse>
+
+            {idx < unidades.length - 1 && !isOpen && <Divider />}
+          </Box>
+        );
+      })}
+    </Box>
   );
 }
 

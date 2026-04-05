@@ -397,3 +397,26 @@ export interface RelatorioBurndown {
   totalOAs:   number;
   series:     BurndownPonto[];
 }
+
+// ─── Progresso por Unidade ────────────────────────────────────────────────────
+
+export interface RelatorioCapituloProgresso {
+  numero:      number;
+  nome:        string;
+  totalOAs:    number;
+  concluidos:  number;
+  atrasados:   number;
+  progressoPct: number;
+}
+
+export interface RelatorioUnidadeProgresso {
+  numero:      number;
+  nome:        string;
+  totalOAs:    number;
+  concluidos:  number;
+  atrasados:   number;
+  progressoPct: number;
+  capitulos:   RelatorioCapituloProgresso[];
+}
+
+export type RelatorioProgressoUnidades = RelatorioUnidadeProgresso[];

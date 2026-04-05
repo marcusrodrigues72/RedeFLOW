@@ -498,6 +498,91 @@ router.get("/desvio-deadline", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /relatorios/progresso-unidades?cursoId=
+router.get("/progresso-unidades", async (req, res, next) => {
+  try {
+    const usuarioId   = req.usuario!.sub;
+    const isAdmin     = req.usuario!.papel === "ADMIN";
+    const { cursoId } = req.query as { cursoId?: string };
+
+    if (!cursoId) {
+      res.status(400).json({ message: "cursoId é obrigatório." });
+      return;
+    }
+
+    // Verifica acesso ao curso
+    const curso = await prisma.curso.findFirst({
+      where: { id: cursoId, ...(isAdmin ? {} : { membros: { some: { usuarioId } } }) },
+      select: { id: true },
+    });
+    if (!curso) { res.status(404).json({ message: "Curso não encontrado." }); return; }
+
+    type AggRow = {
+      unidadeNumero: number;
+      unidadeNome:   string;
+      capituloNumero: number;
+      capituloNome:  string;
+      total:         bigint;
+      concluidos:    bigint;
+      atrasados:     bigint;
+    };
+
+    const rows = await prisma.$queryRaw<AggRow[]>`
+      SELECT
+        u.numero               AS "unidadeNumero",
+        u.nome                 AS "unidadeNome",
+        c.numero               AS "capituloNumero",
+        c.nome                 AS "capituloNome",
+        COUNT(DISTINCT oa.id)                                                        AS total,
+        COUNT(DISTINCT CASE WHEN oa.status = 'CONCLUIDO'           THEN oa.id END)  AS concluidos,
+        COUNT(DISTINCT CASE WHEN e.status IN ('PENDENTE','EM_ANDAMENTO')
+                             AND e."deadlinePrevisto" < NOW()       THEN e.id  END)  AS atrasados
+      FROM      "unidades"             u
+      JOIN      "capitulos"            c  ON c."unidadeId"  = u.id
+      JOIN      "objetos_aprendizagem" oa ON oa."capituloId" = c.id
+      LEFT JOIN "etapas_oa"            e  ON e."oaId"        = oa.id
+      WHERE u."cursoId" = ${cursoId}
+      GROUP BY u.id, u.numero, u.nome, c.id, c.numero, c.nome
+      ORDER BY u.numero, c.numero
+    `;
+
+    // Agrupa capítulos por unidade
+    const unidadeMap = new Map<number, {
+      numero: number; nome: string;
+      totalOAs: number; concluidos: number; atrasados: number;
+      capitulos: { numero: number; nome: string; totalOAs: number; concluidos: number; atrasados: number; progressoPct: number }[];
+    }>();
+
+    for (const row of rows) {
+      if (!unidadeMap.has(row.unidadeNumero)) {
+        unidadeMap.set(row.unidadeNumero, {
+          numero: row.unidadeNumero, nome: row.unidadeNome,
+          totalOAs: 0, concluidos: 0, atrasados: 0, capitulos: [],
+        });
+      }
+      const u   = unidadeMap.get(row.unidadeNumero)!;
+      const tot = Number(row.total);
+      const con = Number(row.concluidos);
+      const atr = Number(row.atrasados);
+      u.totalOAs   += tot;
+      u.concluidos += con;
+      u.atrasados  += atr;
+      u.capitulos.push({
+        numero: row.capituloNumero, nome: row.capituloNome,
+        totalOAs: tot, concluidos: con, atrasados: atr,
+        progressoPct: tot > 0 ? Math.round((con / tot) * 100) : 0,
+      });
+    }
+
+    const result = Array.from(unidadeMap.values()).map((u) => ({
+      ...u,
+      progressoPct: u.totalOAs > 0 ? Math.round((u.concluidos / u.totalOAs) * 100) : 0,
+    }));
+
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
 // GET /relatorios/export/atrasos?cursoId=
 router.get("/export/atrasos", async (req, res, next) => {
   try {
