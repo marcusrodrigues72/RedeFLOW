@@ -77,7 +77,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             component="img"
             src="/redeflow_logo.png"
             alt="RedeFLOW"
-            sx={{ width: "80%", height: "auto", display: "block", mixBlendMode: "multiply" }}
+            sx={{ width: "80%", height: "auto", display: "block" }}
           />
         </Box>
 
