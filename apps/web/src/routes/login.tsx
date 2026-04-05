@@ -80,7 +80,7 @@ function LoginPage() {
           component="img"
           src="/redeflow_logo.png"
           alt="RedeFLOW"
-          sx={{ width: 220, height: "auto", mb: 2.5, borderRadius: 2 }}
+          sx={{ width: 220, height: "auto", mb: 2.5, mixBlendMode: "multiply" }}
         />
         <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.8 }}>
           Gestão da produção de conteúdo educacional do iRede.
