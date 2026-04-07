@@ -193,7 +193,7 @@ router.patch("/me", authenticate, async (req, res, next) => {
     // Se troca de senha, valida senha atual
     if (novaSenha) {
       const atual = await prisma.usuario.findUnique({ where: { id }, select: { senhaHash: true } });
-      const correta = atual && await bcrypt.compare(senhaAtual!, atual.senhaHash);
+      const correta = atual?.senhaHash && await bcrypt.compare(senhaAtual!, atual.senhaHash);
       if (!correta) {
         res.status(400).json({ message: "Senha atual incorreta." });
         return;
@@ -254,7 +254,7 @@ router.get("/microsoft/callback", async (req, res) => {
   if (!code)  { failRedirect("Código de autorização ausente."); return; }
 
   // Verifica CSRF state
-  try { jwt.verify(state, STATE_SECRET); }
+  try { jwt.verify(state ?? "", STATE_SECRET); }
   catch { failRedirect("State inválido ou expirado. Tente novamente."); return; }
 
   try {
