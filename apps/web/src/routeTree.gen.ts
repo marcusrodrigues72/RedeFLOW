@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SsoCallbackRouteImport } from './routes/sso-callback'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
@@ -24,6 +25,11 @@ import { Route as AuthedAdminUsuariosRouteImport } from './routes/_authed/admin/
 import { Route as AuthedCursosCursoIdSetupProducaoRouteImport } from './routes/_authed/cursos/$cursoId_/setup-producao'
 import { Route as AuthedCursosCursoIdOasRouteImport } from './routes/_authed/cursos/$cursoId_/oas'
 
+const SsoCallbackRoute = SsoCallbackRouteImport.update({
+  id: '/sso-callback',
+  path: '/sso-callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -98,6 +104,7 @@ const AuthedCursosCursoIdOasRoute = AuthedCursosCursoIdOasRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof AuthedIndexRoute
   '/login': typeof LoginRoute
+  '/sso-callback': typeof SsoCallbackRoute
   '/alocacao': typeof AuthedAlocacaoRoute
   '/meu-trabalho': typeof AuthedMeuTrabalhoRoute
   '/perfil': typeof AuthedPerfilRoute
@@ -112,6 +119,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
+  '/sso-callback': typeof SsoCallbackRoute
   '/alocacao': typeof AuthedAlocacaoRoute
   '/meu-trabalho': typeof AuthedMeuTrabalhoRoute
   '/perfil': typeof AuthedPerfilRoute
@@ -129,6 +137,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authed': typeof AuthedRouteWithChildren
   '/login': typeof LoginRoute
+  '/sso-callback': typeof SsoCallbackRoute
   '/_authed/alocacao': typeof AuthedAlocacaoRoute
   '/_authed/meu-trabalho': typeof AuthedMeuTrabalhoRoute
   '/_authed/perfil': typeof AuthedPerfilRoute
@@ -147,6 +156,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/sso-callback'
     | '/alocacao'
     | '/meu-trabalho'
     | '/perfil'
@@ -161,6 +171,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
+    | '/sso-callback'
     | '/alocacao'
     | '/meu-trabalho'
     | '/perfil'
@@ -177,6 +188,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_authed'
     | '/login'
+    | '/sso-callback'
     | '/_authed/alocacao'
     | '/_authed/meu-trabalho'
     | '/_authed/perfil'
@@ -194,10 +206,18 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AuthedRoute: typeof AuthedRouteWithChildren
   LoginRoute: typeof LoginRoute
+  SsoCallbackRoute: typeof SsoCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/sso-callback': {
+      id: '/sso-callback'
+      path: '/sso-callback'
+      fullPath: '/sso-callback'
+      preLoaderRoute: typeof SsoCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -335,6 +355,7 @@ const AuthedRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   AuthedRoute: AuthedRouteWithChildren,
   LoginRoute: LoginRoute,
+  SsoCallbackRoute: SsoCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
