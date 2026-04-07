@@ -436,19 +436,38 @@ function TimelineGantt({ cursos }: { cursos: CursoTimeline[] }) {
               <Box sx={{ flex: 1, position: "relative", height: "100%", display: "flex", alignItems: "center" }}>
                 {start && end ? (
                   <Tooltip
+                    arrow
+                    placement="top"
                     title={
                       <Box>
-                        <Typography variant="caption" sx={{ display: "block", fontWeight: 700 }}>{curso.nome}</Typography>
-                        <Typography variant="caption" sx={{ display: "block" }}>
+                        <Typography sx={{ display: "block", fontSize: "0.8rem", fontWeight: 700, color: "#1e293b" }}>{curso.nome}</Typography>
+                        <Typography sx={{ display: "block", fontSize: "0.75rem", color: "#475569" }}>
                           {new Date(start).toLocaleDateString("pt-BR")} → {new Date(end).toLocaleDateString("pt-BR")}
                           {" "}(estimado via OAs)
                         </Typography>
-                        <Typography variant="caption" sx={{ display: "block" }}>
+                        <Typography sx={{ display: "block", fontSize: "0.75rem", color: "#475569" }}>
                           {curso.progressoPct}% concluído · {curso.totalOAs} OAs
                         </Typography>
                       </Box>
                     }
-                    placement="top"
+                    componentsProps={{
+                      tooltip: {
+                        sx: {
+                          bgcolor: "white",
+                          color: "#1e293b",
+                          border: "1px solid #e2e8f0",
+                          boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
+                          borderRadius: 1.5,
+                          px: 1.5, py: 1,
+                        },
+                      },
+                      arrow: {
+                        sx: {
+                          color: "white",
+                          "&::before": { border: "1px solid #e2e8f0" },
+                        },
+                      },
+                    }}
                   >
                     <Box
                       sx={{

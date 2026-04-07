@@ -1,5 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import {
@@ -10,6 +11,14 @@ import {
 import { authenticate } from "../middlewares/authenticate.js";
 import { validate } from "../middlewares/validate.js";
 import { loginSchema, refreshSchema } from "shared";
+
+// ─── Configuração Microsoft OAuth ─────────────────────────────────────────────
+const MS_TENANT_ID      = process.env["MICROSOFT_TENANT_ID"]     ?? "";
+const MS_CLIENT_ID      = process.env["MICROSOFT_CLIENT_ID"]     ?? "";
+const MS_CLIENT_SECRET  = process.env["MICROSOFT_CLIENT_SECRET"] ?? "";
+const MS_REDIRECT_URI   = process.env["MICROSOFT_REDIRECT_URI"]  ?? "";
+const FRONTEND_URL      = process.env["FRONTEND_URL"]            ?? "http://localhost:5173";
+const STATE_SECRET      = process.env["JWT_ACCESS_SECRET"]       ?? "dev-access-secret-inseguro";
 
 const router = Router();
 
@@ -22,6 +31,11 @@ router.post("/login", validate(loginSchema), async (req, res, next) => {
 
     if (!usuario || !usuario.ativo) {
       res.status(401).json({ message: "Credenciais inválidas." });
+      return;
+    }
+
+    if (!usuario.senhaHash) {
+      res.status(401).json({ message: "Esta conta usa login institucional (SSO). Use o botão 'Entrar com Microsoft'." });
       return;
     }
 
@@ -202,6 +216,151 @@ router.patch("/me", authenticate, async (req, res, next) => {
 
     res.json(usuario);
   } catch (err) { next(err); }
+});
+
+// ─── SSO Microsoft ────────────────────────────────────────────────────────────
+
+// GET /api/auth/microsoft — inicia o fluxo OAuth redirect
+router.get("/microsoft", (req, res) => {
+  if (!MS_CLIENT_ID || !MS_TENANT_ID) {
+    res.status(503).json({ message: "SSO Microsoft não configurado neste ambiente." });
+    return;
+  }
+
+  // State assinado com validade de 5 min — proteção CSRF sem armazenamento server-side
+  const state = jwt.sign({ ts: Date.now() }, STATE_SECRET, { expiresIn: "5m" });
+
+  const params = new URLSearchParams({
+    client_id:     MS_CLIENT_ID,
+    response_type: "code",
+    redirect_uri:  MS_REDIRECT_URI,
+    response_mode: "query",
+    scope:         "openid email profile User.Read",
+    state,
+  });
+
+  res.redirect(`https://login.microsoftonline.com/${MS_TENANT_ID}/oauth2/v2.0/authorize?${params}`);
+});
+
+// GET /api/auth/microsoft/callback — recebe o code, cria/encontra usuário, emite JWT
+router.get("/microsoft/callback", async (req, res) => {
+  const { code, state, error } = req.query as Record<string, string>;
+
+  // Redireciona para o frontend com erro em caso de falha no lado Microsoft
+  const failRedirect = (msg: string) =>
+    res.redirect(`${FRONTEND_URL}/sso-callback?error=${encodeURIComponent(msg)}`);
+
+  if (error) { failRedirect(`Microsoft recusou o login: ${error}`); return; }
+  if (!code)  { failRedirect("Código de autorização ausente."); return; }
+
+  // Verifica CSRF state
+  try { jwt.verify(state, STATE_SECRET); }
+  catch { failRedirect("State inválido ou expirado. Tente novamente."); return; }
+
+  try {
+    // 1. Troca o code por tokens da Microsoft
+    const tokenBody = new URLSearchParams({
+      client_id:     MS_CLIENT_ID,
+      client_secret: MS_CLIENT_SECRET,
+      code,
+      redirect_uri:  MS_REDIRECT_URI,
+      grant_type:    "authorization_code",
+    });
+
+    const tokenRes  = await fetch(
+      `https://login.microsoftonline.com/${MS_TENANT_ID}/oauth2/v2.0/token`,
+      { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: tokenBody }
+    );
+    const tokenData = await tokenRes.json() as Record<string, string>;
+
+    if (!tokenRes.ok || !tokenData["access_token"]) {
+      failRedirect("Falha ao obter tokens da Microsoft.");
+      return;
+    }
+
+    // 2. Busca dados do usuário no Microsoft Graph
+    const graphRes  = await fetch("https://graph.microsoft.com/v1.0/me", {
+      headers: { Authorization: `Bearer ${tokenData["access_token"]}` },
+    });
+    const graphData = await graphRes.json() as Record<string, string>;
+
+    const msId  = graphData["id"];
+    const nome  = graphData["displayName"] ?? graphData["givenName"] ?? "Usuário";
+    const email = (graphData["mail"] ?? graphData["userPrincipalName"] ?? "").toLowerCase();
+
+    if (!msId || !email) { failRedirect("Não foi possível obter dados do perfil Microsoft."); return; }
+
+    // 3. Encontra ou cria o usuário no sistema
+    let usuario = await prisma.usuario.findFirst({
+      where: { OR: [{ microsoftId: msId }, { email }] },
+    });
+
+    let isNovo = false;
+
+    if (usuario) {
+      // Vincula o microsoftId se ainda não estiver vinculado (ex.: usuário já existia com email manual)
+      if (!usuario.microsoftId) {
+        usuario = await prisma.usuario.update({
+          where: { id: usuario.id },
+          data:  { microsoftId: msId, authProvider: "MICROSOFT" },
+        });
+      }
+      if (!usuario.ativo) { failRedirect("Sua conta está inativa. Entre em contato com o administrador."); return; }
+    } else {
+      // Cria novo usuário como LEITOR
+      usuario = await prisma.usuario.create({
+        data: {
+          nome,
+          email,
+          senhaHash:   null,
+          papelGlobal: "LEITOR",
+          microsoftId: msId,
+          authProvider:"MICROSOFT",
+        },
+      });
+      isNovo = true;
+    }
+
+    // 4. Se novo, notifica todos os ADMINs
+    if (isNovo) {
+      const admins = await prisma.usuario.findMany({
+        where: { papelGlobal: "ADMIN", ativo: true },
+        select: { id: true },
+      });
+      if (admins.length > 0) {
+        await prisma.notificacao.createMany({
+          data: admins.map((admin) => ({
+            usuarioId:    admin.id,
+            tipo:         "NOVO_USUARIO_SSO",
+            titulo:       `Novo acesso via SSO: ${nome}`,
+            corpo:        `${nome} (${email}) entrou pelo login institucional e foi cadastrado como Leitor. Acesse a gestão de usuários para configurar as permissões.`,
+            entidadeTipo: "USUARIO",
+            entidadeId:   usuario.id,
+          })),
+        });
+      }
+    }
+
+    // 5. Emite tokens do Redeflow
+    const accessToken  = signAccessToken({ sub: usuario.id, email: usuario.email, papel: usuario.papelGlobal });
+    const refreshToken = signRefreshToken(usuario.id);
+    const expiresAt    = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+    await prisma.refreshToken.create({ data: { token: refreshToken, usuarioId: usuario.id, expiresAt } });
+
+    // 6. Redireciona para o frontend com os tokens na query string
+    //    (os tokens chegam apenas ao navegador do usuário — não são enviados a nenhum servidor)
+    const user = { id: usuario.id, nome: usuario.nome, email: usuario.email, papelGlobal: usuario.papelGlobal, fotoUrl: usuario.fotoUrl ?? null };
+    const params = new URLSearchParams({
+      access_token:  accessToken,
+      refresh_token: refreshToken,
+      user:          Buffer.from(JSON.stringify(user)).toString("base64"),
+    });
+    res.redirect(`${FRONTEND_URL}/sso-callback?${params}`);
+  } catch (err) {
+    console.error("SSO callback error:", err);
+    failRedirect("Erro interno durante autenticação SSO.");
+  }
 });
 
 export default router;

@@ -1,7 +1,7 @@
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import {
   Box, Card, CardContent, TextField, Button, Typography,
-  Alert, CircularProgress, InputAdornment, IconButton,
+  Alert, CircularProgress, InputAdornment, IconButton, Divider,
 } from "@mui/material";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
@@ -144,6 +144,34 @@ function LoginPage() {
               {isLoading ? <CircularProgress size={22} sx={{ color: "white" }} /> : "Entrar"}
             </Button>
           </Box>
+
+          <Divider sx={{ my: 2.5 }}>
+            <Typography variant="caption" color="text.disabled">ou</Typography>
+          </Divider>
+
+          <Button
+            fullWidth
+            variant="outlined"
+            size="large"
+            onClick={() => { window.location.href = `${import.meta.env.VITE_API_URL ?? ""}/api/auth/microsoft`; }}
+            sx={{
+              height: 48,
+              borderColor: "#8c8c8c",
+              color: "#3c3c3c",
+              gap: 1.5,
+              fontWeight: 500,
+              "&:hover": { borderColor: "#0078d4", color: "#0078d4", bgcolor: "#f0f7ff" },
+            }}
+          >
+            {/* Ícone Microsoft */}
+            <Box component="svg" viewBox="0 0 21 21" sx={{ width: 20, height: 20, flexShrink: 0 }}>
+              <rect x="1"  y="1"  width="9" height="9" fill="#f25022" />
+              <rect x="11" y="1"  width="9" height="9" fill="#7fba00" />
+              <rect x="1"  y="11" width="9" height="9" fill="#00a4ef" />
+              <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+            </Box>
+            Entrar com Microsoft
+          </Button>
         </CardContent>
       </Card>
     </Box>

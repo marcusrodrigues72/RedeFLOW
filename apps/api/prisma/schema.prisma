@@ -77,13 +77,15 @@ model Usuario {
   id          String      @id @default(cuid())
   nome        String
   email       String      @unique
-  senhaHash   String
+  senhaHash   String?
   papelGlobal PapelGlobal @default(COLABORADOR)
   ativo       Boolean     @default(true)
   fotoUrl          String?
   notifEmailAtivo  Boolean     @default(true)
   mfaSecret        String?
   mfaAtivo         Boolean     @default(false)
+  microsoftId      String?     @unique
+  authProvider     String      @default("LOCAL")
   createdAt        DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
