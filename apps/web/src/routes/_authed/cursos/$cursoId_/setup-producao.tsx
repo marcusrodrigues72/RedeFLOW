@@ -11,13 +11,16 @@ import CheckCircleIcon      from "@mui/icons-material/CheckCircle";
 import LinkIcon             from "@mui/icons-material/Link";
 import VerifiedIcon         from "@mui/icons-material/Verified";
 import PersonIcon           from "@mui/icons-material/Person";
+import AutoAwesomeIcon      from "@mui/icons-material/AutoAwesome";
+import PlayArrowIcon        from "@mui/icons-material/PlayArrow";
 import { useState }         from "react";
 import {
   useOAsByCurso, useCurso, useAtualizarOA, useAtualizarEtapaGeral,
   useValidarMatriz, useDefinirCoordenadorProducao,
+  useSugestaoAlocacao, useAplicarSugestao,
 } from "@/lib/api/cursos";
 import { useAuthStore } from "@/stores/auth.store";
-import type { OADetalhe, TipoOA, StatusEtapa } from "shared";
+import type { OADetalhe, TipoOA, StatusEtapa, SugestaoAlocacao, SugestaoItem } from "shared";
 
 export const Route = createFileRoute("/_authed/cursos/$cursoId_/setup-producao")({
   component: SetupProducaoPage,
@@ -113,6 +116,9 @@ function SetupProducaoPage() {
           coordenadorAtual={curso.coordenadorProducao}
         />
       )}
+
+      {/* Sugestão Inteligente */}
+      <SugestaoAlocacaoCard cursoId={cursoId} />
 
       {/* Banner de validação da matriz */}
       {temOAsImportados && !matrizValidada && (
@@ -212,6 +218,190 @@ function SetupProducaoPage() {
       <Snackbar open={!!snackMsg} autoHideDuration={4000} onClose={() => setSnackMsg(null)}
         message={snackMsg} anchorOrigin={{ vertical: "bottom", horizontal: "center" }} />
     </Box>
+  );
+}
+
+// ─── Sugestão Inteligente de Alocação ────────────────────────────────────────
+
+const PAPEL_LABEL: Record<string, string> = {
+  COORDENADOR_PRODUCAO:  "Coord. Produção",
+  CONTEUDISTA:           "Conteudista",
+  DESIGNER_INSTRUCIONAL: "Designer Instrucional",
+  PROFESSOR_ATOR:        "Professor Ator",
+  PROFESSOR_TECNICO:     "Professor Técnico",
+  ACESSIBILIDADE:        "Acessibilidade",
+  EDITOR_VIDEO:          "Editor de Vídeo",
+  DESIGNER_GRAFICO:      "Designer Gráfico",
+  PRODUTOR_FINAL:        "Produtor Final",
+  VALIDADOR_FINAL:       "Validador Final",
+};
+
+function OcupacaoBar({ pct }: { pct: number }) {
+  const color = pct >= 90 ? "#ef4444" : pct >= 70 ? "#f59e0b" : "#10b981";
+  return (
+    <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 120 }}>
+      <Box sx={{ flex: 1, height: 6, borderRadius: 3, bgcolor: "#e2e8f0", overflow: "hidden" }}>
+        <Box sx={{ width: `${Math.min(pct, 100)}%`, height: "100%", bgcolor: color, borderRadius: 3, transition: "width 0.4s" }} />
+      </Box>
+      <Typography variant="caption" sx={{ minWidth: 36, textAlign: "right", fontWeight: 600, color }}>
+        {Math.round(pct)}%
+      </Typography>
+    </Box>
+  );
+}
+
+function SugestaoAlocacaoCard({ cursoId }: { cursoId: string }) {
+  const [aberto, setAberto]                         = useState(false);
+  const [mostrarMembros, setMostrarMembros]         = useState(false);
+  const [snack, setSnack]                           = useState<string | null>(null);
+  const { data, isLoading, isFetching, refetch }    = useSugestaoAlocacao(cursoId, aberto);
+  const { mutate: aplicar, isPending: aplicando }   = useAplicarSugestao(cursoId);
+
+  const handleAplicar = () => {
+    if (!data?.sugestao?.length) return;
+    aplicar(data.sugestao, {
+      onSuccess: (res) => {
+        setSnack(`${res.totalAtualizado} etapa(s) atribuída(s) com sucesso.`);
+        setAberto(false);
+      },
+    });
+  };
+
+  return (
+    <>
+      <Card sx={{ mb: 2.5, border: "1px solid #e0e7ff", bgcolor: aberto ? "#fafafe" : "background.paper" }}>
+        <CardContent sx={{ p: 2 }}>
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <AutoAwesomeIcon sx={{ color: "#6366f1", fontSize: 20 }} />
+              <Box>
+                <Typography variant="body2" fontWeight={700} color="#4338ca">
+                  Sugestão Inteligente de Alocação
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Analisa a carga de todos os projetos e sugere o colaborador menos ocupado por papel
+                </Typography>
+              </Box>
+            </Box>
+            <Button
+              size="small" variant={aberto ? "outlined" : "contained"}
+              onClick={() => { setAberto((v) => !v); if (!aberto) refetch(); }}
+              sx={{ whiteSpace: "nowrap", bgcolor: aberto ? undefined : "#6366f1", "&:hover": { bgcolor: aberto ? undefined : "#4338ca" } }}
+            >
+              {aberto ? "Fechar" : "Ver Sugestão"}
+            </Button>
+          </Box>
+
+          {aberto && (
+            <Box sx={{ mt: 2 }}>
+              {isLoading || isFetching ? (
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                  {[1, 2, 3].map((i) => <Skeleton key={i} height={36} sx={{ borderRadius: 1 }} />)}
+                </Box>
+              ) : !data || data.sugestao.length === 0 ? (
+                <Alert severity="info" sx={{ mt: 1 }}>
+                  Nenhum membro com papéis de produção configurados. Defina os papéis de produção na aba <strong>Equipe</strong> do curso.
+                </Alert>
+              ) : (
+                <>
+                  {data.oasPendentesSetup > 0 && (
+                    <Alert severity="info" icon={false} sx={{ py: 0.5, mb: 1.5, fontSize: "0.8rem" }}>
+                      <strong>{data.oasPendentesSetup}</strong> OA(s) com etapas sem responsável — esta sugestão irá preencher automaticamente.
+                    </Alert>
+                  )}
+
+                  {/* Tabela de sugestões */}
+                  <Box component="table" sx={{ width: "100%", borderCollapse: "collapse" }}>
+                    <Box component="thead">
+                      <Box component="tr">
+                        {["Papel", "Sugerido", "Ocupação Global"].map((h) => (
+                          <Box key={h} component="th" sx={{ textAlign: "left", py: 0.75, px: 1, fontSize: "0.7rem", fontWeight: 700, color: "text.secondary", borderBottom: "1px solid", borderColor: "divider" }}>
+                            {h}
+                          </Box>
+                        ))}
+                      </Box>
+                    </Box>
+                    <Box component="tbody">
+                      {data.sugestao.map((s: SugestaoItem) => (
+                        <Box key={s.papel} component="tr" sx={{ "&:hover": { bgcolor: "action.hover" } }}>
+                          <Box component="td" sx={{ py: 1, px: 1, fontSize: "0.8rem", whiteSpace: "nowrap" }}>
+                            <Chip label={PAPEL_LABEL[s.papel] ?? s.papel} size="small" sx={{ fontSize: "0.65rem", bgcolor: "#eff6ff", color: "primary.main" }} />
+                          </Box>
+                          <Box component="td" sx={{ py: 1, px: 1 }}>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                              <Avatar sx={{ width: 24, height: 24, fontSize: "0.65rem", bgcolor: "primary.light", fontWeight: 700 }}>
+                                {s.responsavelNome[0]?.toUpperCase()}
+                              </Avatar>
+                              <Typography variant="body2" fontWeight={500}>{s.responsavelNome}</Typography>
+                            </Box>
+                          </Box>
+                          <Box component="td" sx={{ py: 1, px: 1, minWidth: 160 }}>
+                            <OcupacaoBar pct={s.percentualOcupado} />
+                          </Box>
+                        </Box>
+                      ))}
+                    </Box>
+                  </Box>
+
+                  {/* Membros detalhados */}
+                  <Box sx={{ mt: 1.5 }}>
+                    <Button size="small" variant="text" sx={{ fontSize: "0.75rem", color: "text.secondary", px: 0 }}
+                      onClick={() => setMostrarMembros((v) => !v)}>
+                      {mostrarMembros ? "Ocultar" : "Ver"} todos os membros ({data.membros.length})
+                    </Button>
+                    {mostrarMembros && (
+                      <Box sx={{ mt: 1, display: "flex", flexDirection: "column", gap: 0.75 }}>
+                        {data.membros.map((m: SugestaoAlocacao["membros"][number]) => (
+                          <Box key={m.usuarioId} sx={{ display: "flex", alignItems: "center", gap: 1.5, px: 1, py: 0.5, bgcolor: "#f8fafc", borderRadius: 1 }}>
+                            <Avatar sx={{ width: 24, height: 24, fontSize: "0.65rem", bgcolor: "primary.light", fontWeight: 700 }}>
+                              {m.nome[0]?.toUpperCase()}
+                            </Avatar>
+                            <Typography variant="caption" fontWeight={600} sx={{ minWidth: 130 }}>{m.nome}</Typography>
+                            <Typography variant="caption" color="text.disabled" sx={{ flex: 1, fontSize: "0.65rem" }}>
+                              {m.papeisProducao.map((p) => PAPEL_LABEL[p] ?? p).join(", ") || "Sem papéis"}
+                            </Typography>
+                            <OcupacaoBar pct={m.percentualOcupado} />
+                            <Typography variant="caption" color="text.disabled" sx={{ minWidth: 70, fontSize: "0.65rem" }}>
+                              {m.horasCompromissadas.toFixed(1)}h/{m.capacidade}h sem.
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    )}
+                  </Box>
+
+                  <Divider sx={{ my: 2 }} />
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                    <Button
+                      variant="contained" size="small"
+                      startIcon={<PlayArrowIcon />}
+                      onClick={handleAplicar}
+                      disabled={aplicando || data.oasPendentesSetup === 0}
+                      sx={{ fontWeight: 700, bgcolor: "#6366f1", "&:hover": { bgcolor: "#4338ca" } }}
+                    >
+                      {aplicando ? "Aplicando…" : "Aplicar Sugestão"}
+                    </Button>
+                    {data.oasPendentesSetup === 0 && (
+                      <Typography variant="caption" color="text.secondary">
+                        Todos os OAs já têm responsáveis atribuídos.
+                      </Typography>
+                    )}
+                    {data.oasPendentesSetup > 0 && (
+                      <Typography variant="caption" color="text.secondary">
+                        Atribuirá responsáveis às etapas sem responsável, respeitando os papéis de produção.
+                      </Typography>
+                    )}
+                  </Box>
+                </>
+              )}
+            </Box>
+          )}
+        </CardContent>
+      </Card>
+
+      <Snackbar open={!!snack} autoHideDuration={5000} onClose={() => setSnack(null)}
+        message={snack} anchorOrigin={{ vertical: "bottom", horizontal: "center" }} />
+    </>
   );
 }
 

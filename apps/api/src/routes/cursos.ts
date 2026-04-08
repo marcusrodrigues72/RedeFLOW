@@ -337,20 +337,34 @@ router.patch("/:id/coordenador-producao", async (req, res, next) => {
 // ── Gestão de Membros ─────────────────────────────────────────────────────────
 
 const membroSchema = z.object({
-  usuarioId: z.string(),
-  papel:     z.enum(["ADMIN", "COLABORADOR", "LEITOR"]).default("COLABORADOR"),
+  usuarioId:      z.string(),
+  papel:          z.enum(["ADMIN", "COLABORADOR", "LEITOR"]).default("COLABORADOR"),
+  papeisProducao: z.array(z.string()).optional(),
 });
 
 router.post("/:id/membros", async (req, res, next) => {
   try {
-    const { usuarioId, papel } = membroSchema.parse(req.body);
+    const { usuarioId, papel, papeisProducao } = membroSchema.parse(req.body);
     const membro = await prisma.cursoMembro.upsert({
       where:  { cursoId_usuarioId: { cursoId: req.params["id"] as string, usuarioId } },
-      create: { cursoId: req.params["id"] as string, usuarioId, papel },
-      update: { papel },
+      create: { cursoId: req.params["id"] as string, usuarioId, papel, papeisProducao: papeisProducao ?? [] },
+      update: { papel, ...(papeisProducao !== undefined ? { papeisProducao } : {}) },
       include: { usuario: { select: { id: true, nome: true, email: true, fotoUrl: true, papelGlobal: true } } },
     });
     res.status(201).json(membro);
+  } catch (err) { next(err); }
+});
+
+// PATCH /:id/membros/:usuarioId — atualiza apenas papeisProducao de um membro existente
+router.patch("/:id/membros/:usuarioId", async (req, res, next) => {
+  try {
+    const { papeisProducao } = z.object({ papeisProducao: z.array(z.string()) }).parse(req.body);
+    const membro = await prisma.cursoMembro.update({
+      where:  { cursoId_usuarioId: { cursoId: req.params["id"] as string, usuarioId: req.params["usuarioId"] as string } },
+      data:   { papeisProducao },
+      include: { usuario: { select: { id: true, nome: true, email: true, fotoUrl: true, papelGlobal: true } } },
+    });
+    res.json(membro);
   } catch (err) { next(err); }
 });
 
@@ -360,6 +374,110 @@ router.delete("/:id/membros/:usuarioId", async (req, res, next) => {
       where: { cursoId_usuarioId: { cursoId: req.params["id"] as string, usuarioId: req.params["usuarioId"] as string } },
     });
     res.status(204).send();
+  } catch (err) { next(err); }
+});
+
+// ── Sugestão Inteligente de Alocação ──────────────────────────────────────────
+
+router.get("/:id/setup/sugestao-alocacao", async (req, res, next) => {
+  try {
+    const cursoId = req.params["id"] as string;
+
+    // 1. Membros do curso com seus papéis de produção
+    const membros = await prisma.cursoMembro.findMany({
+      where:   { cursoId },
+      include: { usuario: { select: { id: true, nome: true, email: true, fotoUrl: true, capacidadeHorasSemanais: true } } },
+    });
+
+    // 2. Para cada membro, calcula horas comprometidas em TODOS os cursos ativos
+    const HORIZONTE_SEMANAS = 4;
+    const analise = await Promise.all(membros.map(async (m) => {
+      const etapasPendentes = await prisma.etapaOA.findMany({
+        where: {
+          responsavelId: m.usuarioId,
+          status:        { in: ["PENDENTE", "EM_ANDAMENTO"] },
+          oa: { capitulo: { unidade: { curso: { status: "ATIVO" } } } },
+        },
+        include: { etapaDef: { select: { esforcoHoras: true } } },
+      });
+
+      const horasComprometidas = etapasPendentes.reduce((s, e) => s + (e.etapaDef.esforcoHoras ?? 2), 0);
+      const horasSemana        = horasComprometidas / HORIZONTE_SEMANAS;
+      const horasDisponiveis   = Math.max(0, m.usuario.capacidadeHorasSemanais - horasSemana);
+      const percentualOcupado  = Math.min(100, Math.round((horasSemana / m.usuario.capacidadeHorasSemanais) * 100));
+
+      return {
+        usuarioId:       m.usuarioId,
+        nome:            m.usuario.nome,
+        email:           m.usuario.email,
+        fotoUrl:         m.usuario.fotoUrl,
+        papeisProducao:  m.papeisProducao,
+        capacidade:      m.usuario.capacidadeHorasSemanais,
+        horasCompromissadas: Math.round(horasSemana * 10) / 10,
+        horasDisponiveis:    Math.round(horasDisponiveis * 10) / 10,
+        percentualOcupado,
+        etapasPendentesTotal: etapasPendentes.length,
+      };
+    }));
+
+    // 3. Conta OAs pendentes de setup neste curso (sem responsável na etapa de coordenação)
+    const oasPendentesSetup = await prisma.etapaOA.count({
+      where: {
+        status:    "PENDENTE",
+        responsavelId: null,
+        oa: { capitulo: { unidade: { cursoId } } },
+        etapaDef:  { papel: { not: "COORDENADOR_PRODUCAO" } },
+      },
+    });
+
+    // 4. Por papel, lista candidatos ranqueados por disponibilidade
+    const papeisNoCurso = [...new Set(analise.flatMap((m) => m.papeisProducao))];
+    const porPapel = papeisNoCurso.map((papel) => {
+      const candidatos = analise
+        .filter((m) => m.papeisProducao.includes(papel))
+        .sort((a, b) => a.percentualOcupado - b.percentualOcupado);
+      return { papel, candidatos };
+    });
+
+    // 5. Sugestão: para cada papel, o candidato menos ocupado
+    const sugestao = porPapel
+      .filter((p) => p.candidatos.length > 0)
+      .map((p) => ({
+        papel:            p.papel,
+        responsavelId:    p.candidatos[0]!.usuarioId,
+        responsavelNome:  p.candidatos[0]!.nome,
+        percentualOcupado: p.candidatos[0]!.percentualOcupado,
+      }));
+
+    res.json({ membros: analise, porPapel, sugestao, oasPendentesSetup });
+  } catch (err) { next(err); }
+});
+
+// POST /:id/setup/aplicar-sugestao — aplica a sugestão a todas as EtapaOAs PENDENTE sem responsável
+router.post("/:id/setup/aplicar-sugestao", async (req, res, next) => {
+  try {
+    const cursoId = req.params["id"] as string;
+    const sugestaoSchema = z.array(z.object({
+      papel:         z.string(),
+      responsavelId: z.string(),
+    }));
+    const sugestao = sugestaoSchema.parse(req.body);
+
+    let totalAtualizado = 0;
+    for (const item of sugestao) {
+      const result = await prisma.etapaOA.updateMany({
+        where: {
+          responsavelId: null,
+          status:        "PENDENTE",
+          oa:            { capitulo: { unidade: { cursoId } } },
+          etapaDef:      { papel: item.papel as any },
+        },
+        data: { responsavelId: item.responsavelId },
+      });
+      totalAtualizado += result.count;
+    }
+
+    res.json({ totalAtualizado, message: `${totalAtualizado} etapas alocadas.` });
   } catch (err) { next(err); }
 });
 

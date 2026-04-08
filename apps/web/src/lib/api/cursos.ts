@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { CursoResumo, CursoDetalhe, DashboardStats, ImportPreview, ImportResult, MIPreview, MIResult, OADetalhe, EtapaOADetalhe, ComentarioOA, DashboardDetalheTipo, DashboardDetalheOA, DashboardDetalheAtraso, AtribuicaoPreview, AtribuicaoResult, AuditLogEntry, UsuarioPublico } from "shared";
+import type { CursoResumo, CursoDetalhe, DashboardStats, ImportPreview, ImportResult, MIPreview, MIResult, OADetalhe, EtapaOADetalhe, ComentarioOA, DashboardDetalheTipo, DashboardDetalheOA, DashboardDetalheAtraso, AtribuicaoPreview, AtribuicaoResult, AuditLogEntry, UsuarioPublico, SugestaoAlocacao, AplicarSugestaoResult, SugestaoItem } from "shared";
 import { useAuthStore } from "@/stores/auth.store";
 
 // ─── Keys ─────────────────────────────────────────────────────────────────────
@@ -460,6 +460,35 @@ export function useRemoverMembro(cursoId: string) {
   });
 }
 
+export function useAtualizarPapeisProducao(cursoId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ usuarioId, papeisProducao }: { usuarioId: string; papeisProducao: string[] }) =>
+      api.patch(`/cursos/${cursoId}/membros/${usuarioId}`, { papeisProducao }).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: cursoKeys.detail(cursoId) }),
+  });
+}
+
+export function useSugestaoAlocacao(cursoId: string, enabled = true) {
+  return useQuery({
+    queryKey: ["sugestao-alocacao", cursoId],
+    queryFn:  () => api.get<SugestaoAlocacao>(`/cursos/${cursoId}/setup/sugestao-alocacao`).then((r) => r.data),
+    enabled:  !!cursoId && enabled,
+  });
+}
+
+export function useAplicarSugestao(cursoId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (sugestao: SugestaoItem[]) =>
+      api.post<AplicarSugestaoResult>(`/cursos/${cursoId}/setup/aplicar-sugestao`, sugestao).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: cursoKeys.oas(cursoId) });
+      qc.invalidateQueries({ queryKey: ["sugestao-alocacao", cursoId] });
+    },
+  });
+}
+
 export function useImportarConfirmar(cursoId: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -483,11 +512,12 @@ export function useImportarConfirmar(cursoId: string) {
 // ─── Perfil do usuário ────────────────────────────────────────────────────────
 
 export interface AtualizarPerfilPayload {
-  nome?:            string;
-  email?:           string;
-  senhaAtual?:      string;
-  novaSenha?:       string;
-  notifEmailAtivo?: boolean;
+  nome?:                    string;
+  email?:                   string;
+  senhaAtual?:              string;
+  novaSenha?:               string;
+  notifEmailAtivo?:         boolean;
+  capacidadeHorasSemanais?: number;
 }
 
 export function useAtualizarPerfil() {

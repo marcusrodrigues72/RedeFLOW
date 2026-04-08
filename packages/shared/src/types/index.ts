@@ -18,6 +18,7 @@ export interface UsuarioPublico {
   papelGlobal: PapelGlobal;
   fotoUrl: string | null;
   notifEmailAtivo?: boolean;
+  capacidadeHorasSemanais?: number;
 }
 
 export interface AuthTokens { accessToken: string; refreshToken: string }
@@ -64,9 +65,10 @@ export interface UnidadeResumo {
 export interface CursoDetalhe extends Omit<CursoResumo, "_count"> {
   unidades: UnidadeResumo[];
   membros: {
-    usuarioId: string;
-    papel: PapelGlobal;
-    usuario: UsuarioPublico;
+    usuarioId:      string;
+    papel:          PapelGlobal;
+    papeisProducao: string[];
+    usuario:        UsuarioPublico;
   }[];
   coordenadorProducaoId: string | null;
   coordenadorProducao: { id: string; nome: string; fotoUrl: string | null } | null;
@@ -390,6 +392,45 @@ export interface MIResult {
   oasCriados: number;
   oasIgnorados: number;
   avisos?: string[];
+}
+
+// ─── Sugestão de Alocação ─────────────────────────────────────────────────────
+
+export interface MembroCapacidade {
+  usuarioId:            string;
+  nome:                 string;
+  email:                string;
+  fotoUrl:              string | null;
+  papeisProducao:       string[];
+  capacidade:           number;   // horas/semana disponíveis globalmente
+  horasCompromissadas:  number;   // já alocadas em todos os cursos ativos
+  horasDisponiveis:     number;
+  percentualOcupado:    number;
+  etapasPendentesTotal: number;
+}
+
+export interface PapelCandidatos {
+  papel:      string;
+  candidatos: MembroCapacidade[];
+}
+
+export interface SugestaoItem {
+  papel:             string;
+  responsavelId:     string;
+  responsavelNome:   string;
+  percentualOcupado: number;
+}
+
+export interface SugestaoAlocacao {
+  membros:           MembroCapacidade[];
+  porPapel:          PapelCandidatos[];
+  sugestao:          SugestaoItem[];
+  oasPendentesSetup: number;
+}
+
+export interface AplicarSugestaoResult {
+  totalAtualizado: number;
+  message:         string;
 }
 
 // ─── Burndown ─────────────────────────────────────────────────────────────────

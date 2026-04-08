@@ -166,11 +166,12 @@ router.get("/me", authenticate, async (req, res, next) => {
 
 // PATCH /api/auth/me — auto-edição de perfil (qualquer usuário autenticado)
 const perfilSchema = z.object({
-  nome:            z.string().min(2).max(100).optional(),
-  email:           z.string().email().optional(),
-  senhaAtual:      z.string().min(1).optional(),
-  novaSenha:       z.string().min(6).optional(),
-  notifEmailAtivo: z.boolean().optional(),
+  nome:                   z.string().min(2).max(100).optional(),
+  email:                  z.string().email().optional(),
+  senhaAtual:             z.string().min(1).optional(),
+  novaSenha:              z.string().min(6).optional(),
+  notifEmailAtivo:        z.boolean().optional(),
+  capacidadeHorasSemanais: z.number().int().min(1).max(168).optional(),
 }).refine(
   (d) => !d.novaSenha || d.senhaAtual,
   { message: "Informe a senha atual para definir uma nova senha.", path: ["senhaAtual"] }
@@ -178,7 +179,7 @@ const perfilSchema = z.object({
 
 router.patch("/me", authenticate, async (req, res, next) => {
   try {
-    const { nome, email, senhaAtual, novaSenha, notifEmailAtivo } = perfilSchema.parse(req.body);
+    const { nome, email, senhaAtual, novaSenha, notifEmailAtivo, capacidadeHorasSemanais } = perfilSchema.parse(req.body);
     const id = req.usuario!.sub;
 
     // Se e-mail mudou, verifica conflito
@@ -205,6 +206,9 @@ router.patch("/me", authenticate, async (req, res, next) => {
     if (email !== undefined) updateData["email"] = email;
     if (notifEmailAtivo !== undefined) {
       updateData["notifEmailAtivo"] = notifEmailAtivo;
+    }
+    if (capacidadeHorasSemanais !== undefined) {
+      updateData["capacidadeHorasSemanais"] = capacidadeHorasSemanais;
     }
     if (novaSenha) updateData["senhaHash"] = await bcrypt.hash(novaSenha, 12);
 

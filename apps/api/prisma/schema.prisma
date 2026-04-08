@@ -86,6 +86,7 @@ model Usuario {
   mfaAtivo         Boolean     @default(false)
   microsoftId      String?     @unique
   authProvider     String      @default("LOCAL")
+  capacidadeHorasSemanais Int  @default(40)
   createdAt        DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
@@ -144,11 +145,12 @@ model Curso {
 
 /// Associação many-to-many entre Usuário e Curso com papel
 model CursoMembro {
-  id        String      @id @default(cuid())
-  cursoId   String
-  usuarioId String
-  papel     PapelGlobal @default(COLABORADOR)
-  createdAt DateTime    @default(now())
+  id              String      @id @default(cuid())
+  cursoId         String
+  usuarioId       String
+  papel           PapelGlobal @default(COLABORADOR)
+  papeisProducao  String[]    @default([])   // PapelEtapa[] que este membro executa neste curso
+  createdAt       DateTime    @default(now())
 
   curso   Curso   @relation(fields: [cursoId], references: [id], onDelete: Cascade)
   usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
@@ -229,6 +231,7 @@ model EtapaDefinicao {
   obrigatorio  Boolean    @default(true)
   ativo        Boolean    @default(true)
   temArtefato  Boolean    @default(false)
+  esforcoHoras Float      @default(2.0)  // horas estimadas para completar esta etapa por OA
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 

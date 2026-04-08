@@ -23,7 +23,7 @@ import PersonAddIcon   from "@mui/icons-material/PersonAdd";
 import SearchIcon      from "@mui/icons-material/Search";
 import InputAdornment  from "@mui/material/InputAdornment";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
-import { useCurso, useOAsByCurso, useAdicionarMembro, useRemoverMembro, useAtualizarCurso, useExcluirCurso, useAtribuicaoPreview, useAtribuirResponsaveis, useExportarMC } from "@/lib/api/cursos";
+import { useCurso, useOAsByCurso, useAdicionarMembro, useRemoverMembro, useAtualizarCurso, useExcluirCurso, useAtribuicaoPreview, useAtribuirResponsaveis, useExportarMC, useAtualizarPapeisProducao } from "@/lib/api/cursos";
 import { useUsuarios } from "@/lib/api/usuarios";
 import { useAuthStore } from "@/stores/auth.store";
 import type { PapelEtapa } from "shared";
@@ -456,17 +456,46 @@ const PAPEL_EQUIPE_CONFIG: Record<string, { label: string; color: string; bg: st
   LEITOR:      { label: "Leitor",      color: "#64748b", bg: "#f8fafc" },
 };
 
+const PAPEIS_PRODUCAO_OPCOES: { value: string; label: string }[] = [
+  { value: "COORDENADOR_PRODUCAO",   label: "Coord. Produção" },
+  { value: "CONTEUDISTA",            label: "Conteudista" },
+  { value: "DESIGNER_INSTRUCIONAL",  label: "Designer Instrucional" },
+  { value: "PROFESSOR_ATOR",         label: "Professor Ator" },
+  { value: "PROFESSOR_TECNICO",      label: "Professor Técnico" },
+  { value: "ACESSIBILIDADE",         label: "Acessibilidade" },
+  { value: "EDITOR_VIDEO",           label: "Editor de Vídeo" },
+  { value: "DESIGNER_GRAFICO",       label: "Designer Gráfico" },
+  { value: "PRODUTOR_FINAL",         label: "Produtor Final" },
+  { value: "VALIDADOR_FINAL",        label: "Validador Final" },
+];
+
 function EquipeTab({ cursoId, membros }: {
   cursoId: string;
-  membros: { usuarioId: string; papel: string; usuario: { id: string; nome: string; email: string } }[];
+  membros: { usuarioId: string; papel: string; papeisProducao: string[]; usuario: { id: string; nome: string; email: string } }[];
 }) {
-  const { mutate: adicionar, isPending: adicionando } = useAdicionarMembro(cursoId);
-  const { mutate: remover }                           = useRemoverMembro(cursoId);
-  const { data: todos = [] }                          = useUsuarios();
-  const [dialogOpen, setDialogOpen]                   = useState(false);
-  const [busca,      setBusca]                        = useState("");
-  const [papeis,     setPapeis]                       = useState<Record<string, string>>({});
-  const [adicionandoId, setAdicionandoId]             = useState<string | null>(null);
+  const { mutate: adicionar, isPending: adicionando }  = useAdicionarMembro(cursoId);
+  const { mutate: remover }                            = useRemoverMembro(cursoId);
+  const { mutate: atualizarRoles }                     = useAtualizarPapeisProducao(cursoId);
+  const { data: todos = [] }                           = useUsuarios();
+  const [dialogOpen,    setDialogOpen]                 = useState(false);
+  const [busca,         setBusca]                      = useState("");
+  const [papeis,        setPapeis]                     = useState<Record<string, string>>({});
+  const [adicionandoId, setAdicionandoId]              = useState<string | null>(null);
+  const [localRoles,    setLocalRoles]                 = useState<Record<string, string[]>>({});
+
+  const getRoles = (usuarioId: string): string[] =>
+    localRoles[usuarioId] ?? membros.find((m) => m.usuarioId === usuarioId)?.papeisProducao ?? [];
+
+  const handleRolesChange = (usuarioId: string, newRoles: string[]) =>
+    setLocalRoles((prev) => ({ ...prev, [usuarioId]: newRoles }));
+
+  const handleRolesClose = (usuarioId: string) => {
+    const original = membros.find((m) => m.usuarioId === usuarioId)?.papeisProducao ?? [];
+    const pending  = localRoles[usuarioId];
+    if (pending && JSON.stringify([...pending].sort()) !== JSON.stringify([...original].sort())) {
+      atualizarRoles({ usuarioId, papeisProducao: pending });
+    }
+  };
 
   const disponiveis = todos.filter((u) => u.ativo && !membros.some((m) => m.usuarioId === u.id));
 
@@ -504,14 +533,15 @@ function EquipeTab({ cursoId, membros }: {
           <Table>
             <TableHead>
               <TableRow sx={{ bgcolor: "#f8fafc" }}>
-                {["Membro", "E-mail", "Papel", ""].map((h) => (
+                {["Membro", "E-mail", "Papel", "Papéis de Produção", ""].map((h) => (
                   <TableCell key={h} sx={{ fontWeight: 700, fontSize: "0.75rem", color: "text.secondary" }}>{h}</TableCell>
                 ))}
               </TableRow>
             </TableHead>
             <TableBody>
               {membros.map((m) => {
-                const pc = PAPEL_EQUIPE_CONFIG[m.papel] ?? PAPEL_EQUIPE_CONFIG.COLABORADOR;
+                const pc    = PAPEL_EQUIPE_CONFIG[m.papel] ?? PAPEL_EQUIPE_CONFIG.COLABORADOR;
+                const roles = getRoles(m.usuarioId);
                 return (
                   <TableRow key={m.usuarioId} sx={{ "&:hover": { bgcolor: "action.hover" } }}>
                     <TableCell>
@@ -526,6 +556,40 @@ function EquipeTab({ cursoId, membros }: {
                     <TableCell>
                       <Chip label={pc.label} size="small"
                         sx={{ bgcolor: pc.bg, color: pc.color, fontWeight: 600, fontSize: "0.7rem" }} />
+                    </TableCell>
+                    <TableCell sx={{ minWidth: 220 }}>
+                      <Select
+                        multiple
+                        size="small"
+                        displayEmpty
+                        value={roles}
+                        onChange={(e) => handleRolesChange(m.usuarioId, e.target.value as string[])}
+                        onClose={() => handleRolesClose(m.usuarioId)}
+                        renderValue={(selected) =>
+                          selected.length === 0 ? (
+                            <Typography variant="caption" color="text.disabled">Nenhum</Typography>
+                          ) : (
+                            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                              {(selected as string[]).map((v) => (
+                                <Chip
+                                  key={v}
+                                  label={PAPEIS_PRODUCAO_OPCOES.find((o) => o.value === v)?.label ?? v}
+                                  size="small"
+                                  sx={{ fontSize: "0.65rem", height: 18 }}
+                                />
+                              ))}
+                            </Box>
+                          )
+                        }
+                        sx={{ fontSize: "0.8rem", minWidth: 160 }}
+                      >
+                        {PAPEIS_PRODUCAO_OPCOES.map((op) => (
+                          <MenuItem key={op.value} value={op.value} dense>
+                            <Checkbox checked={roles.includes(op.value)} size="small" sx={{ py: 0 }} />
+                            <ListItemText primary={op.label} primaryTypographyProps={{ fontSize: "0.8rem" }} />
+                          </MenuItem>
+                        ))}
+                      </Select>
                     </TableCell>
                     <TableCell align="right">
                       <Tooltip title="Remover do curso">
@@ -660,6 +724,8 @@ const PAPEIS_ETAPA: { value: PapelEtapa; label: string }[] = [
   { value: "PROFESSOR_ATOR",        label: "Professor Ator" },
   { value: "PROFESSOR_TECNICO",     label: "Professor Técnico" },
   { value: "ACESSIBILIDADE",        label: "Acessibilidade" },
+  { value: "EDITOR_VIDEO",          label: "Editor de Vídeo" },
+  { value: "DESIGNER_GRAFICO",      label: "Designer Gráfico" },
   { value: "PRODUTOR_FINAL",        label: "Produtor Final" },
   { value: "VALIDADOR_FINAL",       label: "Validador Final" },
 ];

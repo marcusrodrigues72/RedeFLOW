@@ -24,8 +24,9 @@ export default function PerfilPage() {
   const [cronPending, setCronPending] = useState(false);
 
   // Dados pessoais
-  const [nome,  setNome]  = useState(user?.nome  ?? "");
-  const [email, setEmail] = useState(user?.email ?? "");
+  const [nome,       setNome]       = useState(user?.nome  ?? "");
+  const [email,      setEmail]      = useState(user?.email ?? "");
+  const [capacidade, setCapacidade] = useState<number>(user?.capacidadeHorasSemanais ?? 40);
 
   // Notificações
   const [notifEmail, setNotifEmail] = useState(user?.notifEmailAtivo ?? true);
@@ -43,7 +44,7 @@ export default function PerfilPage() {
     setSuccessMsg(null);
     setErrorMsg(null);
     mutate(
-      { nome: nome.trim() || undefined, email: email.trim() || undefined, notifEmailAtivo: notifEmail },
+      { nome: nome.trim() || undefined, email: email.trim() || undefined, notifEmailAtivo: notifEmail, capacidadeHorasSemanais: capacidade },
       {
         onSuccess: () => setSuccessMsg("Dados atualizados com sucesso."),
         onError: (err: unknown) => {
@@ -134,6 +135,16 @@ export default function PerfilPage() {
             size="small"
             fullWidth
             InputProps={{ startAdornment: <EmailOutlinedIcon sx={{ mr: 1, fontSize: 18, color: "text.disabled" }} /> }}
+          />
+          <TextField
+            label="Capacidade semanal (horas)"
+            type="number"
+            value={capacidade}
+            onChange={(e) => setCapacidade(Math.max(1, Math.min(168, Number(e.target.value))))}
+            size="small"
+            fullWidth
+            inputProps={{ min: 1, max: 168 }}
+            helperText="Horas disponíveis por semana em todos os projetos — usado para sugestão de alocação."
           />
         </Box>
 
