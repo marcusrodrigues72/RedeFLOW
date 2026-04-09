@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { CursoResumo, CursoDetalhe, DashboardStats, ImportPreview, ImportResult, MIPreview, MIResult, OADetalhe, EtapaOADetalhe, ComentarioOA, DashboardDetalheTipo, DashboardDetalheOA, DashboardDetalheAtraso, AtribuicaoPreview, AtribuicaoResult, AuditLogEntry, UsuarioPublico, SugestaoAlocacao, AplicarSugestaoResult, SugestaoItem } from "shared";
+import type { CursoResumo, CursoDetalhe, DashboardStats, ImportPreview, ImportResult, MIPreview, MIResult, OADetalhe, EtapaOADetalhe, ComentarioOA, DashboardDetalheTipo, DashboardDetalheOA, DashboardDetalheAtraso, AtribuicaoPreview, AtribuicaoResult, AuditLogEntry, UsuarioPublico, SugestaoAlocacao, AplicarSugestaoResult, SugestaoItem, CalcularDeadlinesResult } from "shared";
 import { useAuthStore } from "@/stores/auth.store";
 
 // ─── Keys ─────────────────────────────────────────────────────────────────────
@@ -486,6 +486,15 @@ export function useAplicarSugestao(cursoId: string) {
       qc.invalidateQueries({ queryKey: cursoKeys.oas(cursoId) });
       qc.invalidateQueries({ queryKey: ["sugestao-alocacao", cursoId] });
     },
+  });
+}
+
+export function useCalcularDeadlines(cursoId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api.post<CalcularDeadlinesResult>(`/cursos/${cursoId}/setup/calcular-deadlines`).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: cursoKeys.oas(cursoId) }),
   });
 }
 

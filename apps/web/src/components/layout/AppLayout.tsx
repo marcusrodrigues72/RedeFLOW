@@ -11,6 +11,7 @@ import SchoolOutlinedIcon         from "@mui/icons-material/SchoolOutlined";
 import AssignmentOutlinedIcon     from "@mui/icons-material/AssignmentOutlined";
 import BarChartOutlinedIcon       from "@mui/icons-material/BarChartOutlined";
 import PeopleOutlinedIcon         from "@mui/icons-material/PeopleOutlined";
+import AccountTreeOutlinedIcon    from "@mui/icons-material/AccountTreeOutlined";
 import CalendarMonthOutlinedIcon  from "@mui/icons-material/CalendarMonthOutlined";
 import NotificationsNoneIcon      from "@mui/icons-material/NotificationsNone";
 import CheckCircleOutlineIcon     from "@mui/icons-material/CheckCircleOutline";
@@ -31,6 +32,7 @@ const NAV: NavItem[] = [
   { label: "Relatórios",   to: "/relatorios",   icon: <BarChartOutlinedIcon fontSize="small" /> },
   { label: "Alocação",     to: "/alocacao",     icon: <CalendarMonthOutlinedIcon fontSize="small" /> },
   { label: "Equipe",       to: "/admin/usuarios", icon: <PeopleOutlinedIcon fontSize="small" />, adminOnly: true },
+  { label: "Pipeline",     to: "/admin/pipeline", icon: <AccountTreeOutlinedIcon fontSize="small" />, adminOnly: true },
 ];
 
 export default function AppLayout({ children }: { children: ReactNode }) {
@@ -310,6 +312,7 @@ function getBreadcrumb(path: string): string {
   if (path.startsWith("/alocacao"))        return "REDEFLOW · ALOCAÇÃO DO TIME";
   if (path.startsWith("/oas/"))            return "REDEFLOW · OAs · DETALHE";
   if (path.startsWith("/admin/usuarios"))  return "REDEFLOW · EQUIPE";
+  if (path.startsWith("/admin/pipeline"))  return "REDEFLOW · PIPELINE";
   if (path.startsWith("/perfil"))          return "REDEFLOW · MEU PERFIL";
   return "REDEFLOW";
 }

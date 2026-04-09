@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { UsuarioAdmin } from "shared";
+import type { UsuarioAdmin, EtapaDefinicaoAdmin } from "shared";
 
 export const usuarioKeys = {
   list: () => ["usuarios"] as const,
@@ -25,9 +25,29 @@ export function useCriarUsuario() {
 export function useAtualizarUsuario() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: { nome?: string; email?: string; papelGlobal?: string; ativo?: boolean; senha?: string } }) =>
+    mutationFn: ({ id, data }: { id: string; data: { nome?: string; email?: string; papelGlobal?: string; ativo?: boolean; senha?: string; capacidadeHorasSemanais?: number } }) =>
       api.patch<UsuarioAdmin>(`/usuarios/${id}`, data).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: usuarioKeys.list() }),
+  });
+}
+
+// ─── Pipeline ─────────────────────────────────────────────────────────────────
+
+export const pipelineKeys = { list: () => ["admin-pipeline"] as const };
+
+export function usePipeline() {
+  return useQuery({
+    queryKey: pipelineKeys.list(),
+    queryFn:  () => api.get<EtapaDefinicaoAdmin[]>("/admin/pipeline").then((r) => r.data),
+  });
+}
+
+export function useAtualizarEtapaDefinicao() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: { esforcoHoras?: number; nome?: string; ativo?: boolean } }) =>
+      api.patch<EtapaDefinicaoAdmin>(`/admin/pipeline/${id}`, data).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: pipelineKeys.list() }),
   });
 }
 

@@ -22,6 +22,7 @@ import { Route as AuthedOasOaIdRouteImport } from './routes/_authed/oas/$oaId'
 import { Route as AuthedCursosImportarRouteImport } from './routes/_authed/cursos/importar'
 import { Route as AuthedCursosCursoIdRouteImport } from './routes/_authed/cursos/$cursoId'
 import { Route as AuthedAdminUsuariosRouteImport } from './routes/_authed/admin/usuarios'
+import { Route as AuthedAdminPipelineRouteImport } from './routes/_authed/admin/pipeline'
 import { Route as AuthedCursosCursoIdSetupProducaoRouteImport } from './routes/_authed/cursos/$cursoId_/setup-producao'
 import { Route as AuthedCursosCursoIdOasRouteImport } from './routes/_authed/cursos/$cursoId_/oas'
 
@@ -89,6 +90,11 @@ const AuthedAdminUsuariosRoute = AuthedAdminUsuariosRouteImport.update({
   path: '/admin/usuarios',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedAdminPipelineRoute = AuthedAdminPipelineRouteImport.update({
+  id: '/admin/pipeline',
+  path: '/admin/pipeline',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedCursosCursoIdSetupProducaoRoute =
   AuthedCursosCursoIdSetupProducaoRouteImport.update({
     id: '/cursos/$cursoId_/setup-producao',
@@ -110,6 +116,7 @@ export interface FileRoutesByFullPath {
   '/perfil': typeof AuthedPerfilRoute
   '/relatorios': typeof AuthedRelatoriosRoute
   '/admin/usuarios': typeof AuthedAdminUsuariosRoute
+  '/admin/pipeline': typeof AuthedAdminPipelineRoute
   '/cursos/$cursoId': typeof AuthedCursosCursoIdRoute
   '/cursos/importar': typeof AuthedCursosImportarRoute
   '/oas/$oaId': typeof AuthedOasOaIdRoute
@@ -126,6 +133,7 @@ export interface FileRoutesByTo {
   '/relatorios': typeof AuthedRelatoriosRoute
   '/': typeof AuthedIndexRoute
   '/admin/usuarios': typeof AuthedAdminUsuariosRoute
+  '/admin/pipeline': typeof AuthedAdminPipelineRoute
   '/cursos/$cursoId': typeof AuthedCursosCursoIdRoute
   '/cursos/importar': typeof AuthedCursosImportarRoute
   '/oas/$oaId': typeof AuthedOasOaIdRoute
@@ -144,6 +152,7 @@ export interface FileRoutesById {
   '/_authed/relatorios': typeof AuthedRelatoriosRoute
   '/_authed/': typeof AuthedIndexRoute
   '/_authed/admin/usuarios': typeof AuthedAdminUsuariosRoute
+  '/_authed/admin/pipeline': typeof AuthedAdminPipelineRoute
   '/_authed/cursos/$cursoId': typeof AuthedCursosCursoIdRoute
   '/_authed/cursos/importar': typeof AuthedCursosImportarRoute
   '/_authed/oas/$oaId': typeof AuthedOasOaIdRoute
@@ -162,6 +171,7 @@ export interface FileRouteTypes {
     | '/perfil'
     | '/relatorios'
     | '/admin/usuarios'
+    | '/admin/pipeline'
     | '/cursos/$cursoId'
     | '/cursos/importar'
     | '/oas/$oaId'
@@ -178,6 +188,7 @@ export interface FileRouteTypes {
     | '/relatorios'
     | '/'
     | '/admin/usuarios'
+    | '/admin/pipeline'
     | '/cursos/$cursoId'
     | '/cursos/importar'
     | '/oas/$oaId'
@@ -195,6 +206,7 @@ export interface FileRouteTypes {
     | '/_authed/relatorios'
     | '/_authed/'
     | '/_authed/admin/usuarios'
+    | '/_authed/admin/pipeline'
     | '/_authed/cursos/$cursoId'
     | '/_authed/cursos/importar'
     | '/_authed/oas/$oaId'
@@ -302,6 +314,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAdminUsuariosRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/admin/pipeline': {
+      id: '/_authed/admin/pipeline'
+      path: '/admin/pipeline'
+      fullPath: '/admin/pipeline'
+      preLoaderRoute: typeof AuthedAdminPipelineRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/cursos/$cursoId_/setup-producao': {
       id: '/_authed/cursos/$cursoId_/setup-producao'
       path: '/cursos/$cursoId/setup-producao'
@@ -326,6 +345,7 @@ interface AuthedRouteChildren {
   AuthedRelatoriosRoute: typeof AuthedRelatoriosRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
   AuthedAdminUsuariosRoute: typeof AuthedAdminUsuariosRoute
+  AuthedAdminPipelineRoute: typeof AuthedAdminPipelineRoute
   AuthedCursosCursoIdRoute: typeof AuthedCursosCursoIdRoute
   AuthedCursosImportarRoute: typeof AuthedCursosImportarRoute
   AuthedOasOaIdRoute: typeof AuthedOasOaIdRoute
@@ -341,6 +361,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedRelatoriosRoute: AuthedRelatoriosRoute,
   AuthedIndexRoute: AuthedIndexRoute,
   AuthedAdminUsuariosRoute: AuthedAdminUsuariosRoute,
+  AuthedAdminPipelineRoute: AuthedAdminPipelineRoute,
   AuthedCursosCursoIdRoute: AuthedCursosCursoIdRoute,
   AuthedCursosImportarRoute: AuthedCursosImportarRoute,
   AuthedOasOaIdRoute: AuthedOasOaIdRoute,

@@ -13,11 +13,12 @@ import VerifiedIcon         from "@mui/icons-material/Verified";
 import PersonIcon           from "@mui/icons-material/Person";
 import AutoAwesomeIcon      from "@mui/icons-material/AutoAwesome";
 import PlayArrowIcon        from "@mui/icons-material/PlayArrow";
+import ScheduleIcon         from "@mui/icons-material/Schedule";
 import { useState }         from "react";
 import {
   useOAsByCurso, useCurso, useAtualizarOA, useAtualizarEtapaGeral,
   useValidarMatriz, useDefinirCoordenadorProducao,
-  useSugestaoAlocacao, useAplicarSugestao,
+  useSugestaoAlocacao, useAplicarSugestao, useCalcularDeadlines,
 } from "@/lib/api/cursos";
 import { useAuthStore } from "@/stores/auth.store";
 import type { OADetalhe, TipoOA, StatusEtapa, SugestaoAlocacao, SugestaoItem } from "shared";
@@ -46,6 +47,7 @@ function SetupProducaoPage() {
   const user = useAuthStore((s) => s.user);
 
   const { mutate: validarMatriz, isPending: validando } = useValidarMatriz(cursoId);
+  const { mutate: calcularDeadlines, isPending: calculando } = useCalcularDeadlines(cursoId);
 
   if (loadingCurso || loadingOAs) return <LoadingSkeleton />;
   if (isError) return <Alert severity="error">Erro ao carregar OAs.</Alert>;
@@ -119,6 +121,41 @@ function SetupProducaoPage() {
 
       {/* Sugestão Inteligente */}
       <SugestaoAlocacaoCard cursoId={cursoId} />
+
+      {/* Calcular Deadlines Automaticamente */}
+      <Card sx={{ mb: 2.5, border: "1px solid #d1fae5", bgcolor: "#f0fdf4" }}>
+        <CardContent sx={{ p: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <ScheduleIcon sx={{ color: "#059669", fontSize: 20 }} />
+            <Box>
+              <Typography variant="body2" fontWeight={700} color="#065f46">
+                Calcular Deadlines Automaticamente
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Redistribui os prazos das etapas com base na capacidade de cada responsável e no esforço configurado no pipeline.
+              </Typography>
+            </Box>
+          </Box>
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<ScheduleIcon />}
+            onClick={() =>
+              calcularDeadlines(undefined, {
+                onSuccess: (res) =>
+                  setSnackMsg(
+                    `${res.totalAtualizadas} deadline(s) recalculado(s).` +
+                    (res.avisos.length ? ` ⚠ ${res.avisos[0]}` : "")
+                  ),
+              })
+            }
+            disabled={calculando}
+            sx={{ bgcolor: "#059669", "&:hover": { bgcolor: "#047857" }, whiteSpace: "nowrap", flexShrink: 0 }}
+          >
+            {calculando ? "Calculando…" : "Calcular Deadlines"}
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Banner de validação da matriz */}
       {temOAsImportados && !matrizValidada && (

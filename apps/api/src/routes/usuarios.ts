@@ -17,6 +17,7 @@ const adminOnly = (req: any, res: any, next: any) => {
 const select = {
   id: true, nome: true, email: true,
   papelGlobal: true, ativo: true, fotoUrl: true, createdAt: true,
+  capacidadeHorasSemanais: true,
 };
 
 // GET /usuarios
@@ -52,11 +53,12 @@ router.post("/", adminOnly, async (req, res, next) => {
 
 // PATCH /usuarios/:id
 const atualizarSchema = z.object({
-  nome:        z.string().min(2).optional(),
-  email:       z.string().email().optional(),
-  papelGlobal: z.enum(["ADMIN", "COLABORADOR", "LEITOR"]).optional(),
-  ativo:       z.boolean().optional(),
-  senha:       z.string().min(6).optional(),
+  nome:                    z.string().min(2).optional(),
+  email:                   z.string().email().optional(),
+  papelGlobal:             z.enum(["ADMIN", "COLABORADOR", "LEITOR"]).optional(),
+  ativo:                   z.boolean().optional(),
+  senha:                   z.string().min(6).optional(),
+  capacidadeHorasSemanais: z.number().int().min(1).max(168).optional(),
 });
 
 router.patch("/:id", adminOnly, async (req, res, next) => {

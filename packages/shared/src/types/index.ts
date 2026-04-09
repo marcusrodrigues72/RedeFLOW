@@ -232,13 +232,14 @@ export interface Notificacao {
 // ─── Usuário Admin ────────────────────────────────────────────────────────────
 
 export interface UsuarioAdmin {
-  id:          string;
-  nome:        string;
-  email:       string;
-  papelGlobal: PapelGlobal;
-  ativo:       boolean;
-  fotoUrl:     string | null;
-  createdAt:   string;
+  id:                      string;
+  nome:                    string;
+  email:                   string;
+  papelGlobal:             PapelGlobal;
+  ativo:                   boolean;
+  fotoUrl:                 string | null;
+  createdAt:               string;
+  capacidadeHorasSemanais: number;
 }
 
 // ─── Dashboard Detalhe ────────────────────────────────────────────────────────
@@ -472,3 +473,23 @@ export interface RelatorioUnidadeProgresso {
 }
 
 export type RelatorioProgressoUnidades = RelatorioUnidadeProgresso[];
+
+// ─── Pipeline Admin ───────────────────────────────────────────────────────────
+
+export interface EtapaDefinicaoAdmin {
+  id:           string;
+  nome:         string;
+  tipoOA:       TipoOA | null;
+  papel:        string;
+  ordem:        number;
+  obrigatorio:  boolean;
+  ativo:        boolean;
+  temArtefato:  boolean;
+  esforcoHoras: number;
+  createdAt:    string;
+}
+
+export interface CalcularDeadlinesResult {
+  totalAtualizadas: number;
+  avisos:           string[];
+}

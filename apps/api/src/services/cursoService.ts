@@ -4,8 +4,8 @@ import { prisma } from "../lib/prisma.js";
 export class CursoService {
   private repo = new CursoRepository();
 
-  listar(usuarioId: string) {
-    return this.repo.findAll(usuarioId);
+  listar(usuarioId: string, papelGlobal?: string) {
+    return this.repo.findAll(usuarioId, papelGlobal === "ADMIN");
   }
 
   async buscarPorId(id: string, usuarioId: string) {

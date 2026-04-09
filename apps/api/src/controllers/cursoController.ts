@@ -24,7 +24,7 @@ export class CursoController {
 
   listar = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const cursos = await this.service.listar(req.usuario!.sub);
+      const cursos = await this.service.listar(req.usuario!.sub, req.usuario!.papel);
       res.json(cursos);
     } catch (err) { next(err); }
   };

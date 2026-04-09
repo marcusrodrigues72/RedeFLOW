@@ -1,7 +1,9 @@
 import { Router } from "express";
+import { z } from "zod";
 import { authenticate, requireAdmin } from "../middlewares/authenticate.js";
 import { runDeadlineChecks } from "../lib/scheduler.js";
 import { logger } from "../lib/logger.js";
+import { prisma } from "../lib/prisma.js";
 
 const router = Router();
 
@@ -18,6 +20,42 @@ router.post("/run-deadline-checks", authenticate, requireAdmin, async (_req, res
   } catch (err) {
     next(err);
   }
+});
+
+// ─── Pipeline: Etapas de Definição ───────────────────────────────────────────
+
+/**
+ * GET /admin/pipeline
+ * Lista todas as definições de etapas com esforcoHoras (Admin only).
+ */
+router.get("/pipeline", authenticate, requireAdmin, async (_req, res, next) => {
+  try {
+    const etapas = await prisma.etapaDefinicao.findMany({
+      orderBy: [{ tipoOA: "asc" }, { ordem: "asc" }],
+    });
+    res.json(etapas);
+  } catch (err) { next(err); }
+});
+
+const pipelineUpdateSchema = z.object({
+  esforcoHoras: z.number().min(0.5).max(200).optional(),
+  nome:         z.string().min(1).max(100).optional(),
+  ativo:        z.boolean().optional(),
+});
+
+/**
+ * PATCH /admin/pipeline/:id
+ * Atualiza campos de uma definição de etapa (esforcoHoras, nome, ativo).
+ */
+router.patch("/pipeline/:id", authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const data = pipelineUpdateSchema.parse(req.body);
+    const etapa = await prisma.etapaDefinicao.update({
+      where: { id: req.params["id"] as string },
+      data,
+    });
+    res.json(etapa);
+  } catch (err) { next(err); }
 });
 
 export default router;

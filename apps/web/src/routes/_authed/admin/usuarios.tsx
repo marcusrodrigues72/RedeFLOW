@@ -93,7 +93,7 @@ function UsuariosPage() {
             <Table>
               <TableHead>
                 <TableRow sx={{ bgcolor: "#f8fafc" }}>
-                  {["Usuário", "E-mail", "Papel", "Status", "Desde", "Ações"].map((h) => (
+                  {["Usuário", "E-mail", "Papel", "CH Semanal", "Status", "Desde", "Ações"].map((h) => (
                     <TableCell key={h} sx={{ fontWeight: 700, fontSize: "0.75rem", color: "text.secondary", py: 1.5 }}>{h}</TableCell>
                   ))}
                 </TableRow>
@@ -101,7 +101,7 @@ function UsuariosPage() {
               <TableBody>
                 {usuariosFiltrados.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} sx={{ textAlign: "center", py: 4, color: "text.disabled" }}>
+                    <TableCell colSpan={7} sx={{ textAlign: "center", py: 4, color: "text.disabled" }}>
                       Nenhum usuário encontrado para "{busca}"
                     </TableCell>
                   </TableRow>
@@ -124,6 +124,11 @@ function UsuariosPage() {
                       <TableCell>
                         <Chip label={pc.label} size="small"
                           sx={{ bgcolor: pc.bg, color: pc.color, fontWeight: 600, fontSize: "0.7rem" }} />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" color={u.capacidadeHorasSemanais < 20 ? "warning.main" : "text.secondary"}>
+                          {u.capacidadeHorasSemanais}h/sem
+                        </Typography>
                       </TableCell>
                       <TableCell>
                         <Chip
@@ -206,6 +211,7 @@ function UsuarioDialog({ open, usuario, onClose }: {
   const [confirmarSenha, setConfirmarSenha] = useState("");
   const [papel,          setPapel]          = useState("COLABORADOR");
   const [ativo,          setAtivo]          = useState(true);
+  const [capacidade,     setCapacidade]     = useState(40);
 
   const isEdit = Boolean(usuario);
   const busy   = criando || atualizando;
@@ -223,14 +229,15 @@ function UsuarioDialog({ open, usuario, onClose }: {
       setConfirmarSenha("");
       setPapel(usuario.papelGlobal);
       setAtivo(usuario.ativo);
+      setCapacidade(usuario.capacidadeHorasSemanais ?? 40);
     } else {
-      setNome(""); setEmail(""); setSenha(""); setNovaSenha(""); setConfirmarSenha(""); setPapel("COLABORADOR"); setAtivo(true);
+      setNome(""); setEmail(""); setSenha(""); setNovaSenha(""); setConfirmarSenha(""); setPapel("COLABORADOR"); setAtivo(true); setCapacidade(40);
     }
   };
 
   const handleSalvar = () => {
     if (isEdit && usuario) {
-      const data: { nome: string; email: string; papelGlobal: string; ativo: boolean; senha?: string } = { nome, email, papelGlobal: papel, ativo };
+      const data: { nome: string; email: string; papelGlobal: string; ativo: boolean; senha?: string; capacidadeHorasSemanais: number } = { nome, email, papelGlobal: papel, ativo, capacidadeHorasSemanais: capacidade };
       if (novaSenha) data.senha = novaSenha;
       atualizar({ id: usuario.id, data }, { onSuccess: onClose });
     } else {
@@ -279,6 +286,17 @@ function UsuarioDialog({ open, usuario, onClose }: {
               disabled={!novaSenha}
             />
           </>
+        )}
+        {isEdit && (
+          <TextField
+            label="CH Semanal (horas)"
+            type="number"
+            value={capacidade}
+            onChange={(e) => setCapacidade(Math.max(1, Math.min(168, Number(e.target.value))))}
+            size="small" fullWidth
+            inputProps={{ min: 1, max: 168 }}
+            helperText="Horas disponíveis por semana para produção de conteúdo"
+          />
         )}
         <FormControl size="small" fullWidth>
           <InputLabel>Papel</InputLabel>

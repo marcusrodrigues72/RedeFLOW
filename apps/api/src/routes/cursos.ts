@@ -481,4 +481,109 @@ router.post("/:id/setup/aplicar-sugestao", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ─── POST /:id/setup/calcular-deadlines ──────────────────────────────────────
+// Recalcula deadlines de todas as EtapaOAs do curso com base na capacidade
+// disponível de cada responsável e no esforcoHoras de cada definição de etapa.
+router.post("/:id/setup/calcular-deadlines", async (req, res, next) => {
+  try {
+    const cursoId = req.params["id"] as string;
+
+    // Verifica acesso (admin global ou admin do curso)
+    const isAdminGlobal = req.usuario!.papel === "ADMIN";
+    if (!isAdminGlobal) {
+      const membro = await prisma.cursoMembro.findUnique({
+        where: { cursoId_usuarioId: { cursoId, usuarioId: req.usuario!.sub } },
+      });
+      if (!membro || membro.papel !== "ADMIN") {
+        res.status(403).json({ message: "Acesso negado." }); return;
+      }
+    }
+
+    // Carrega todos os OAs do curso com etapas ordenadas
+    const oas = await prisma.objetoAprendizagem.findMany({
+      where: { capitulo: { unidade: { cursoId } } },
+      select: {
+        codigo: true,
+        etapas: {
+          orderBy: { ordem: "asc" },
+          select: {
+            id: true, ordem: true, deadlinePrevisto: true, responsavelId: true,
+            etapaDef: { select: { papel: true, esforcoHoras: true } },
+          },
+        },
+      },
+    });
+
+    // Calcula horas compromissadas por membro (horizonte de 4 semanas)
+    const HORIZON_WEEKS = 4;
+    const capacidadeMap = new Map<string, number>(); // usuarioId → horasDisponiveis/semana
+
+    const membrosComCapacidade = await prisma.cursoMembro.findMany({
+      where: { cursoId },
+      select: {
+        usuarioId: true,
+        usuario:   { select: { capacidadeHorasSemanais: true } },
+      },
+    });
+
+    for (const m of membrosComCapacidade) {
+      const compromissadas = await prisma.etapaOA.findMany({
+        where: {
+          responsavelId: m.usuarioId,
+          status: { in: ["PENDENTE", "EM_ANDAMENTO"] },
+          oa: { capitulo: { unidade: { curso: { status: "ATIVO" } } } },
+        },
+        select: { etapaDef: { select: { esforcoHoras: true } } },
+      });
+      const totalHoras = compromissadas.reduce((s, e) => s + e.etapaDef.esforcoHoras, 0);
+      const horasSemanais = totalHoras / HORIZON_WEEKS;
+      const disponiveis   = Math.max(4, m.usuario.capacidadeHorasSemanais - horasSemanais);
+      capacidadeMap.set(m.usuarioId, disponiveis);
+    }
+
+    const DEFAULT_HORAS_DISPONIVEIS = 8; // sem responsável: assume 8h/semana
+
+    let totalAtualizadas = 0;
+    const avisos: string[] = [];
+
+    for (const oa of oas) {
+      const setupIdx = oa.etapas.findIndex(
+        (e) => e.etapaDef.papel === "COORDENADOR_PRODUCAO"
+      );
+      if (setupIdx === -1) continue;
+
+      const setupEtapa = oa.etapas[setupIdx];
+      if (!setupEtapa.deadlinePrevisto) {
+        avisos.push(`${oa.codigo}: sem deadline de setup — ignorado.`);
+        continue;
+      }
+
+      let prevDeadline = new Date(setupEtapa.deadlinePrevisto);
+
+      for (let i = setupIdx + 1; i < oa.etapas.length; i++) {
+        const etapa = oa.etapas[i];
+        const horasDisponiveis = etapa.responsavelId
+          ? (capacidadeMap.get(etapa.responsavelId) ?? DEFAULT_HORAS_DISPONIVEIS)
+          : DEFAULT_HORAS_DISPONIVEIS;
+
+        const horasPorDia  = horasDisponiveis / 5;
+        const diasNecessarios = Math.max(1, Math.ceil(etapa.etapaDef.esforcoHoras / horasPorDia));
+
+        const novoDeadline = new Date(prevDeadline);
+        novoDeadline.setDate(novoDeadline.getDate() + diasNecessarios);
+
+        await prisma.etapaOA.update({
+          where: { id: etapa.id },
+          data:  { deadlinePrevisto: novoDeadline },
+        });
+
+        prevDeadline = novoDeadline;
+        totalAtualizadas++;
+      }
+    }
+
+    res.json({ totalAtualizadas, avisos });
+  } catch (err) { next(err); }
+});
+
 export default router;
