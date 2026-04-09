@@ -4,7 +4,7 @@ import { prisma } from "../lib/prisma.js";
 export class CursoRepository {
   findAll(usuarioId: string, isAdmin = false) {
     return prisma.curso.findMany({
-      where: isAdmin ? undefined : { membros: { some: { usuarioId } } },
+      where: isAdmin ? {} : { membros: { some: { usuarioId } } },
       include: {
         unidades: { select: { id: true, numero: true, nome: true } },
         membros: { select: { usuarioId: true, papel: true } },

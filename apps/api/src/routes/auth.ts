@@ -278,6 +278,7 @@ router.get("/microsoft/callback", async (req, res) => {
     const tokenData = await tokenRes.json() as Record<string, string>;
 
     if (!tokenRes.ok || !tokenData["access_token"]) {
+      console.error("[SSO] token exchange failed:", JSON.stringify(tokenData));
       failRedirect("Falha ao obter tokens da Microsoft.");
       return;
     }

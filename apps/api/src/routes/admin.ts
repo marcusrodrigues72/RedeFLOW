@@ -49,10 +49,14 @@ const pipelineUpdateSchema = z.object({
  */
 router.patch("/pipeline/:id", authenticate, requireAdmin, async (req, res, next) => {
   try {
-    const data = pipelineUpdateSchema.parse(req.body);
+    const parsed = pipelineUpdateSchema.parse(req.body);
+    const updateData: Record<string, unknown> = {};
+    if (parsed.nome          !== undefined) updateData["nome"]          = parsed.nome;
+    if (parsed.ativo         !== undefined) updateData["ativo"]         = parsed.ativo;
+    if (parsed.esforcoHoras  !== undefined) updateData["esforcoHoras"]  = parsed.esforcoHoras;
     const etapa = await prisma.etapaDefinicao.update({
       where: { id: req.params["id"] as string },
-      data,
+      data:  updateData,
     });
     res.json(etapa);
   } catch (err) { next(err); }

@@ -4,8 +4,17 @@ import { prisma } from "../lib/prisma.js";
 export class CursoService {
   private repo = new CursoRepository();
 
-  listar(usuarioId: string, papelGlobal?: string) {
-    return this.repo.findAll(usuarioId, papelGlobal === "ADMIN");
+  async listar(usuarioId: string, papelGlobal?: string) {
+    // JWT já indica ADMIN — caminho rápido
+    if (papelGlobal === "ADMIN") {
+      return this.repo.findAll(usuarioId, true);
+    }
+    // Verifica no banco para cobrir casos de JWT desatualizado (papel alterado após login)
+    const usuario = await prisma.usuario.findUnique({
+      where: { id: usuarioId },
+      select: { papelGlobal: true },
+    });
+    return this.repo.findAll(usuarioId, usuario?.papelGlobal === "ADMIN");
   }
 
   async buscarPorId(id: string, usuarioId: string) {

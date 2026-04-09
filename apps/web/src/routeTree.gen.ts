@@ -115,8 +115,8 @@ export interface FileRoutesByFullPath {
   '/meu-trabalho': typeof AuthedMeuTrabalhoRoute
   '/perfil': typeof AuthedPerfilRoute
   '/relatorios': typeof AuthedRelatoriosRoute
-  '/admin/usuarios': typeof AuthedAdminUsuariosRoute
   '/admin/pipeline': typeof AuthedAdminPipelineRoute
+  '/admin/usuarios': typeof AuthedAdminUsuariosRoute
   '/cursos/$cursoId': typeof AuthedCursosCursoIdRoute
   '/cursos/importar': typeof AuthedCursosImportarRoute
   '/oas/$oaId': typeof AuthedOasOaIdRoute
@@ -132,8 +132,8 @@ export interface FileRoutesByTo {
   '/perfil': typeof AuthedPerfilRoute
   '/relatorios': typeof AuthedRelatoriosRoute
   '/': typeof AuthedIndexRoute
-  '/admin/usuarios': typeof AuthedAdminUsuariosRoute
   '/admin/pipeline': typeof AuthedAdminPipelineRoute
+  '/admin/usuarios': typeof AuthedAdminUsuariosRoute
   '/cursos/$cursoId': typeof AuthedCursosCursoIdRoute
   '/cursos/importar': typeof AuthedCursosImportarRoute
   '/oas/$oaId': typeof AuthedOasOaIdRoute
@@ -151,8 +151,8 @@ export interface FileRoutesById {
   '/_authed/perfil': typeof AuthedPerfilRoute
   '/_authed/relatorios': typeof AuthedRelatoriosRoute
   '/_authed/': typeof AuthedIndexRoute
-  '/_authed/admin/usuarios': typeof AuthedAdminUsuariosRoute
   '/_authed/admin/pipeline': typeof AuthedAdminPipelineRoute
+  '/_authed/admin/usuarios': typeof AuthedAdminUsuariosRoute
   '/_authed/cursos/$cursoId': typeof AuthedCursosCursoIdRoute
   '/_authed/cursos/importar': typeof AuthedCursosImportarRoute
   '/_authed/oas/$oaId': typeof AuthedOasOaIdRoute
@@ -170,8 +170,8 @@ export interface FileRouteTypes {
     | '/meu-trabalho'
     | '/perfil'
     | '/relatorios'
-    | '/admin/usuarios'
     | '/admin/pipeline'
+    | '/admin/usuarios'
     | '/cursos/$cursoId'
     | '/cursos/importar'
     | '/oas/$oaId'
@@ -187,8 +187,8 @@ export interface FileRouteTypes {
     | '/perfil'
     | '/relatorios'
     | '/'
-    | '/admin/usuarios'
     | '/admin/pipeline'
+    | '/admin/usuarios'
     | '/cursos/$cursoId'
     | '/cursos/importar'
     | '/oas/$oaId'
@@ -205,8 +205,8 @@ export interface FileRouteTypes {
     | '/_authed/perfil'
     | '/_authed/relatorios'
     | '/_authed/'
-    | '/_authed/admin/usuarios'
     | '/_authed/admin/pipeline'
+    | '/_authed/admin/usuarios'
     | '/_authed/cursos/$cursoId'
     | '/_authed/cursos/importar'
     | '/_authed/oas/$oaId'
@@ -344,8 +344,8 @@ interface AuthedRouteChildren {
   AuthedPerfilRoute: typeof AuthedPerfilRoute
   AuthedRelatoriosRoute: typeof AuthedRelatoriosRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
-  AuthedAdminUsuariosRoute: typeof AuthedAdminUsuariosRoute
   AuthedAdminPipelineRoute: typeof AuthedAdminPipelineRoute
+  AuthedAdminUsuariosRoute: typeof AuthedAdminUsuariosRoute
   AuthedCursosCursoIdRoute: typeof AuthedCursosCursoIdRoute
   AuthedCursosImportarRoute: typeof AuthedCursosImportarRoute
   AuthedOasOaIdRoute: typeof AuthedOasOaIdRoute
@@ -360,8 +360,8 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedPerfilRoute: AuthedPerfilRoute,
   AuthedRelatoriosRoute: AuthedRelatoriosRoute,
   AuthedIndexRoute: AuthedIndexRoute,
-  AuthedAdminUsuariosRoute: AuthedAdminUsuariosRoute,
   AuthedAdminPipelineRoute: AuthedAdminPipelineRoute,
+  AuthedAdminUsuariosRoute: AuthedAdminUsuariosRoute,
   AuthedCursosCursoIdRoute: AuthedCursosCursoIdRoute,
   AuthedCursosImportarRoute: AuthedCursosImportarRoute,
   AuthedOasOaIdRoute: AuthedOasOaIdRoute,

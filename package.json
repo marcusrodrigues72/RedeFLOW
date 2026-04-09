@@ -10,6 +10,8 @@
   "scripts": {
     "dev": "pnpm --filter shared build && pnpm --parallel --filter api --filter web dev",
     "build": "pnpm -r build",
+    "build:homolog": "pnpm --filter shared build && pnpm --filter web build:homolog",
+    "build:prod": "pnpm --filter shared build && pnpm --filter api build && pnpm --filter web build:prod",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
     "db:generate": "pnpm --filter api exec prisma generate",

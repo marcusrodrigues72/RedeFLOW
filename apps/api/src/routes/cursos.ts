@@ -21,8 +21,28 @@ router.post("/novo-via-mi/confirmar", uploadExcel, ctrl.importarMINovoCurso);
 
 router.get("/:id", ctrl.buscar);
 router.post("/",   ctrl.criar);
-router.patch("/:id", ctrl.atualizar);
-router.delete("/:id", ctrl.excluir);
+router.patch("/:id", async (req, res, next) => {
+  try {
+    const cursoId = req.params["id"] as string;
+    const usuario = await prisma.usuario.findUnique({ where: { id: req.usuario!.sub }, select: { papelGlobal: true } });
+    if (usuario?.papelGlobal !== "ADMIN") {
+      const membro = await prisma.cursoMembro.findUnique({ where: { cursoId_usuarioId: { cursoId, usuarioId: req.usuario!.sub } } });
+      if (membro?.papel !== "ADMIN") { res.status(403).json({ message: "Apenas administradores podem editar o curso." }); return; }
+    }
+    return ctrl.atualizar(req, res, next);
+  } catch (err) { next(err); }
+});
+router.delete("/:id", async (req, res, next) => {
+  try {
+    const cursoId = req.params["id"] as string;
+    const usuario = await prisma.usuario.findUnique({ where: { id: req.usuario!.sub }, select: { papelGlobal: true } });
+    if (usuario?.papelGlobal !== "ADMIN") {
+      const membro = await prisma.cursoMembro.findUnique({ where: { cursoId_usuarioId: { cursoId, usuarioId: req.usuario!.sub } } });
+      if (membro?.papel !== "ADMIN") { res.status(403).json({ message: "Apenas administradores podem excluir o curso." }); return; }
+    }
+    return ctrl.excluir(req, res, next);
+  } catch (err) { next(err); }
+});
 
 // OAs do curso
 router.get("/:id/oas", oaCtrl.listarByCurso);
@@ -312,14 +332,20 @@ router.patch("/:id/coordenador-producao", async (req, res, next) => {
     const cursoId = req.params["id"] as string;
     const { coordenadorProducaoId } = req.body as { coordenadorProducaoId: string | null };
 
-    // Valida que, se informado, o usuário é membro do curso
+    // Valida que, se informado, o usuário é membro do curso ou ADMIN global
     if (coordenadorProducaoId) {
-      const isMembro = await prisma.cursoMembro.findUnique({
-        where: { cursoId_usuarioId: { cursoId, usuarioId: coordenadorProducaoId } },
+      const coordenador = await prisma.usuario.findUnique({
+        where: { id: coordenadorProducaoId },
+        select: { papelGlobal: true },
       });
-      if (!isMembro) {
-        res.status(422).json({ message: "O usuário selecionado não é membro do curso." });
-        return;
+      if (coordenador?.papelGlobal !== "ADMIN") {
+        const isMembro = await prisma.cursoMembro.findUnique({
+          where: { cursoId_usuarioId: { cursoId, usuarioId: coordenadorProducaoId } },
+        });
+        if (!isMembro) {
+          res.status(422).json({ message: "O usuário selecionado não é membro do curso." });
+          return;
+        }
       }
     }
 
@@ -344,6 +370,12 @@ const membroSchema = z.object({
 
 router.post("/:id/membros", async (req, res, next) => {
   try {
+    const cursoId = req.params["id"] as string;
+    const solicitante = await prisma.usuario.findUnique({ where: { id: req.usuario!.sub }, select: { papelGlobal: true } });
+    if (solicitante?.papelGlobal !== "ADMIN") {
+      const membroSolicitante = await prisma.cursoMembro.findUnique({ where: { cursoId_usuarioId: { cursoId, usuarioId: req.usuario!.sub } } });
+      if (membroSolicitante?.papel !== "ADMIN") { res.status(403).json({ message: "Apenas administradores podem gerenciar membros do curso." }); return; }
+    }
     const { usuarioId, papel, papeisProducao } = membroSchema.parse(req.body);
     const membro = await prisma.cursoMembro.upsert({
       where:  { cursoId_usuarioId: { cursoId: req.params["id"] as string, usuarioId } },
@@ -358,6 +390,12 @@ router.post("/:id/membros", async (req, res, next) => {
 // PATCH /:id/membros/:usuarioId — atualiza apenas papeisProducao de um membro existente
 router.patch("/:id/membros/:usuarioId", async (req, res, next) => {
   try {
+    const cursoId = req.params["id"] as string;
+    const solicitante = await prisma.usuario.findUnique({ where: { id: req.usuario!.sub }, select: { papelGlobal: true } });
+    if (solicitante?.papelGlobal !== "ADMIN") {
+      const membroSolicitante = await prisma.cursoMembro.findUnique({ where: { cursoId_usuarioId: { cursoId, usuarioId: req.usuario!.sub } } });
+      if (membroSolicitante?.papel !== "ADMIN") { res.status(403).json({ message: "Apenas administradores podem gerenciar membros do curso." }); return; }
+    }
     const { papeisProducao } = z.object({ papeisProducao: z.array(z.string()) }).parse(req.body);
     const membro = await prisma.cursoMembro.update({
       where:  { cursoId_usuarioId: { cursoId: req.params["id"] as string, usuarioId: req.params["usuarioId"] as string } },
@@ -370,6 +408,12 @@ router.patch("/:id/membros/:usuarioId", async (req, res, next) => {
 
 router.delete("/:id/membros/:usuarioId", async (req, res, next) => {
   try {
+    const cursoId = req.params["id"] as string;
+    const solicitante = await prisma.usuario.findUnique({ where: { id: req.usuario!.sub }, select: { papelGlobal: true } });
+    if (solicitante?.papelGlobal !== "ADMIN") {
+      const membroSolicitante = await prisma.cursoMembro.findUnique({ where: { cursoId_usuarioId: { cursoId, usuarioId: req.usuario!.sub } } });
+      if (membroSolicitante?.papel !== "ADMIN") { res.status(403).json({ message: "Apenas administradores podem gerenciar membros do curso." }); return; }
+    }
     await prisma.cursoMembro.delete({
       where: { cursoId_usuarioId: { cursoId: req.params["id"] as string, usuarioId: req.params["usuarioId"] as string } },
     });
@@ -553,7 +597,7 @@ router.post("/:id/setup/calcular-deadlines", async (req, res, next) => {
       if (setupIdx === -1) continue;
 
       const setupEtapa = oa.etapas[setupIdx];
-      if (!setupEtapa.deadlinePrevisto) {
+      if (!setupEtapa?.deadlinePrevisto) {
         avisos.push(`${oa.codigo}: sem deadline de setup — ignorado.`);
         continue;
       }
@@ -562,6 +606,7 @@ router.post("/:id/setup/calcular-deadlines", async (req, res, next) => {
 
       for (let i = setupIdx + 1; i < oa.etapas.length; i++) {
         const etapa = oa.etapas[i];
+        if (!etapa) continue;
         const horasDisponiveis = etapa.responsavelId
           ? (capacidadeMap.get(etapa.responsavelId) ?? DEFAULT_HORAS_DISPONIVEIS)
           : DEFAULT_HORAS_DISPONIVEIS;
