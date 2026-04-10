@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { CursoService } from "../services/cursoService.js";
-import { parseBuffer, buildPreview, persistMC, parseMI, buildMIPreview, persistMI, extractNomesResponsaveis } from "../services/importService.js";
+import { parseBuffer, buildPreview, persistMC, parseMI, buildMIPreview, persistMI, extractNomesResponsaveis, matchesNome } from "../services/importService.js";
 import { prisma } from "../lib/prisma.js";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
@@ -78,19 +78,19 @@ export class CursoController {
       const rows    = parseBuffer(req.file.buffer, req.file.originalname);
       const preview = buildPreview(rows);
 
-      // Resolve responsáveis contra os membros do curso
+      // Resolve responsáveis: primeiro membros do curso, depois usuários globais
       const membros = await prisma.cursoMembro.findMany({
         where:   { cursoId },
         include: { usuario: { select: { id: true, nome: true } } },
       });
-      const todosNomes = extractNomesResponsaveis(rows);
-      preview.responsaveisNaoEncontrados = todosNomes.filter((nome) => {
-        const n = nome.toLowerCase();
-        return !membros.some((m) =>
-          m.usuario.nome.toLowerCase() === n ||
-          m.usuario.nome.toLowerCase().startsWith(n)
-        );
+      const todosUsuarios = await prisma.usuario.findMany({
+        select: { id: true, nome: true },
       });
+      const todosNomes = extractNomesResponsaveis(rows);
+      preview.responsaveisNaoEncontrados = todosNomes.filter((nome) =>
+        !membros.some((m) => matchesNome(nome, m.usuario.nome)) &&
+        !todosUsuarios.some((u) => matchesNome(nome, u.nome))
+      );
 
       res.json(preview);
     } catch (err) { next(err); }

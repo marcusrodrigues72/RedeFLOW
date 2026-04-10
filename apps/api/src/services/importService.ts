@@ -216,6 +216,44 @@ function normH(s: string): string {
     .replace(/\s+/g, " ").trim();
 }
 
+/** Normaliza nome de pessoa: minúsculas + remove acentos */
+function normNome(s: string): string {
+  return (s ?? "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ").trim();
+}
+
+/** Levenshtein distance entre dois strings */
+function levenshtein(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, (_, i) =>
+    Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
+  );
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      dp[i]![j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1]![j - 1]!
+        : 1 + Math.min(dp[i - 1]![j]!, dp[i]![j - 1]!, dp[i - 1]![j - 1]!);
+  return dp[m]![n]!;
+}
+
+/**
+ * Verifica se o nome da planilha corresponde ao nome cadastrado.
+ * Estratégias (em ordem):
+ *   1. Exact match após normalizar acentos/case
+ *   2. Nome cadastrado começa com o nome da planilha (abreviações)
+ *   3. Levenshtein ≤ 2 para nomes com ≥ 6 caracteres (erros de digitação)
+ */
+export function matchesNome(planilha: string, cadastrado: string): boolean {
+  const a = normNome(planilha);
+  const b = normNome(cadastrado);
+  if (!a || !b) return false;
+  if (b === a || b.startsWith(a)) return true;
+  if (a.length >= 6 && levenshtein(a, b) <= 2) return true;
+  return false;
+}
+
 /**
  * Detecta os índices de cada coluna a partir do cabeçalho real da aba,
  * tornando o parser imune a colunas extras ou reordenações.
@@ -236,7 +274,7 @@ function buildColMap(headerRow: string[]): ColMap {
   const capitulo   = after(/capitulo/);
   const codigo     = after(/codigo/);
   const tipo       = after(/^tipo/);
-  const pct        = after(/^%$/);
+  const pct        = after(/^%$|progresso\s+%|\bpct\b/);
   const linkObjeto = after(/^objeto$/);          // "🔗 Objeto" → normaliza p/ "objeto"
   const linkFinal  = after(/objeto.*final/);     // "🔗Objeto Final" → "objeto final"
 
@@ -403,16 +441,30 @@ export async function persistMC(rows: MCRow[], cursoId: string): Promise<{ criad
     where:   { cursoId },
     include: { usuario: { select: { id: true, nome: true } } },
   });
+  // Carrega todos os usuários globais como fallback (evita criar duplicatas)
+  const todosUsuarios = await prisma.usuario.findMany({
+    select: { id: true, nome: true },
+  });
+  const membroIds = new Set(membros.map((m) => m.usuarioId));
+  const pendentesAddCurso: string[] = []; // usuários globais a adicionar ao curso
+
   const nomesNaoResolvidos = new Set<string>();
   const resolveResponsavel = (nome: string): string | null => {
     if (!nome?.trim()) return null;
-    const n = nome.trim().toLowerCase();
-    const m = membros.find((mb) =>
-      mb.usuario.nome.toLowerCase() === n ||
-      mb.usuario.nome.toLowerCase().startsWith(n)
-    );
-    if (!m) nomesNaoResolvidos.add(nome.trim());
-    return m?.usuarioId ?? null;
+    // 1. Membro do curso
+    const m = membros.find((mb) => matchesNome(nome, mb.usuario.nome));
+    if (m) return m.usuarioId;
+    // 2. Usuário global (será adicionado ao curso como COLABORADOR)
+    const u = todosUsuarios.find((usr) => matchesNome(nome, usr.nome));
+    if (u) {
+      if (!membroIds.has(u.id)) {
+        membroIds.add(u.id);
+        pendentesAddCurso.push(u.id);
+      }
+      return u.id;
+    }
+    nomesNaoResolvidos.add(nome.trim());
+    return null;
   };
 
   let criados    = 0;
@@ -559,8 +611,17 @@ export async function persistMC(rows: MCRow[], cursoId: string): Promise<{ criad
     }
   }
 
+  // Adiciona ao curso os usuários globais resolvidos que ainda não eram membros
+  for (const usuarioId of pendentesAddCurso) {
+    await prisma.cursoMembro.upsert({
+      where:  { cursoId_usuarioId: { cursoId, usuarioId } },
+      create: { cursoId, usuarioId, papel: "COLABORADOR" },
+      update: {},
+    });
+  }
+
   for (const nome of nomesNaoResolvidos) {
-    avisosMC.push(`Responsável "${nome}" não encontrado no time do projeto — etapas atribuídas a este nome ficaram sem responsável.`);
+    avisosMC.push(`Responsável "${nome}" não encontrado no sistema — etapas atribuídas a este nome ficaram sem responsável.`);
   }
 
   return { criados, atualizados, ignorados, avisos: avisosMC };
