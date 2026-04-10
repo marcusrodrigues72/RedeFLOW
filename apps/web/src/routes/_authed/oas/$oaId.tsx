@@ -23,6 +23,7 @@ import ListItemButton          from "@mui/material/ListItemButton";
 import ListItemText            from "@mui/material/ListItemText";
 import { useOA, useAtualizarEtapa, useComentariosOA, useAdicionarComentario, useExcluirComentario, useAuditLogOA } from "@/lib/api/cursos";
 import { useAuthStore }         from "@/stores/auth.store";
+import { UserAvatar }           from "@/components/ui/UserAvatar";
 import type { StatusEtapa, TipoOA, StatusOA, AuditLogEntry } from "shared";
 
 export const Route = createFileRoute("/_authed/oas/$oaId")({
@@ -508,9 +509,7 @@ function ComentariosCard({ oaId, membros }: { oaId: string; membros: MembroSimpl
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2.5 }}>
             {comentarios.map((c) => (
               <Box key={c.id} sx={{ display: "flex", gap: 1.5, alignItems: "flex-start" }}>
-                <Avatar sx={{ width: 28, height: 28, bgcolor: "primary.light", fontSize: "0.7rem", fontWeight: 700, flexShrink: 0 }}>
-                  {c.autor.nome[0]?.toUpperCase()}
-                </Avatar>
+                <UserAvatar nome={c.autor.nome} fotoUrl={c.autor.fotoUrl} size={28} />
                 <Box sx={{ flex: 1, bgcolor: "#f8fafc", borderRadius: 2, px: 1.5, py: 1 }}>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.25 }}>
                     <Typography variant="caption" fontWeight={700}>{c.autor.nome}</Typography>
@@ -545,9 +544,7 @@ function ComentariosCard({ oaId, membros }: { oaId: string; membros: MembroSimpl
                   onMouseDown={(e) => { e.preventDefault(); inserirMencao(m.usuario.nome); }}
                   sx={{ py: 0.75, px: 2 }}
                 >
-                  <Avatar sx={{ width: 24, height: 24, bgcolor: "primary.light", fontSize: "0.65rem", mr: 1.5 }}>
-                    {m.usuario.nome[0]?.toUpperCase()}
-                  </Avatar>
+                  <UserAvatar nome={m.usuario.nome} fotoUrl={m.usuario.fotoUrl} size={24} sx={{ mr: 1.5 }} />
                   <ListItemText primary={m.usuario.nome} primaryTypographyProps={{ variant: "body2", fontWeight: 600 }} />
                 </ListItemButton>
               ))}
@@ -655,9 +652,7 @@ function HistoricoItem({ log, isLast }: { log: AuditLogEntry; isLast: boolean })
     <Box sx={{ display: "flex", gap: 1.5 }}>
       {/* Timeline line + dot */}
       <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
-        <Avatar sx={{ width: 28, height: 28, bgcolor: "primary.light", fontSize: "0.7rem", fontWeight: 700 }}>
-          {log.usuario?.nome?.[0]?.toUpperCase() ?? "?"}
-        </Avatar>
+        <UserAvatar nome={log.usuario?.nome ?? "?"} fotoUrl={log.usuario?.fotoUrl} size={28} />
         {!isLast && <Box sx={{ width: 2, flex: 1, bgcolor: "#e2e8f0", mt: 0.5, mb: 0.5 }} />}
       </Box>
 

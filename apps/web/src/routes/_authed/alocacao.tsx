@@ -13,6 +13,7 @@ import AccessTimeIcon     from "@mui/icons-material/AccessTime";
 import SearchIcon         from "@mui/icons-material/Search";
 import { useState, useMemo } from "react";
 import type { ResponsavelAlocacao, EtapaAlocacao } from "shared";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useAlocacao }    from "@/lib/api/relatorios";
 
 export const Route = createFileRoute("/_authed/alocacao")({
@@ -617,10 +618,8 @@ function AgendaTimeline({ pessoas, view }: { pessoas: ResponsavelAlocacao[]; vie
                 borderBottom: pi < pessoasVisiveis.length - 1 ? "1px solid" : "none",
                 borderColor: "divider" }}>
                 <Box sx={{ width: PESSOA_W, flexShrink: 0, px: 2, py: 1.5, display: "flex", alignItems: "flex-start", gap: 1.5 }}>
-                  <Avatar sx={{ width: 34, height: 34, fontSize: "0.75rem", fontWeight: 700,
-                    bgcolor: pessoa.emAndamento > 0 ? "primary.main" : "#94a3b8", flexShrink: 0, mt: 0.25 }}>
-                    {initials(pessoa.nome)}
-                  </Avatar>
+                  <UserAvatar nome={pessoa.nome} fotoUrl={pessoa.fotoUrl} size={34}
+                    sx={{ bgcolor: pessoa.emAndamento > 0 ? "primary.main" : "#94a3b8", mt: 0.25 }} />
                   <Box sx={{ minWidth: 0 }}>
                     <Typography variant="body2" fontWeight={600} noWrap>{pessoa.nome}</Typography>
                     <Typography variant="caption" color="text.disabled" noWrap sx={{ display: "block" }}>{pessoa.email}</Typography>

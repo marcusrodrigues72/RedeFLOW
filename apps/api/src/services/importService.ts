@@ -383,8 +383,22 @@ export function parseBuffer(buffer: Buffer, filename: string): MCRow[] {
   }
 
   // ── XLSX: processa cada aba separadamente com ColMap dinâmico ──────────────
-  const wb = XLSX.read(buffer, { type: "buffer", cellDates: true });
+  // Lê com cellFormula: true para capturar fórmulas HYPERLINK do Google Sheets
+  const wb = XLSX.read(buffer, { type: "buffer", cellDates: true, cellFormula: true });
   const result: MCRow[] = [];
+
+  // Extrai URL de hyperlink de uma célula XLSX:
+  // - Excel nativo: cell.l.Target
+  // - Google Sheets exportado: fórmula =HYPERLINK("url","texto")
+  const extractUrl = (cell: (XLSX.CellObject & { l?: { Target?: string } }) | undefined): string | null => {
+    if (!cell) return null;
+    if (cell.l?.Target) return cell.l.Target;
+    if (cell.f) {
+      const m = cell.f.match(/HYPERLINK\s*\(\s*"([^"]+)"/i);
+      if (m?.[1]) return m[1];
+    }
+    return null;
+  };
 
   for (const sheetName of wb.SheetNames) {
     const ws = wb.Sheets[sheetName]!;
@@ -393,6 +407,30 @@ export function parseBuffer(buffer: Buffer, filename: string): MCRow[] {
     }) as string[][];
 
     if (sheetRows.length < 2) continue;
+
+    // Substitui valores de células pelo URL do hyperlink quando disponível
+    const range = ws["!ref"] ? XLSX.utils.decode_range(ws["!ref"]) : null;
+    let hyperlinksFound = 0;
+    if (range) {
+      for (let r = range.s.r; r <= range.e.r; r++) {
+        for (let c = range.s.c; c <= range.e.c; c++) {
+          const addr = XLSX.utils.encode_cell({ r, c });
+          const cell = ws[addr] as (XLSX.CellObject & { l?: { Target?: string } }) | undefined;
+
+          // Log diagnóstico: primeiras 3 linhas de dados, todas as colunas
+          if (r > 0 && r <= 3) {
+            logger.info({ sheetName, addr, t: cell?.t, v: cell?.v, f: cell?.f, hasL: !!cell?.l, lTarget: (cell as any)?.l?.Target }, "parseBuffer cell debug");
+          }
+
+          const url = extractUrl(cell);
+          if (url && sheetRows[r]) {
+            sheetRows[r]![c] = url;
+            hyperlinksFound++;
+          }
+        }
+      }
+    }
+    logger.info({ sheetName, hyperlinksFound }, "parseBuffer hyperlinks substituídos");
 
     const colMap  = buildColMap(sheetRows[0]!);
     const dataRows = sheetRows
@@ -724,7 +762,9 @@ function buildMIColMap(headerRow: string[]): MIColMap {
       /^objeto de aprendizagem$/,  // singular
       /objeto.*aprendizagem/,      // qualquer variação com ambas as palavras
       /^tipo.*\boa\b/,             // "Tipo OA", "Tipo de OA"
+      /^tipo de objeto/,           // "Tipo de Objeto"
       /^oa$/,                      // coluna chamada apenas "OA"
+      /^tipo$/,                    // coluna chamada apenas "Tipo" (quando próxima a qtd)
     ]) {
       const idx = find(pat);
       if (idx >= 0) return idx;
@@ -740,6 +780,7 @@ function buildMIColMap(headerRow: string[]): MIColMap {
       /n.*\boas?\b/,
       /qtd.*\boas?\b/,
       /quantidade.*\boas?\b/,
+      /^qtd$|^quantidade$|^qtde$/, // coluna genérica de quantidade
     ]) {
       const idx = find(pat);
       if (idx >= 0) return idx;

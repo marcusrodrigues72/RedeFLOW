@@ -17,6 +17,7 @@ import { useState }   from "react";
 import { useAuthStore } from "@/stores/auth.store";
 import { useUsuarios, useCriarUsuario, useAtualizarUsuario, useExcluirUsuario } from "@/lib/api/usuarios";
 import type { UsuarioAdmin } from "shared";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 
 export const Route = createFileRoute("/_authed/admin/usuarios")({
   component: UsuariosPage,
@@ -112,9 +113,7 @@ function UsuariosPage() {
                     <TableRow key={u.id} sx={{ "&:hover": { bgcolor: "action.hover" }, opacity: u.ativo ? 1 : 0.5 }}>
                       <TableCell sx={{ py: 1.5 }}>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                          <Avatar sx={{ width: 32, height: 32, bgcolor: "primary.light", fontSize: "0.8rem", fontWeight: 700 }}>
-                            {u.nome[0]?.toUpperCase()}
-                          </Avatar>
+                          <UserAvatar nome={u.nome} fotoUrl={u.fotoUrl} size={32} />
                           <Typography variant="body2" fontWeight={600}>{u.nome}</Typography>
                         </Box>
                       </TableCell>

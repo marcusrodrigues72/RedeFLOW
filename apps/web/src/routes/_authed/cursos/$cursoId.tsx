@@ -27,6 +27,7 @@ import { useCurso, useOAsByCurso, useAdicionarMembro, useRemoverMembro, useAtual
 import { useUsuarios } from "@/lib/api/usuarios";
 import { useAuthStore } from "@/stores/auth.store";
 import type { PapelEtapa } from "shared";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 
 export const Route = createFileRoute("/_authed/cursos/$cursoId")({
   component: CursoDetalhePage,
@@ -181,9 +182,7 @@ function CursoDetalhePage() {
             <CardContent sx={{ p: 2.5, pb: "12px !important", display: "flex", alignItems: "center", gap: 2 }}>
               <AvatarGroup max={5} sx={{ "& .MuiAvatar-root": { width: 32, height: 32, fontSize: "0.75rem", border: "2px solid white" } }}>
                 {curso.membros.map((m) => (
-                  <Avatar key={m.usuarioId} sx={{ bgcolor: "primary.light", fontWeight: 700 }}>
-                    {m.usuario.nome[0]?.toUpperCase()}
-                  </Avatar>
+                  <UserAvatar key={m.usuarioId} nome={m.usuario.nome} fotoUrl={m.usuario.fotoUrl} size={32} showTooltip />
                 ))}
               </AvatarGroup>
               <Box>
@@ -546,9 +545,7 @@ function EquipeTab({ cursoId, membros }: {
                   <TableRow key={m.usuarioId} sx={{ "&:hover": { bgcolor: "action.hover" } }}>
                     <TableCell>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                        <Avatar sx={{ width: 32, height: 32, bgcolor: "primary.light", fontSize: "0.8rem", fontWeight: 700 }}>
-                          {m.usuario.nome[0]?.toUpperCase()}
-                        </Avatar>
+                        <UserAvatar nome={m.usuario.nome} fotoUrl={m.usuario.fotoUrl} size={32} />
                         <Typography variant="body2" fontWeight={600}>{m.usuario.nome}</Typography>
                       </Box>
                     </TableCell>
@@ -642,9 +639,7 @@ function EquipeTab({ cursoId, membros }: {
                   border: "1px solid", borderColor: "divider",
                   "&:hover": { bgcolor: "action.hover" },
                 }}>
-                  <Avatar sx={{ width: 34, height: 34, bgcolor: "primary.light", fontSize: "0.8rem", fontWeight: 700, flexShrink: 0 }}>
-                    {u.nome[0]?.toUpperCase()}
-                  </Avatar>
+                  <UserAvatar nome={u.nome} fotoUrl={u.fotoUrl} size={34} />
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography variant="body2" fontWeight={600} noWrap>{u.nome}</Typography>
                     <Typography variant="caption" color="text.secondary" noWrap>{u.email}</Typography>
