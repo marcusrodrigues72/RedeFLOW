@@ -278,13 +278,15 @@ router.get("/microsoft/callback", async (req, res) => {
     const tokenData = await tokenRes.json() as Record<string, string>;
 
     if (!tokenRes.ok || !tokenData["access_token"]) {
+      console.error("[SSO] token exchange failed:", JSON.stringify(tokenData));
       failRedirect("Falha ao obter tokens da Microsoft.");
       return;
     }
 
     // 2. Busca dados do usuário no Microsoft Graph
+    const msAccessToken = tokenData["access_token"]!;
     const graphRes  = await fetch("https://graph.microsoft.com/v1.0/me", {
-      headers: { Authorization: `Bearer ${tokenData["access_token"]}` },
+      headers: { Authorization: `Bearer ${msAccessToken}` },
     });
     const graphData = await graphRes.json() as Record<string, string>;
 
@@ -294,6 +296,21 @@ router.get("/microsoft/callback", async (req, res) => {
 
     if (!msId || !email) { failRedirect("Não foi possível obter dados do perfil Microsoft."); return; }
 
+    // 2b. Tenta buscar a foto de perfil do Microsoft (96x96)
+    let fotoUrl: string | null = null;
+    try {
+      const fotoRes = await fetch("https://graph.microsoft.com/v1.0/me/photos/96x96/$value", {
+        headers: { Authorization: `Bearer ${msAccessToken}` },
+      });
+      if (fotoRes.ok) {
+        const contentType = fotoRes.headers.get("content-type") ?? "image/jpeg";
+        const buffer      = Buffer.from(await fotoRes.arrayBuffer());
+        fotoUrl = `data:${contentType};base64,${buffer.toString("base64")}`;
+      }
+    } catch {
+      // Foto indisponível — continua sem ela
+    }
+
     // 3. Encontra ou cria o usuário no sistema
     let usuario = await prisma.usuario.findFirst({
       where: { OR: [{ microsoftId: msId }, { email }] },
@@ -302,12 +319,12 @@ router.get("/microsoft/callback", async (req, res) => {
     let isNovo = false;
 
     if (usuario) {
-      // Vincula o microsoftId se ainda não estiver vinculado (ex.: usuário já existia com email manual)
-      if (!usuario.microsoftId) {
-        usuario = await prisma.usuario.update({
-          where: { id: usuario.id },
-          data:  { microsoftId: msId, authProvider: "MICROSOFT" },
-        });
+      // Vincula o microsoftId e atualiza foto se necessário
+      const updateData: Record<string, unknown> = {};
+      if (!usuario.microsoftId) { updateData["microsoftId"] = msId; updateData["authProvider"] = "MICROSOFT"; }
+      if (fotoUrl)              { updateData["fotoUrl"] = fotoUrl; }
+      if (Object.keys(updateData).length > 0) {
+        usuario = await prisma.usuario.update({ where: { id: usuario.id }, data: updateData });
       }
       if (!usuario.ativo) { failRedirect("Sua conta está inativa. Entre em contato com o administrador."); return; }
     } else {
@@ -320,6 +337,7 @@ router.get("/microsoft/callback", async (req, res) => {
           papelGlobal: "LEITOR",
           microsoftId: msId,
           authProvider:"MICROSOFT",
+          ...(fotoUrl ? { fotoUrl } : {}),
         },
       });
       isNovo = true;
@@ -354,7 +372,9 @@ router.get("/microsoft/callback", async (req, res) => {
 
     // 6. Redireciona para o frontend com os tokens na query string
     //    (os tokens chegam apenas ao navegador do usuário — não são enviados a nenhum servidor)
-    const user = { id: usuario.id, nome: usuario.nome, email: usuario.email, papelGlobal: usuario.papelGlobal, fotoUrl: usuario.fotoUrl ?? null };
+    // fotoUrl excluído intencionalmente: seria base64 enorme na URL, causando "too big header" no nginx.
+    // O cliente já atualiza o perfil via GET /auth/me após o login.
+    const user = { id: usuario.id, nome: usuario.nome, email: usuario.email, papelGlobal: usuario.papelGlobal, fotoUrl: null };
     const params = new URLSearchParams({
       access_token:  accessToken,
       refresh_token: refreshToken,
@@ -362,7 +382,7 @@ router.get("/microsoft/callback", async (req, res) => {
     });
     res.redirect(`${FRONTEND_URL}/sso-callback?${params}`);
   } catch (err) {
-    console.error("SSO callback error:", err);
+    console.error("[SSO] callback error:", err);
     failRedirect("Erro interno durante autenticação SSO.");
   }
 });

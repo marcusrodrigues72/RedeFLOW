@@ -43,12 +43,16 @@ function SSOCallbackPage() {
   }, []);
 
   if (erro) {
+    // Limpa a URL de callback para evitar que o código OAuth expirado seja reutilizado
+    window.history.replaceState({}, "", "/login");
     return (
       <Box sx={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", p: 3 }}>
         <Box sx={{ maxWidth: 420, textAlign: "center" }}>
-          <Alert severity="error" sx={{ mb: 2, textAlign: "left" }}>{erro}</Alert>
+          <Alert severity="error" sx={{ mb: 2, textAlign: "left" }}>
+            A sessão de autenticação expirou ou foi interrompida. Por favor, tente novamente.
+          </Alert>
           <Button variant="contained" onClick={() => navigate({ to: "/login" })}>
-            Voltar ao login
+            Ir para o login
           </Button>
         </Box>
       </Box>
