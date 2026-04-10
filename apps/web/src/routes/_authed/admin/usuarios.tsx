@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import {
   Box, Typography, Card, CardContent, Table, TableHead,
-  TableRow, TableCell, TableBody, Chip, Button, Avatar,
+  TableRow, TableCell, TableBody, Chip, Button,
   Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, Select, MenuItem, FormControl, InputLabel,
   Skeleton, Alert, Switch, FormControlLabel, IconButton, Tooltip,

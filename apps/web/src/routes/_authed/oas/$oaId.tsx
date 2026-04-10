@@ -3,7 +3,7 @@ import {
   Box, Typography, Chip, Button, Card, CardContent,
   Stepper, Step, StepLabel, StepContent, Alert, Skeleton,
   Select, MenuItem, FormControl, InputLabel, Divider,
-  TextField, Avatar, IconButton, Tooltip, Snackbar, Tabs, Tab,
+  TextField, IconButton, Tooltip, Snackbar, Tabs, Tab,
 } from "@mui/material";
 import ArrowBackIcon            from "@mui/icons-material/ArrowBack";
 import CheckCircleIcon          from "@mui/icons-material/CheckCircle";
@@ -431,7 +431,7 @@ function DeadlineLabel({ etapa, isAdmin, isPending, onSave }: {
 
 // ─── Comentários ──────────────────────────────────────────────────────────────
 
-type MembroSimples = { usuarioId: string; usuario: { id: string; nome: string } };
+type MembroSimples = { usuarioId: string; usuario: { id: string; nome: string; fotoUrl: string | null } };
 
 /** Highlights @mentions in comment text with a blue span */
 function TextoComMencoes({ texto }: { texto: string }) {

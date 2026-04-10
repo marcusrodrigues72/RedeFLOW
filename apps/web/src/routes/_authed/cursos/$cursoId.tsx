@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   Box, Typography, Chip, Button, Card, CardContent,
   Table, TableHead, TableRow, TableCell, TableBody,
-  Skeleton, Avatar, AvatarGroup,
+  Skeleton, AvatarGroup,
   Tabs, Tab, Accordion, AccordionSummary, AccordionDetails,
   Alert, IconButton, Tooltip, Drawer, Divider, Switch, FormControlLabel,
   Snackbar, Checkbox, ListItemText,
@@ -470,7 +470,7 @@ const PAPEIS_PRODUCAO_OPCOES: { value: string; label: string }[] = [
 
 function EquipeTab({ cursoId, membros }: {
   cursoId: string;
-  membros: { usuarioId: string; papel: string; papeisProducao: string[]; usuario: { id: string; nome: string; email: string } }[];
+  membros: { usuarioId: string; papel: string; papeisProducao: string[]; usuario: { id: string; nome: string; email: string; fotoUrl: string | null } }[];
 }) {
   const { mutate: adicionar, isPending: adicionando }  = useAdicionarMembro(cursoId);
   const { mutate: remover }                            = useRemoverMembro(cursoId);
@@ -728,7 +728,7 @@ const PAPEIS_ETAPA: { value: PapelEtapa; label: string }[] = [
 function AtribuicaoDrawer({ open, cursoId, membros, unidades, onClose }: {
   open: boolean;
   cursoId: string;
-  membros: { usuarioId: string; papel: string; usuario: { id: string; nome: string; email: string } }[];
+  membros: { usuarioId: string; papel: string; usuario: { id: string; nome: string; email: string; fotoUrl: string | null } }[];
   unidades: { id: string; numero: number; nome: string }[];
   onClose: () => void;
 }) {

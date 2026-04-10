@@ -410,27 +410,18 @@ export function parseBuffer(buffer: Buffer, filename: string): MCRow[] {
 
     // Substitui valores de células pelo URL do hyperlink quando disponível
     const range = ws["!ref"] ? XLSX.utils.decode_range(ws["!ref"]) : null;
-    let hyperlinksFound = 0;
     if (range) {
       for (let r = range.s.r; r <= range.e.r; r++) {
         for (let c = range.s.c; c <= range.e.c; c++) {
           const addr = XLSX.utils.encode_cell({ r, c });
           const cell = ws[addr] as (XLSX.CellObject & { l?: { Target?: string } }) | undefined;
-
-          // Log diagnóstico: primeiras 3 linhas de dados, todas as colunas
-          if (r > 0 && r <= 3) {
-            logger.info({ sheetName, addr, t: cell?.t, v: cell?.v, f: cell?.f, hasL: !!cell?.l, lTarget: (cell as any)?.l?.Target }, "parseBuffer cell debug");
-          }
-
           const url = extractUrl(cell);
           if (url && sheetRows[r]) {
             sheetRows[r]![c] = url;
-            hyperlinksFound++;
           }
         }
       }
     }
-    logger.info({ sheetName, hyperlinksFound }, "parseBuffer hyperlinks substituídos");
 
     const colMap  = buildColMap(sheetRows[0]!);
     const dataRows = sheetRows
