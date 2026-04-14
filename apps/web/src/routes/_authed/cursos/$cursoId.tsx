@@ -26,8 +26,13 @@ import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import { useCurso, useOAsByCurso, useAdicionarMembro, useRemoverMembro, useAtualizarCurso, useExcluirCurso, useAtribuicaoPreview, useAtribuirResponsaveis, useExportarMC, useAtualizarPapeisProducao } from "@/lib/api/cursos";
 import { useUsuarios } from "@/lib/api/usuarios";
 import { useAuthStore } from "@/stores/auth.store";
+import { useConfigAlertasCurso, useSalvarConfigAlertasCurso, useAtualizarNotifMembro } from "@/lib/api/notificacoes";
 import type { PapelEtapa } from "shared";
 import { UserAvatar } from "@/components/ui/UserAvatar";
+import NotificationsNoneIcon   from "@mui/icons-material/NotificationsNone";
+import CircularProgress        from "@mui/material/CircularProgress";
+import Stack                   from "@mui/material/Stack";
+import Slider                  from "@mui/material/Slider";
 
 export const Route = createFileRoute("/_authed/cursos/$cursoId")({
   component: CursoDetalhePage,
@@ -199,6 +204,7 @@ function CursoDetalhePage() {
         <Tab label="Matriz de Conteúdo" sx={{ fontWeight: 600 }} />
         <Tab label="Matriz Instrucional" sx={{ fontWeight: 600 }} />
         <Tab label="Equipe" sx={{ fontWeight: 600 }} />
+        <Tab label="Alertas" sx={{ fontWeight: 600 }} icon={<NotificationsNoneIcon sx={{ fontSize: 16 }} />} iconPosition="start" />
       </Tabs>
 
       {/* Aba 0 — Matriz de Conteúdo */}
@@ -360,6 +366,9 @@ function CursoDetalhePage() {
 
       {/* Aba 2 — Equipe */}
       {aba === 2 && <EquipeTab cursoId={cursoId} membros={curso.membros} />}
+
+      {/* Aba 3 — Alertas */}
+      {aba === 3 && <AlertasTab cursoId={cursoId} membros={curso.membros} isAdmin={isAdmin} />}
     </Box>
   );
 }
@@ -675,6 +684,146 @@ function EquipeTab({ cursoId, membros }: {
         </DialogActions>
       </Dialog>
     </>
+  );
+}
+
+// ─── Aba Alertas ──────────────────────────────────────────────────────────────
+
+function AlertasTab({ cursoId, membros, isAdmin }: {
+  cursoId: string;
+  membros: { usuarioId: string; papel: string; notifEmailAtivo: boolean; notifInAppAtivo: boolean; usuario: { id: string; nome: string; email: string; fotoUrl: string | null } }[];
+  isAdmin: boolean;
+}) {
+  const { data: config, isLoading } = useConfigAlertasCurso(cursoId);
+  const { mutate: salvar, isPending: salvando } = useSalvarConfigAlertasCurso(cursoId);
+  const { mutate: atualizarNotif } = useAtualizarNotifMembro(cursoId);
+
+  if (isLoading) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  return (
+    <Stack spacing={3}>
+      {/* ── Configuração global do curso ─────────────────────────────────── */}
+      <Card>
+        <CardContent>
+          <Typography variant="subtitle1" fontWeight={700} mb={2}>
+            Configuração de Alertas do Curso
+          </Typography>
+          {!isAdmin && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              Apenas administradores podem alterar estas configurações.
+            </Alert>
+          )}
+
+          {/* Dias de antecedência */}
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="body2" fontWeight={600} gutterBottom>
+              Dias de antecedência para alerta de prazo próximo
+            </Typography>
+            <Stack direction="row" alignItems="center" spacing={2} sx={{ maxWidth: 400 }}>
+              <Slider
+                value={config?.diasAntecedencia ?? 3}
+                min={1} max={30} step={1}
+                marks={[{ value: 1, label: "1d" }, { value: 7, label: "7d" }, { value: 14, label: "14d" }, { value: 30, label: "30d" }]}
+                valueLabelDisplay="auto"
+                disabled={!isAdmin || salvando}
+                onChange={(_, v) => salvar({ diasAntecedencia: v as number })}
+                sx={{ flex: 1 }}
+              />
+              <Typography variant="body2" fontWeight={700} sx={{ minWidth: 32, textAlign: "right" }}>
+                {config?.diasAntecedencia ?? 3}d
+              </Typography>
+            </Stack>
+          </Box>
+
+          {/* Toggles de tipos de alerta */}
+          <Typography variant="body2" fontWeight={600} gutterBottom>
+            Tipos de alerta ativos
+          </Typography>
+          <Stack spacing={0.5}>
+            {([
+              { key: "alertDeadlineVencido", label: "Prazo vencido" },
+              { key: "alertPrazoProximo",    label: "Prazo próximo" },
+              { key: "alertEtapaLiberada",   label: "Etapa liberada" },
+              { key: "alertMencao",          label: "Menção" },
+            ] as { key: keyof typeof config; label: string }[]).map(({ key, label }) => (
+              <FormControlLabel
+                key={key}
+                control={
+                  <Switch
+                    size="small"
+                    checked={Boolean(config?.[key] ?? true)}
+                    disabled={!isAdmin || salvando}
+                    onChange={(e) => salvar({ [key]: e.target.checked })}
+                  />
+                }
+                label={<Typography variant="body2">{label}</Typography>}
+              />
+            ))}
+          </Stack>
+        </CardContent>
+      </Card>
+
+      {/* ── Preferências por colaborador ─────────────────────────────────── */}
+      <Card>
+        <CardContent sx={{ p: 0, pb: "0 !important" }}>
+          <Box sx={{ px: 3, py: 2, borderBottom: "1px solid", borderColor: "divider" }}>
+            <Typography variant="subtitle1" fontWeight={700}>
+              Preferências de Notificação por Membro
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              Cada membro pode desativar notificações por e-mail ou in-app especificamente para este curso.
+            </Typography>
+          </Box>
+          <Table size="small">
+            <TableHead>
+              <TableRow sx={{ bgcolor: "#f8fafc" }}>
+                {["Membro", "E-mail", "Notif. In-App", "E-mail Ativo", "In-App Ativo"].map((h) => (
+                  <TableCell key={h} sx={{ fontWeight: 700, fontSize: "0.75rem", color: "text.secondary" }}>{h}</TableCell>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {membros.map((m) => (
+                <TableRow key={m.usuarioId} sx={{ "&:hover": { bgcolor: "action.hover" } }}>
+                  <TableCell>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                      <UserAvatar nome={m.usuario.nome} fotoUrl={m.usuario.fotoUrl} size={28} />
+                      <Typography variant="body2" fontWeight={600}>{m.usuario.nome}</Typography>
+                    </Box>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" color="text.secondary">{m.usuario.email}</Typography>
+                  </TableCell>
+                  <TableCell />
+                  <TableCell>
+                    <Switch
+                      size="small"
+                      checked={m.notifEmailAtivo}
+                      disabled={!isAdmin}
+                      onChange={(e) => atualizarNotif({ usuarioId: m.usuarioId, notifEmailAtivo: e.target.checked })}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Switch
+                      size="small"
+                      checked={m.notifInAppAtivo}
+                      disabled={!isAdmin}
+                      onChange={(e) => atualizarNotif({ usuarioId: m.usuarioId, notifInAppAtivo: e.target.checked })}
+                    />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </Stack>
   );
 }
 

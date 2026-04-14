@@ -39,9 +39,11 @@ export class CursoRepository {
               select: { id: true, nome: true, email: true, fotoUrl: true, papelGlobal: true },
             },
           },
+          orderBy: { createdAt: "asc" },
         },
         coordenadorProducao: { select: { id: true, nome: true, fotoUrl: true } },
         matrizValidadaPor:   { select: { id: true, nome: true } },
+        configAlerta:        true,
       },
     });
   }

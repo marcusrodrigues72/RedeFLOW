@@ -62,19 +62,33 @@ export interface UnidadeResumo {
   }[];
 }
 
+export interface ConfigAlertaCurso {
+  id:                   string;
+  cursoId:              string;
+  diasAntecedencia:     number;
+  alertDeadlineVencido: boolean;
+  alertPrazoProximo:    boolean;
+  alertEtapaLiberada:   boolean;
+  alertMencao:          boolean;
+  updatedAt:            string;
+}
+
 export interface CursoDetalhe extends Omit<CursoResumo, "_count"> {
   unidades: UnidadeResumo[];
   membros: {
-    usuarioId:      string;
-    papel:          PapelGlobal;
-    papeisProducao: string[];
-    usuario:        UsuarioPublico;
+    usuarioId:       string;
+    papel:           PapelGlobal;
+    papeisProducao:  string[];
+    notifEmailAtivo: boolean;
+    notifInAppAtivo: boolean;
+    usuario:         UsuarioPublico;
   }[];
   coordenadorProducaoId: string | null;
   coordenadorProducao: { id: string; nome: string; fotoUrl: string | null } | null;
   matrizValidadaEm: string | null;
   matrizValidadaPorId: string | null;
   matrizValidadaPor: { id: string; nome: string } | null;
+  configAlerta: ConfigAlertaCurso | null;
 }
 
 // ─── OA ───────────────────────────────────────────────────────────────────────

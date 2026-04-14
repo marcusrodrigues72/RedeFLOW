@@ -26,13 +26,14 @@ const SIDEBAR_W = 256;
 interface NavItem { label: string; to: string; icon: ReactNode; exact?: boolean; adminOnly?: boolean }
 
 const NAV: NavItem[] = [
-  { label: "Dashboard",    to: "/",             icon: <DashboardOutlinedIcon fontSize="small" />, exact: true },
-  { label: "Cursos",       to: "/cursos",       icon: <SchoolOutlinedIcon fontSize="small" /> },
-  { label: "Meu Trabalho", to: "/meu-trabalho", icon: <AssignmentOutlinedIcon fontSize="small" /> },
-  { label: "Relatórios",   to: "/relatorios",   icon: <BarChartOutlinedIcon fontSize="small" /> },
-  { label: "Alocação",     to: "/alocacao",     icon: <CalendarMonthOutlinedIcon fontSize="small" /> },
-  { label: "Equipe",       to: "/admin/usuarios", icon: <PeopleOutlinedIcon fontSize="small" />, adminOnly: true },
-  { label: "Pipeline",     to: "/admin/pipeline", icon: <AccountTreeOutlinedIcon fontSize="small" />, adminOnly: true },
+  { label: "Dashboard",       to: "/",                icon: <DashboardOutlinedIcon fontSize="small" />, exact: true },
+  { label: "Cursos",          to: "/cursos",          icon: <SchoolOutlinedIcon fontSize="small" /> },
+  { label: "Meu Trabalho",    to: "/meu-trabalho",    icon: <AssignmentOutlinedIcon fontSize="small" /> },
+  { label: "Relatórios",      to: "/relatorios",      icon: <BarChartOutlinedIcon fontSize="small" /> },
+  { label: "Alocação",        to: "/alocacao",        icon: <CalendarMonthOutlinedIcon fontSize="small" /> },
+  { label: "Notificações",    to: "/notificacoes",    icon: <NotificationsNoneIcon fontSize="small" /> },
+  { label: "Equipe",          to: "/admin/usuarios",  icon: <PeopleOutlinedIcon fontSize="small" />, adminOnly: true },
+  { label: "Pipeline",        to: "/admin/pipeline",  icon: <AccountTreeOutlinedIcon fontSize="small" />, adminOnly: true },
 ];
 
 export default function AppLayout({ children }: { children: ReactNode }) {
@@ -251,8 +252,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             <Typography variant="body2" color="text.secondary">Nenhuma notificação.</Typography>
           </Box>
         ) : (
-          <List disablePadding sx={{ overflowY: "auto", maxHeight: 380 }}>
-            {notifs.map((n, i) => (
+          <List disablePadding sx={{ overflowY: "auto", maxHeight: 340 }}>
+            {notifs.slice(0, 10).map((n, i) => (
               <Box key={n.id}>
                 <ListItem disablePadding>
                   <ListItemButton
@@ -291,11 +292,23 @@ export default function AppLayout({ children }: { children: ReactNode }) {
                     />
                   </ListItemButton>
                 </ListItem>
-                {i < notifs.length - 1 && <Divider />}
+                {i < Math.min(notifs.length, 10) - 1 && <Divider />}
               </Box>
             ))}
           </List>
         )}
+
+        {/* Rodapé — link Central de Notificações */}
+        <Box sx={{ borderTop: "1px solid", borderColor: "divider", px: 2.5, py: 1.5 }}>
+          <Button
+            component={Link} to="/notificacoes"
+            size="small" fullWidth variant="text"
+            onClick={() => setAnchorEl(null)}
+            sx={{ fontWeight: 600, fontSize: "0.8rem", color: "primary.main" }}
+          >
+            Ver todas as notificações
+          </Button>
+        </Box>
       </Popover>
     </Box>
   );
@@ -314,5 +327,6 @@ function getBreadcrumb(path: string): string {
   if (path.startsWith("/admin/usuarios"))  return "REDEFLOW · EQUIPE";
   if (path.startsWith("/admin/pipeline"))  return "REDEFLOW · PIPELINE";
   if (path.startsWith("/perfil"))          return "REDEFLOW · MEU PERFIL";
+  if (path.startsWith("/notificacoes"))    return "REDEFLOW · NOTIFICAÇÕES";
   return "REDEFLOW";
 }

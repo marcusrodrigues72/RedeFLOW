@@ -140,6 +140,7 @@ model Curso {
   membros               CursoMembro[]
   coordenadorProducao   Usuario? @relation("CursoCoordenadorProducao",  fields: [coordenadorProducaoId], references: [id])
   matrizValidadaPor     Usuario? @relation("CursoMatrizValidadaPor",    fields: [matrizValidadaPorId],   references: [id])
+  configAlerta          ConfigAlertaCurso?
 
   @@map("cursos")
 }
@@ -151,6 +152,8 @@ model CursoMembro {
   usuarioId       String
   papel           PapelGlobal @default(COLABORADOR)
   papeisProducao  String[]    @default([])   // PapelEtapa[] que este membro executa neste curso
+  notifEmailAtivo Boolean     @default(true) // Override por curso: false = não recebe e-mail deste curso
+  notifInAppAtivo Boolean     @default(true) // Override por curso: false = não recebe notif in-app deste curso
   createdAt       DateTime    @default(now())
 
   curso   Curso   @relation(fields: [cursoId], references: [id], onDelete: Cascade)
@@ -158,6 +161,23 @@ model CursoMembro {
 
   @@unique([cursoId, usuarioId])
   @@map("curso_membros")
+}
+
+// ─── Configuração de alertas por curso ───────────────────────────────────────
+
+model ConfigAlertaCurso {
+  id                   String   @id @default(cuid())
+  cursoId              String   @unique
+  diasAntecedencia     Int      @default(3)   // dias antes do deadline para PRAZO_PROXIMO
+  alertDeadlineVencido Boolean  @default(true)
+  alertPrazoProximo    Boolean  @default(true)
+  alertEtapaLiberada   Boolean  @default(true)
+  alertMencao          Boolean  @default(true)
+  updatedAt            DateTime @updatedAt
+
+  curso Curso @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+
+  @@map("config_alerta_curso")
 }
 
 // ─── Estrutura Pedagógica (Matriz Instrucional) ───────────────────────────────

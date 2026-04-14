@@ -15,6 +15,7 @@ import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
 import { Route as AuthedRelatoriosRouteImport } from './routes/_authed/relatorios'
 import { Route as AuthedPerfilRouteImport } from './routes/_authed/perfil'
+import { Route as AuthedNotificacoesRouteImport } from './routes/_authed/notificacoes'
 import { Route as AuthedMeuTrabalhoRouteImport } from './routes/_authed/meu-trabalho'
 import { Route as AuthedAlocacaoRouteImport } from './routes/_authed/alocacao'
 import { Route as AuthedCursosIndexRouteImport } from './routes/_authed/cursos/index'
@@ -53,6 +54,11 @@ const AuthedRelatoriosRoute = AuthedRelatoriosRouteImport.update({
 const AuthedPerfilRoute = AuthedPerfilRouteImport.update({
   id: '/perfil',
   path: '/perfil',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedNotificacoesRoute = AuthedNotificacoesRouteImport.update({
+  id: '/notificacoes',
+  path: '/notificacoes',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedMeuTrabalhoRoute = AuthedMeuTrabalhoRouteImport.update({
@@ -113,6 +119,7 @@ export interface FileRoutesByFullPath {
   '/sso-callback': typeof SsoCallbackRoute
   '/alocacao': typeof AuthedAlocacaoRoute
   '/meu-trabalho': typeof AuthedMeuTrabalhoRoute
+  '/notificacoes': typeof AuthedNotificacoesRoute
   '/perfil': typeof AuthedPerfilRoute
   '/relatorios': typeof AuthedRelatoriosRoute
   '/admin/pipeline': typeof AuthedAdminPipelineRoute
@@ -129,6 +136,7 @@ export interface FileRoutesByTo {
   '/sso-callback': typeof SsoCallbackRoute
   '/alocacao': typeof AuthedAlocacaoRoute
   '/meu-trabalho': typeof AuthedMeuTrabalhoRoute
+  '/notificacoes': typeof AuthedNotificacoesRoute
   '/perfil': typeof AuthedPerfilRoute
   '/relatorios': typeof AuthedRelatoriosRoute
   '/': typeof AuthedIndexRoute
@@ -148,6 +156,7 @@ export interface FileRoutesById {
   '/sso-callback': typeof SsoCallbackRoute
   '/_authed/alocacao': typeof AuthedAlocacaoRoute
   '/_authed/meu-trabalho': typeof AuthedMeuTrabalhoRoute
+  '/_authed/notificacoes': typeof AuthedNotificacoesRoute
   '/_authed/perfil': typeof AuthedPerfilRoute
   '/_authed/relatorios': typeof AuthedRelatoriosRoute
   '/_authed/': typeof AuthedIndexRoute
@@ -168,6 +177,7 @@ export interface FileRouteTypes {
     | '/sso-callback'
     | '/alocacao'
     | '/meu-trabalho'
+    | '/notificacoes'
     | '/perfil'
     | '/relatorios'
     | '/admin/pipeline'
@@ -184,6 +194,7 @@ export interface FileRouteTypes {
     | '/sso-callback'
     | '/alocacao'
     | '/meu-trabalho'
+    | '/notificacoes'
     | '/perfil'
     | '/relatorios'
     | '/'
@@ -202,6 +213,7 @@ export interface FileRouteTypes {
     | '/sso-callback'
     | '/_authed/alocacao'
     | '/_authed/meu-trabalho'
+    | '/_authed/notificacoes'
     | '/_authed/perfil'
     | '/_authed/relatorios'
     | '/_authed/'
@@ -263,6 +275,13 @@ declare module '@tanstack/react-router' {
       path: '/perfil'
       fullPath: '/perfil'
       preLoaderRoute: typeof AuthedPerfilRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/notificacoes': {
+      id: '/_authed/notificacoes'
+      path: '/notificacoes'
+      fullPath: '/notificacoes'
+      preLoaderRoute: typeof AuthedNotificacoesRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/meu-trabalho': {
@@ -341,6 +360,7 @@ declare module '@tanstack/react-router' {
 interface AuthedRouteChildren {
   AuthedAlocacaoRoute: typeof AuthedAlocacaoRoute
   AuthedMeuTrabalhoRoute: typeof AuthedMeuTrabalhoRoute
+  AuthedNotificacoesRoute: typeof AuthedNotificacoesRoute
   AuthedPerfilRoute: typeof AuthedPerfilRoute
   AuthedRelatoriosRoute: typeof AuthedRelatoriosRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
@@ -357,6 +377,7 @@ interface AuthedRouteChildren {
 const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAlocacaoRoute: AuthedAlocacaoRoute,
   AuthedMeuTrabalhoRoute: AuthedMeuTrabalhoRoute,
+  AuthedNotificacoesRoute: AuthedNotificacoesRoute,
   AuthedPerfilRoute: AuthedPerfilRoute,
   AuthedRelatoriosRoute: AuthedRelatoriosRoute,
   AuthedIndexRoute: AuthedIndexRoute,

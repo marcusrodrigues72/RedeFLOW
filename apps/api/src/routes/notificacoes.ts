@@ -1,17 +1,30 @@
 import { Router } from "express";
+import { z } from "zod";
 import { authenticate } from "../middlewares/authenticate.js";
 import { prisma } from "../lib/prisma.js";
 
 const router = Router();
 router.use(authenticate);
 
-// GET /notificacoes
+const TIPOS_VALIDOS = ["DEADLINE_VENCIDO", "PRAZO_PROXIMO", "ETAPA_LIBERADA", "MENCAO"] as const;
+
+// GET /notificacoes?tipo=DEADLINE_VENCIDO&lida=false&limit=100
 router.get("/", async (req, res, next) => {
   try {
+    const { tipo, lida, limit } = z.object({
+      tipo:  z.enum(TIPOS_VALIDOS).optional(),
+      lida:  z.enum(["true", "false"]).optional(),
+      limit: z.coerce.number().int().min(1).max(500).default(100),
+    }).parse(req.query);
+
     const notifs = await prisma.notificacao.findMany({
-      where:   { usuarioId: req.usuario!.sub },
+      where: {
+        usuarioId: req.usuario!.sub,
+        ...(tipo  !== undefined && { tipo }),
+        ...(lida  !== undefined && { lida: lida === "true" }),
+      },
       orderBy: { createdAt: "desc" },
-      take:    50,
+      take:    limit,
     });
     res.json(notifs);
   } catch (err) { next(err); }

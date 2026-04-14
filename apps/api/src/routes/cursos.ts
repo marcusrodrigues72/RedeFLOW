@@ -631,4 +631,83 @@ router.post("/:id/setup/calcular-deadlines", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── Configuração de alertas por curso ────────────────────────────────────────
+
+const configAlertaSchema = z.object({
+  diasAntecedencia:     z.number().int().min(1).max(30).optional(),
+  alertDeadlineVencido: z.boolean().optional(),
+  alertPrazoProximo:    z.boolean().optional(),
+  alertEtapaLiberada:   z.boolean().optional(),
+  alertMencao:          z.boolean().optional(),
+});
+
+/** GET /cursos/:id/config-alertas — retorna config (cria com defaults se não existir) */
+router.get("/:id/config-alertas", async (req, res, next) => {
+  try {
+    const cursoId = req.params["id"] as string;
+    const config = await prisma.configAlertaCurso.upsert({
+      where:  { cursoId },
+      create: { cursoId },
+      update: {},
+    });
+    res.json(config);
+  } catch (err) { next(err); }
+});
+
+/** PUT /cursos/:id/config-alertas — atualiza config do curso (requer ADMIN) */
+router.put("/:id/config-alertas", async (req, res, next) => {
+  try {
+    const cursoId = req.params["id"] as string;
+    const usuario = await prisma.usuario.findUnique({ where: { id: req.usuario!.sub }, select: { papelGlobal: true } });
+    if (usuario?.papelGlobal !== "ADMIN") {
+      const membro = await prisma.cursoMembro.findUnique({ where: { cursoId_usuarioId: { cursoId, usuarioId: req.usuario!.sub } } });
+      if (membro?.papel !== "ADMIN") { res.status(403).json({ message: "Apenas administradores podem configurar alertas." }); return; }
+    }
+    const parsed = configAlertaSchema.parse(req.body);
+    // Strip undefined values — required by exactOptionalPropertyTypes + Prisma
+    const data: Record<string, unknown> = Object.fromEntries(
+      Object.entries(parsed).filter(([, v]) => v !== undefined)
+    );
+    const config = await prisma.configAlertaCurso.upsert({
+      where:  { cursoId },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      create: { cursoId, ...data } as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      update: data as any,
+    });
+    res.json(config);
+  } catch (err) { next(err); }
+});
+
+/** PATCH /cursos/:id/membros/:usuarioId/notif — preferências de notificação do membro */
+router.patch("/:id/membros/:usuarioId/notif", async (req, res, next) => {
+  try {
+    const cursoId   = req.params["id"] as string;
+    const usuarioId = req.params["usuarioId"] as string;
+
+    // Apenas admin do curso/global ou o próprio usuário
+    const ehAdmin = await prisma.usuario.findUnique({ where: { id: req.usuario!.sub }, select: { papelGlobal: true } })
+      .then((u) => u?.papelGlobal === "ADMIN");
+    const ehMembroAdmin = await prisma.cursoMembro.findUnique({
+      where: { cursoId_usuarioId: { cursoId, usuarioId: req.usuario!.sub } },
+    }).then((m) => m?.papel === "ADMIN");
+
+    if (!ehAdmin && !ehMembroAdmin && req.usuario!.sub !== usuarioId) {
+      res.status(403).json({ message: "Permissão negada." }); return;
+    }
+
+    const { notifEmailAtivo, notifInAppAtivo } = z.object({
+      notifEmailAtivo: z.boolean().optional(),
+      notifInAppAtivo: z.boolean().optional(),
+    }).parse(req.body);
+
+    const membro = await prisma.cursoMembro.update({
+      where: { cursoId_usuarioId: { cursoId, usuarioId } },
+      data:  { ...(notifEmailAtivo !== undefined && { notifEmailAtivo }), ...(notifInAppAtivo !== undefined && { notifInAppAtivo }) },
+      select: { usuarioId: true, notifEmailAtivo: true, notifInAppAtivo: true },
+    });
+    res.json(membro);
+  } catch (err) { next(err); }
+});
+
 export default router;
