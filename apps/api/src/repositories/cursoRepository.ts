@@ -22,7 +22,7 @@ export class CursoRepository {
           include: {
             capitulos: {
               include: {
-                _count: { select: { oas: true } },
+                _count: { select: { oas: true, comentarios: true } },
                 objetivos: {
                   select: { id: true, numero: true, descricao: true, nivelBloom: true },
                   orderBy: { numero: "asc" },

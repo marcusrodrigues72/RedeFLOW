@@ -120,6 +120,11 @@ export interface ImportPreview {
   responsaveisNaoEncontrados: string[];
 }
 
+/** Remove o prefixo "mailto:" que o Excel injeta em células com hyperlink de e-mail */
+function stripMailto(valor: string): string {
+  return valor.startsWith("mailto:") ? valor.slice(7) : valor;
+}
+
 /** Retorna todos os nomes únicos de responsáveis presentes nas linhas da MC */
 export function extractNomesResponsaveis(rows: MCRow[]): string[] {
   const nomes = new Set<string>();
@@ -128,7 +133,7 @@ export function extractNomesResponsaveis(rows: MCRow[]): string[] {
       row.conteudistaNome, row.diNome, row.profAtorNome,
       row.profTecNome, row.acessNome, row.prodNome, row.validadorNome,
     ]) {
-      if (nome?.trim()) nomes.add(nome.trim());
+      if (nome?.trim()) nomes.add(stripMailto(nome.trim()));
     }
   }
   return Array.from(nomes).sort();
@@ -465,26 +470,46 @@ export async function persistMC(rows: MCRow[], cursoId: string): Promise<{ criad
       e.papel === papel && (e.tipoOA === null || e.tipoOA === tipo)
     );
 
-  // Carrega membros do curso para resolver nomes → IDs
+  // Carrega membros do curso para resolver nomes/e-mails → IDs
   const membros = await prisma.cursoMembro.findMany({
     where:   { cursoId },
-    include: { usuario: { select: { id: true, nome: true } } },
+    include: { usuario: { select: { id: true, nome: true, email: true } } },
   });
   // Carrega todos os usuários globais como fallback (evita criar duplicatas)
   const todosUsuarios = await prisma.usuario.findMany({
-    select: { id: true, nome: true },
+    select: { id: true, nome: true, email: true },
   });
   const membroIds = new Set(membros.map((m) => m.usuarioId));
   const pendentesAddCurso: string[] = []; // usuários globais a adicionar ao curso
 
   const nomesNaoResolvidos = new Set<string>();
-  const resolveResponsavel = (nome: string): string | null => {
-    if (!nome?.trim()) return null;
-    // 1. Membro do curso
-    const m = membros.find((mb) => matchesNome(nome, mb.usuario.nome));
+  const resolveResponsavel = (rawValor: string): string | null => {
+    if (!rawValor?.trim()) return null;
+    // Remove prefixo "mailto:" injetado pelo Excel em hyperlinks de e-mail
+    const valor = stripMailto(rawValor.trim());
+    const isEmail = valor.includes("@");
+
+    if (isEmail) {
+      const emailNorm = valor.toLowerCase();
+      // 1a. Membro do curso por e-mail
+      const mEmail = membros.find((mb) => mb.usuario.email.toLowerCase() === emailNorm);
+      if (mEmail) return mEmail.usuarioId;
+      // 2a. Usuário global por e-mail
+      const uEmail = todosUsuarios.find((usr) => usr.email.toLowerCase() === emailNorm);
+      if (uEmail) {
+        if (!membroIds.has(uEmail.id)) {
+          membroIds.add(uEmail.id);
+          pendentesAddCurso.push(uEmail.id);
+        }
+        return uEmail.id;
+      }
+    }
+
+    // 1b. Membro do curso por nome
+    const m = membros.find((mb) => matchesNome(valor, mb.usuario.nome));
     if (m) return m.usuarioId;
-    // 2. Usuário global (será adicionado ao curso como COLABORADOR)
-    const u = todosUsuarios.find((usr) => matchesNome(nome, usr.nome));
+    // 2b. Usuário global por nome
+    const u = todosUsuarios.find((usr) => matchesNome(valor, usr.nome));
     if (u) {
       if (!membroIds.has(u.id)) {
         membroIds.add(u.id);
@@ -492,7 +517,7 @@ export async function persistMC(rows: MCRow[], cursoId: string): Promise<{ criad
       }
       return u.id;
     }
-    nomesNaoResolvidos.add(nome.trim());
+    nomesNaoResolvidos.add(valor);
     return null;
   };
 

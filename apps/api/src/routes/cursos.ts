@@ -5,6 +5,8 @@ import { authenticate }    from "../middlewares/authenticate.js";
 import { uploadExcel }     from "../middlewares/upload.js";
 import { prisma }          from "../lib/prisma.js";
 import { exportMC }        from "../services/exportService.js";
+import { persistMI }       from "../services/importService.js";
+import type { MICapitulo } from "../services/importService.js";
 import { z }               from "zod";
 
 const router   = Router();
@@ -707,6 +709,188 @@ router.patch("/:id/membros/:usuarioId/notif", async (req, res, next) => {
       select: { usuarioId: true, notifEmailAtivo: true, notifInAppAtivo: true },
     });
     res.json(membro);
+  } catch (err) { next(err); }
+});
+
+// ─── RF-M2-05: Histórico de versões da MI ────────────────────────────────────
+
+/** GET /:id/mi/historico — lista versões da MI (mais recentes primeiro) */
+router.get("/:id/mi/historico", async (req, res, next) => {
+  try {
+    const cursoId = req.params["id"] as string;
+    const versoes = await prisma.mIHistorico.findMany({
+      where:   { cursoId },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id:        true,
+        resumo:    true,
+        createdAt: true,
+        importadoPor: { select: { id: true, nome: true, fotoUrl: true } },
+      },
+    });
+    res.json(versoes);
+  } catch (err) { next(err); }
+});
+
+/** GET /:id/mi/historico/:versaoId — retorna snapshot completo de uma versão */
+router.get("/:id/mi/historico/:versaoId", async (req, res, next) => {
+  try {
+    const versao = await prisma.mIHistorico.findUnique({
+      where: { id: req.params["versaoId"] as string },
+      select: {
+        id: true, resumo: true, snapshot: true, createdAt: true,
+        importadoPor: { select: { id: true, nome: true, fotoUrl: true } },
+      },
+    });
+    if (!versao || versao.id !== req.params["versaoId"]) {
+      res.status(404).json({ message: "Versão não encontrada." }); return;
+    }
+    res.json(versao);
+  } catch (err) { next(err); }
+});
+
+/** POST /:id/mi/restaurar/:versaoId — restaura MI a uma versão anterior */
+router.post("/:id/mi/restaurar/:versaoId", async (req, res, next) => {
+  try {
+    const cursoId  = req.params["id"] as string;
+    const versaoId = req.params["versaoId"] as string;
+
+    // Admin guard
+    const usuario = await prisma.usuario.findUnique({ where: { id: req.usuario!.sub }, select: { papelGlobal: true } });
+    if (usuario?.papelGlobal !== "ADMIN") {
+      const membro = await prisma.cursoMembro.findUnique({
+        where: { cursoId_usuarioId: { cursoId, usuarioId: req.usuario!.sub } },
+      });
+      if (membro?.papel !== "ADMIN") { res.status(403).json({ message: "Apenas administradores podem restaurar versões." }); return; }
+    }
+
+    const versao = await prisma.mIHistorico.findUnique({ where: { id: versaoId } });
+    if (!versao || versao.cursoId !== cursoId) {
+      res.status(404).json({ message: "Versão não encontrada." }); return;
+    }
+
+    const caps = versao.snapshot as unknown as MICapitulo[];
+    const result = await persistMI(caps, cursoId);
+
+    // Salva nova entrada no histórico marcando a restauração
+    const totalUnidades = new Set(caps.map((c) => c.unidade)).size;
+    const totalOAs      = caps.reduce((s, c) => s + c.oaDefs.reduce((ss, d) => ss + d.quantidade, 0), 0);
+    await prisma.mIHistorico.create({
+      data: {
+        cursoId,
+        importadoPorId: req.usuario!.sub,
+        snapshot:       versao.snapshot as never,
+        resumo: `[Restauração] ${totalUnidades} unidade(s) · ${result.capitulosAtualizados} capítulos · ${totalOAs} OA(s)`,
+      },
+    });
+
+    res.json({
+      message:              `MI restaurada: ${result.capitulosAtualizados} capítulos, ${result.objetivosCriados} objetivos, ${result.oasCriados} OAs gerados.`,
+      capitulosAtualizados: result.capitulosAtualizados,
+      objetivosCriados:     result.objetivosCriados,
+      oasCriados:           result.oasCriados,
+    });
+  } catch (err) { next(err); }
+});
+
+// ─── RF-M2-06: Comentários por capítulo da MI ────────────────────────────────
+
+const comentarioMISchema = z.object({
+  texto: z.string().min(1).max(2000),
+});
+
+/** GET /:id/capitulos/:capituloId/comentarios */
+router.get("/:id/capitulos/:capituloId/comentarios", async (req, res, next) => {
+  try {
+    const capituloId = req.params["capituloId"] as string;
+    // Verifica que o capítulo pertence ao curso
+    const cap = await prisma.capitulo.findFirst({
+      where: { id: capituloId, unidade: { cursoId: req.params["id"] as string } },
+      select: { id: true },
+    });
+    if (!cap) { res.status(404).json({ message: "Capítulo não encontrado." }); return; }
+
+    const comentarios = await prisma.comentario.findMany({
+      where:   { capituloId },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true, texto: true, editado: true, createdAt: true, mencoes: true, parentId: true,
+        autor: { select: { id: true, nome: true, fotoUrl: true } },
+      },
+    });
+    res.json(comentarios);
+  } catch (err) { next(err); }
+});
+
+/** POST /:id/capitulos/:capituloId/comentarios */
+router.post("/:id/capitulos/:capituloId/comentarios", async (req, res, next) => {
+  try {
+    const cursoId    = req.params["id"] as string;
+    const capituloId = req.params["capituloId"] as string;
+
+    const cap = await prisma.capitulo.findFirst({
+      where: { id: capituloId, unidade: { cursoId } },
+      select: { id: true },
+    });
+    if (!cap) { res.status(404).json({ message: "Capítulo não encontrado." }); return; }
+
+    const { texto } = comentarioMISchema.parse(req.body);
+
+    // Extrai @menções do texto e resolve IDs de membros do curso
+    const nomesMencionados = [...new Set(
+      [...texto.matchAll(/@([\w\u00C0-\u017F]+(?:\s[\w\u00C0-\u017F]+)*)/g)].map((m) => m[1]!.trim())
+    )];
+    let mencoes: string[] = [];
+    if (nomesMencionados.length > 0) {
+      const membros = await prisma.cursoMembro.findMany({
+        where:   { cursoId },
+        include: { usuario: { select: { id: true, nome: true } } },
+      });
+      mencoes = membros
+        .filter((m) => nomesMencionados.some((n) => m.usuario.nome.toLowerCase().startsWith(n.toLowerCase())))
+        .map((m) => m.usuario.id);
+    }
+
+    const comentario = await prisma.comentario.create({
+      data: { texto, capituloId, autorId: req.usuario!.sub, mencoes },
+      select: {
+        id: true, texto: true, editado: true, createdAt: true, mencoes: true, parentId: true,
+        autor: { select: { id: true, nome: true, fotoUrl: true } },
+      },
+    });
+
+    // Notificações in-app para mencionados
+    const autorId = req.usuario!.sub;
+    const idsNotificar = [...new Set(mencoes)].filter((id) => id !== autorId);
+    if (idsNotificar.length > 0) {
+      const autor = await prisma.usuario.findUnique({ where: { id: autorId }, select: { nome: true } });
+      await prisma.notificacao.createMany({
+        data: idsNotificar.map((usuarioId) => ({
+          usuarioId,
+          tipo:         "MENCAO",
+          titulo:       `${autor?.nome ?? "Alguém"} mencionou você em um comentário da MI`,
+          corpo:        texto.slice(0, 120),
+          entidadeTipo: "CAPITULO",
+          entidadeId:   capituloId,
+        })),
+      });
+    }
+
+    res.status(201).json(comentario);
+  } catch (err) { next(err); }
+});
+
+/** DELETE /:id/capitulos/:capituloId/comentarios/:comentarioId */
+router.delete("/:id/capitulos/:capituloId/comentarios/:comentarioId", async (req, res, next) => {
+  try {
+    const c = await prisma.comentario.findUnique({ where: { id: req.params["comentarioId"] as string } });
+    // Autor pode excluir o próprio; admin global também
+    const usuario = await prisma.usuario.findUnique({ where: { id: req.usuario!.sub }, select: { papelGlobal: true } });
+    if (!c || (c.autorId !== req.usuario!.sub && usuario?.papelGlobal !== "ADMIN")) {
+      res.status(403).json({ message: "Sem permissão para excluir este comentário." }); return;
+    }
+    await prisma.comentario.delete({ where: { id: c.id } });
+    res.status(204).send();
   } catch (err) { next(err); }
 });
 

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { CursoResumo, CursoDetalhe, DashboardStats, ImportPreview, ImportResult, MIPreview, MIResult, OADetalhe, EtapaOADetalhe, ComentarioOA, DashboardDetalheTipo, DashboardDetalheOA, DashboardDetalheAtraso, AtribuicaoPreview, AtribuicaoResult, AuditLogEntry, UsuarioPublico, SugestaoAlocacao, AplicarSugestaoResult, SugestaoItem, CalcularDeadlinesResult } from "shared";
+import type { CursoResumo, CursoDetalhe, DashboardStats, ImportPreview, ImportResult, MIPreview, MIResult, OADetalhe, EtapaOADetalhe, ComentarioOA, DashboardDetalheTipo, DashboardDetalheOA, DashboardDetalheAtraso, AtribuicaoPreview, AtribuicaoResult, AuditLogEntry, UsuarioPublico, SugestaoAlocacao, AplicarSugestaoResult, SugestaoItem, CalcularDeadlinesResult, MIHistoricoResumo, MIHistoricoDetalhe, ComentarioMI } from "shared";
 import { useAuthStore } from "@/stores/auth.store";
 
 // ─── Keys ─────────────────────────────────────────────────────────────────────
@@ -514,6 +514,82 @@ export function useImportarConfirmar(cursoId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: cursoKeys.list() });
       qc.invalidateQueries({ queryKey: cursoKeys.stats() });
+    },
+  });
+}
+
+// ─── RF-M2-05: Histórico da MI ────────────────────────────────────────────────
+
+export const miHistoricoKeys = {
+  list:   (cursoId: string) => ["cursos", cursoId, "mi-historico"] as const,
+  detail: (cursoId: string, versaoId: string) => ["cursos", cursoId, "mi-historico", versaoId] as const,
+};
+
+export function useMIHistorico(cursoId: string) {
+  return useQuery({
+    queryKey: miHistoricoKeys.list(cursoId),
+    queryFn:  () => api.get<MIHistoricoResumo[]>(`/cursos/${cursoId}/mi/historico`).then((r) => r.data),
+    enabled:  !!cursoId,
+  });
+}
+
+export function useMIVersao(cursoId: string, versaoId: string | null) {
+  return useQuery({
+    queryKey: miHistoricoKeys.detail(cursoId, versaoId ?? ""),
+    queryFn:  () => api.get<MIHistoricoDetalhe>(`/cursos/${cursoId}/mi/historico/${versaoId}`).then((r) => r.data),
+    enabled:  !!cursoId && !!versaoId,
+  });
+}
+
+export function useRestaurarMI(cursoId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (versaoId: string) =>
+      api.post<{ message: string; capitulosAtualizados: number; objetivosCriados: number; oasCriados: number }>(
+        `/cursos/${cursoId}/mi/restaurar/${versaoId}`
+      ).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: cursoKeys.detail(cursoId) });
+      qc.invalidateQueries({ queryKey: miHistoricoKeys.list(cursoId) });
+    },
+  });
+}
+
+// ─── RF-M2-06: Comentários por capítulo da MI ─────────────────────────────────
+
+export const comentarioMIKeys = {
+  list: (cursoId: string, capituloId: string) => ["cursos", cursoId, "capitulos", capituloId, "comentarios"] as const,
+};
+
+export function useComentariosMI(cursoId: string, capituloId: string | null) {
+  return useQuery({
+    queryKey: comentarioMIKeys.list(cursoId, capituloId ?? ""),
+    queryFn:  () =>
+      api.get<ComentarioMI[]>(`/cursos/${cursoId}/capitulos/${capituloId}/comentarios`).then((r) => r.data),
+    enabled:  !!cursoId && !!capituloId,
+  });
+}
+
+export function useAdicionarComentarioMI(cursoId: string, capituloId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (texto: string) =>
+      api.post<ComentarioMI>(`/cursos/${cursoId}/capitulos/${capituloId}/comentarios`, { texto }).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: comentarioMIKeys.list(cursoId, capituloId) });
+      qc.invalidateQueries({ queryKey: cursoKeys.detail(cursoId) }); // atualiza _count.comentarios
+    },
+  });
+}
+
+export function useExcluirComentarioMI(cursoId: string, capituloId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (comentarioId: string) =>
+      api.delete(`/cursos/${cursoId}/capitulos/${capituloId}/comentarios/${comentarioId}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: comentarioMIKeys.list(cursoId, capituloId) });
+      qc.invalidateQueries({ queryKey: cursoKeys.detail(cursoId) });
     },
   });
 }

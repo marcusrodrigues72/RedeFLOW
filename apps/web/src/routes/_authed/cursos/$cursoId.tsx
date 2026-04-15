@@ -7,27 +7,33 @@ import {
   Alert, IconButton, Tooltip, Drawer, Divider, Switch, FormControlLabel,
   Snackbar, Checkbox, ListItemText,
 } from "@mui/material";
-import ArrowBackIcon       from "@mui/icons-material/ArrowBack";
-import FileDownloadIcon    from "@mui/icons-material/FileDownload";
-import ExpandMoreIcon      from "@mui/icons-material/ExpandMore";
-import FileUploadIcon      from "@mui/icons-material/FileUpload";
-import EditOutlinedIcon    from "@mui/icons-material/EditOutlined";
-import DeleteOutlineIcon   from "@mui/icons-material/DeleteOutline";
-import GroupIcon           from "@mui/icons-material/Group";
-import { useState }        from "react";
+import ArrowBackIcon           from "@mui/icons-material/ArrowBack";
+import FileDownloadIcon         from "@mui/icons-material/FileDownload";
+import ExpandMoreIcon           from "@mui/icons-material/ExpandMore";
+import FileUploadIcon           from "@mui/icons-material/FileUpload";
+import EditOutlinedIcon         from "@mui/icons-material/EditOutlined";
+import DeleteOutlineIcon        from "@mui/icons-material/DeleteOutline";
+import GroupIcon                from "@mui/icons-material/Group";
+import HistoryIcon              from "@mui/icons-material/History";
+import ChatBubbleOutlineIcon    from "@mui/icons-material/ChatBubbleOutline";
+import RestoreIcon              from "@mui/icons-material/Restore";
+import SendIcon                 from "@mui/icons-material/Send";
+import DeleteIcon               from "@mui/icons-material/Delete";
+import { useState, useRef }     from "react";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, Select, MenuItem, FormControl, InputLabel,
+  Badge, List, ListItem, Avatar,
 } from "@mui/material";
 import PersonAddIcon   from "@mui/icons-material/PersonAdd";
 import SearchIcon      from "@mui/icons-material/Search";
 import InputAdornment  from "@mui/material/InputAdornment";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
-import { useCurso, useOAsByCurso, useAdicionarMembro, useRemoverMembro, useAtualizarCurso, useExcluirCurso, useAtribuicaoPreview, useAtribuirResponsaveis, useExportarMC, useAtualizarPapeisProducao } from "@/lib/api/cursos";
+import { useCurso, useOAsByCurso, useAdicionarMembro, useRemoverMembro, useAtualizarCurso, useExcluirCurso, useAtribuicaoPreview, useAtribuirResponsaveis, useExportarMC, useAtualizarPapeisProducao, useMIHistorico, useRestaurarMI, useComentariosMI, useAdicionarComentarioMI, useExcluirComentarioMI } from "@/lib/api/cursos";
 import { useUsuarios } from "@/lib/api/usuarios";
 import { useAuthStore } from "@/stores/auth.store";
 import { useConfigAlertasCurso, useSalvarConfigAlertasCurso, useAtualizarNotifMembro } from "@/lib/api/notificacoes";
-import type { PapelEtapa } from "shared";
+import type { PapelEtapa, MIHistoricoResumo } from "shared";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import NotificationsNoneIcon   from "@mui/icons-material/NotificationsNone";
 import CircularProgress        from "@mui/material/CircularProgress";
@@ -47,6 +53,8 @@ function CursoDetalhePage() {
   const [editOpen,       setEditOpen]       = useState(false);
   const [deleteOpen,     setDeleteOpen]     = useState(false);
   const [atribuirOpen,   setAtribuirOpen]   = useState(false);
+  const [miHistoricoOpen, setMiHistoricoOpen] = useState(false);
+  const [comentarioCapId, setComentarioCapId] = useState<string | null>(null);
 
   const user = useAuthStore((s) => s.user);
 
@@ -293,6 +301,18 @@ function CursoDetalhePage() {
           </Card>
         ) : (
           <Box>
+            {/* Barra de ações da MI */}
+            <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<HistoryIcon />}
+                onClick={() => setMiHistoricoOpen(true)}
+              >
+                Histórico de versões
+              </Button>
+            </Box>
+
             {curso.unidades.map((unidade) => (
               <Accordion key={unidade.id} defaultExpanded={curso.unidades.length === 1}
                 sx={{ mb: 1.5, "&:before": { display: "none" }, borderRadius: "12px !important", overflow: "hidden" }}>
@@ -310,8 +330,8 @@ function CursoDetalhePage() {
                   <Table size="small">
                     <TableHead>
                       <TableRow sx={{ bgcolor: "#fafafa" }}>
-                        {["Capítulo", "CH Assínc.", "Objetivos Educacionais"].map((h) => (
-                          <TableCell key={h} sx={{ fontWeight: 700, fontSize: "0.75rem", color: "text.secondary", py: 1.5 }}>{h}</TableCell>
+                        {["Capítulo", "CH Assínc.", "Objetivos Educacionais", ""].map((h, i) => (
+                          <TableCell key={i} sx={{ fontWeight: 700, fontSize: "0.75rem", color: "text.secondary", py: 1.5 }}>{h}</TableCell>
                         ))}
                       </TableRow>
                     </TableHead>
@@ -353,6 +373,20 @@ function CursoDetalhePage() {
                               </Box>
                             )}
                           </TableCell>
+                          {/* Ícone de comentários */}
+                          <TableCell sx={{ py: 1.5, width: 48, textAlign: "right" }}>
+                            <Tooltip title={`${cap._count.comentarios} comentário(s)`}>
+                              <IconButton size="small" onClick={() => setComentarioCapId(cap.id)}>
+                                <Badge
+                                  badgeContent={cap._count.comentarios || undefined}
+                                  color="primary"
+                                  sx={{ "& .MuiBadge-badge": { fontSize: "0.6rem", minWidth: 16, height: 16 } }}
+                                >
+                                  <ChatBubbleOutlineIcon sx={{ fontSize: 18, color: "text.disabled" }} />
+                                </Badge>
+                              </IconButton>
+                            </Tooltip>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -362,6 +396,25 @@ function CursoDetalhePage() {
             ))}
           </Box>
         )
+      )}
+
+      {/* Drawers de MI */}
+      <MIHistoricoDrawer
+        open={miHistoricoOpen}
+        cursoId={cursoId}
+        isAdmin={isAdmin}
+        onClose={() => setMiHistoricoOpen(false)}
+      />
+      {comentarioCapId && (
+        <ComentariosMIDrawer
+          open={!!comentarioCapId}
+          cursoId={cursoId}
+          capituloId={comentarioCapId}
+          capituloNome={
+            curso.unidades.flatMap((u) => u.capitulos).find((c) => c.id === comentarioCapId)?.nome ?? ""
+          }
+          onClose={() => setComentarioCapId(null)}
+        />
       )}
 
       {/* Aba 2 — Equipe */}
@@ -1052,5 +1105,175 @@ function LoadingSkeleton() {
       <Skeleton height={100} sx={{ mb: 2 }} />
       <Skeleton height={400} />
     </Box>
+  );
+}
+
+// ─── Drawer: Histórico de versões da MI (RF-M2-05) ───────────────────────────
+
+function MIHistoricoDrawer({
+  open, cursoId, isAdmin, onClose,
+}: { open: boolean; cursoId: string; isAdmin: boolean; onClose: () => void }) {
+  const { data: versoes = [], isLoading } = useMIHistorico(cursoId);
+  const { mutate: restaurar, isPending: restaurando } = useRestaurarMI(cursoId);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [snack, setSnack] = useState<string | null>(null);
+
+  const handleRestaurar = (versaoId: string) => {
+    restaurar(versaoId, {
+      onSuccess: (r) => { setSnack(r.message); setConfirmId(null); },
+      onError: () => setSnack("Erro ao restaurar versão."),
+    });
+  };
+
+  return (
+    <Drawer anchor="right" open={open} onClose={onClose}
+      PaperProps={{ sx: { width: { xs: "100%", sm: 480 }, p: 0 } }}>
+      <Box sx={{ p: 3, borderBottom: "1px solid", borderColor: "divider", display: "flex", alignItems: "center", gap: 1.5 }}>
+        <HistoryIcon sx={{ color: "text.secondary" }} />
+        <Typography fontWeight={700} fontSize="1rem">Histórico de versões da MI</Typography>
+      </Box>
+
+      <Box sx={{ flex: 1, overflowY: "auto", p: 2 }}>
+        {isLoading ? (
+          <Box sx={{ p: 3 }}><CircularProgress size={24} /></Box>
+        ) : versoes.length === 0 ? (
+          <Typography color="text.secondary" sx={{ p: 2 }}>Nenhuma versão registrada ainda.</Typography>
+        ) : (
+          <List disablePadding>
+            {versoes.map((v: MIHistoricoResumo, idx) => (
+              <ListItem key={v.id} disablePadding
+                sx={{ mb: 1.5, borderRadius: 2, border: "1px solid", borderColor: "divider", flexDirection: "column", alignItems: "flex-start", p: 2 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, width: "100%", mb: 0.5 }}>
+                  <Avatar src={v.importadoPor.fotoUrl ?? undefined} sx={{ width: 28, height: 28, fontSize: "0.75rem" }}>
+                    {v.importadoPor.nome[0]?.toUpperCase()}
+                  </Avatar>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="body2" fontWeight={600}>{v.importadoPor.nome}</Typography>
+                    <Typography variant="caption" color="text.disabled">
+                      {new Date(v.createdAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
+                    </Typography>
+                  </Box>
+                  {idx === 0 && (
+                    <Chip label="Atual" size="small" sx={{ bgcolor: "#dcfce7", color: "#166534", fontSize: "0.65rem", height: 20 }} />
+                  )}
+                </Box>
+                {v.resumo && (
+                  <Typography variant="caption" color="text.secondary" sx={{ mb: 1 }}>{v.resumo}</Typography>
+                )}
+                {isAdmin && idx > 0 && (
+                  confirmId === v.id ? (
+                    <Box sx={{ display: "flex", gap: 1 }}>
+                      <Button size="small" variant="contained" color="warning"
+                        disabled={restaurando}
+                        startIcon={restaurando ? <CircularProgress size={14} color="inherit" /> : <RestoreIcon />}
+                        onClick={() => handleRestaurar(v.id)}>
+                        Confirmar restauração
+                      </Button>
+                      <Button size="small" onClick={() => setConfirmId(null)}>Cancelar</Button>
+                    </Box>
+                  ) : (
+                    <Button size="small" variant="outlined" startIcon={<RestoreIcon />}
+                      onClick={() => setConfirmId(v.id)}>
+                      Restaurar esta versão
+                    </Button>
+                  )
+                )}
+              </ListItem>
+            ))}
+          </List>
+        )}
+      </Box>
+
+      <Snackbar
+        open={!!snack} autoHideDuration={5000} onClose={() => setSnack(null)}
+        message={snack} anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      />
+    </Drawer>
+  );
+}
+
+// ─── Drawer: Comentários por capítulo da MI (RF-M2-06) ───────────────────────
+
+function ComentariosMIDrawer({
+  open, cursoId, capituloId, capituloNome, onClose,
+}: { open: boolean; cursoId: string; capituloId: string; capituloNome: string; onClose: () => void }) {
+  const user = useAuthStore((s) => s.user);
+  const { data: comentarios = [], isLoading } = useComentariosMI(cursoId, capituloId);
+  const { mutate: adicionar, isPending: adicionando } = useAdicionarComentarioMI(cursoId, capituloId);
+  const { mutate: excluir } = useExcluirComentarioMI(cursoId, capituloId);
+  const [texto, setTexto] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleEnviar = () => {
+    const t = texto.trim();
+    if (!t) return;
+    adicionar(t, { onSuccess: () => setTexto("") });
+  };
+
+  return (
+    <Drawer anchor="right" open={open} onClose={onClose}
+      PaperProps={{ sx: { width: { xs: "100%", sm: 440 }, display: "flex", flexDirection: "column" } }}>
+      <Box sx={{ p: 3, borderBottom: "1px solid", borderColor: "divider", display: "flex", alignItems: "center", gap: 1.5 }}>
+        <ChatBubbleOutlineIcon sx={{ color: "text.secondary" }} />
+        <Box sx={{ flex: 1 }}>
+          <Typography fontWeight={700} fontSize="0.95rem">Comentários</Typography>
+          <Typography variant="caption" color="text.secondary">{capituloNome}</Typography>
+        </Box>
+        <IconButton size="small" onClick={onClose}><DeleteOutlineIcon sx={{ fontSize: 18 }} /></IconButton>
+      </Box>
+
+      <Box sx={{ flex: 1, overflowY: "auto", p: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
+        {isLoading ? (
+          <Box sx={{ display: "flex", justifyContent: "center", p: 3 }}><CircularProgress size={24} /></Box>
+        ) : comentarios.length === 0 ? (
+          <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center", mt: 4 }}>
+            Nenhum comentário ainda. Seja o primeiro!
+          </Typography>
+        ) : comentarios.map((c) => (
+          <Box key={c.id}
+            sx={{ p: 1.5, borderRadius: 2, bgcolor: c.autor.id === user?.id ? "#eff6ff" : "#f8fafc",
+                  border: "1px solid", borderColor: c.autor.id === user?.id ? "#bfdbfe" : "divider" }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+              <Avatar src={c.autor.fotoUrl ?? undefined} sx={{ width: 24, height: 24, fontSize: "0.7rem" }}>
+                {c.autor.nome[0]?.toUpperCase()}
+              </Avatar>
+              <Typography variant="caption" fontWeight={600}>{c.autor.nome}</Typography>
+              <Typography variant="caption" color="text.disabled" sx={{ ml: "auto" }}>
+                {new Date(c.createdAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
+              </Typography>
+              {c.autor.id === user?.id && (
+                <Tooltip title="Excluir">
+                  <IconButton size="small" onClick={() => excluir(c.id)} sx={{ ml: 0.5, color: "text.disabled" }}>
+                    <DeleteIcon sx={{ fontSize: 14 }} />
+                  </IconButton>
+                </Tooltip>
+              )}
+            </Box>
+            <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>{c.texto}</Typography>
+          </Box>
+        ))}
+      </Box>
+
+      <Divider />
+      <Box sx={{ p: 2, display: "flex", gap: 1, alignItems: "flex-end" }}>
+        <TextField
+          inputRef={inputRef}
+          multiline maxRows={4}
+          size="small"
+          fullWidth
+          placeholder="Escreva um comentário... (@nome para mencionar)"
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleEnviar(); } }}
+        />
+        <IconButton
+          color="primary" disabled={!texto.trim() || adicionando}
+          onClick={handleEnviar}
+          sx={{ border: "1px solid", borderColor: "primary.main", borderRadius: 2, p: 1 }}
+        >
+          {adicionando ? <CircularProgress size={18} color="inherit" /> : <SendIcon fontSize="small" />}
+        </IconButton>
+      </Box>
+    </Drawer>
   );
 }

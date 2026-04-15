@@ -1,10 +1,26 @@
 import type { Request, Response, NextFunction } from "express";
 import { CursoService } from "../services/cursoService.js";
 import { parseBuffer, buildPreview, persistMC, parseMI, buildMIPreview, persistMI, extractNomesResponsaveis, matchesNome } from "../services/importService.js";
+import type { MICapitulo } from "../services/importService.js";
 import { prisma } from "../lib/prisma.js";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
+
+/** Salva um snapshot da MI no histórico após importação bem-sucedida. */
+async function salvarMIHistorico(
+  caps: MICapitulo[],
+  cursoId: string,
+  usuarioId: string,
+  result: { capitulosAtualizados: number; objetivosCriados: number; oasCriados: number },
+): Promise<void> {
+  const totalUnidades = new Set(caps.map((c) => c.unidade)).size;
+  const totalOAs      = caps.reduce((s, c) => s + c.oaDefs.reduce((ss, d) => ss + d.quantidade, 0), 0);
+  const resumo = `${totalUnidades} unidade(s) · ${result.capitulosAtualizados} capítulos · ${result.objetivosCriados} objetivos · ${totalOAs} OA(s)`;
+  await prisma.mIHistorico.create({
+    data: { cursoId, importadoPorId: usuarioId, snapshot: caps as never, resumo },
+  });
+}
 
 const criarCursoSchema = z.object({
   codigo:           z.string().min(2).max(20),
@@ -79,18 +95,30 @@ export class CursoController {
       const preview = buildPreview(rows);
 
       // Resolve responsáveis: primeiro membros do curso, depois usuários globais
+      // Inclui e-mail para suportar planilhas com hyperlink "mailto:email"
       const membros = await prisma.cursoMembro.findMany({
         where:   { cursoId },
-        include: { usuario: { select: { id: true, nome: true } } },
+        include: { usuario: { select: { id: true, nome: true, email: true } } },
       });
       const todosUsuarios = await prisma.usuario.findMany({
-        select: { id: true, nome: true },
+        select: { id: true, nome: true, email: true },
       });
-      const todosNomes = extractNomesResponsaveis(rows);
-      preview.responsaveisNaoEncontrados = todosNomes.filter((nome) =>
-        !membros.some((m) => matchesNome(nome, m.usuario.nome)) &&
-        !todosUsuarios.some((u) => matchesNome(nome, u.nome))
-      );
+
+      /** Verifica se um valor (nome ou e-mail) resolve para algum usuário conhecido */
+      const podeResolver = (valor: string): boolean => {
+        const isEmail = valor.includes("@");
+        if (isEmail) {
+          const emailNorm = valor.toLowerCase();
+          if (membros.some((m) => m.usuario.email.toLowerCase() === emailNorm)) return true;
+          if (todosUsuarios.some((u) => u.email.toLowerCase() === emailNorm))   return true;
+          return false;
+        }
+        return membros.some((m) => matchesNome(valor, m.usuario.nome)) ||
+               todosUsuarios.some((u) => matchesNome(valor, u.nome));
+      };
+
+      const todosNomes = extractNomesResponsaveis(rows); // já retorna com mailto: removido
+      preview.responsaveisNaoEncontrados = todosNomes.filter((nome) => !podeResolver(nome));
 
       res.json(preview);
     } catch (err) { next(err); }
@@ -116,6 +144,7 @@ export class CursoController {
       const caps   = parseMI(req.file.buffer, req.file.originalname);
       const avisos = buildMIPreview(caps).avisos;
       const result = await persistMI(caps, cursoId);
+      await salvarMIHistorico(caps, cursoId, req.usuario!.sub, result);
       res.json({
         message:              `MI importada: ${result.capitulosAtualizados} capítulos, ${result.objetivosCriados} objetivos, ${result.oasCriados} OAs gerados.`,
         cursoId,
@@ -162,6 +191,7 @@ export class CursoController {
       const caps   = parseMI(req.file.buffer, req.file.originalname);
       const avisos = buildMIPreview(caps).avisos;
       const result = await persistMI(caps, curso.id, dataInicioDate ? { dataInicio: dataInicioDate } : {});
+      await salvarMIHistorico(caps, curso.id, req.usuario!.sub, result);
 
       res.status(201).json({
         message:              `Curso criado e MI importada: ${result.capitulosAtualizados} capítulos, ${result.oasCriados} OAs gerados.`,

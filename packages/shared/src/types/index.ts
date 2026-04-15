@@ -58,7 +58,7 @@ export interface UnidadeResumo {
     nome: string;
     chAssincrona: string | null;
     chSincrona: string | null;
-    _count: { oas: number };
+    _count: { oas: number; comentarios: number };
     objetivos: ObjetivoResumo[];
   }[];
 }
@@ -353,6 +353,31 @@ export interface AuditLogEntry {
   ip:           string | null;
   createdAt:    string;
   usuario:      { id: string; nome: string; fotoUrl: string | null } | null;
+}
+
+// ─── MI Histórico (RF-M2-05) ──────────────────────────────────────────────────
+
+export interface MIHistoricoResumo {
+  id:        string;
+  resumo:    string | null;
+  createdAt: string;
+  importadoPor: { id: string; nome: string; fotoUrl: string | null };
+}
+
+export interface MIHistoricoDetalhe extends MIHistoricoResumo {
+  snapshot: unknown; // MICapitulo[] serializado
+}
+
+// ─── Comentário MI (RF-M2-06) ─────────────────────────────────────────────────
+
+export interface ComentarioMI {
+  id:        string;
+  texto:     string;
+  editado:   boolean;
+  createdAt: string;
+  mencoes:   string[];
+  parentId:  string | null;
+  autor:     { id: string; nome: string; fotoUrl: string | null };
 }
 
 // ─── Import ───────────────────────────────────────────────────────────────────

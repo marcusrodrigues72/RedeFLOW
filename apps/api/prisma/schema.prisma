@@ -103,6 +103,7 @@ model Usuario {
   auditLogs                  AuditLog[]
   cursosCoordenaProducao     Curso[]    @relation("CursoCoordenadorProducao")
   cursosValidouMatriz        Curso[]    @relation("CursoMatrizValidadaPor")
+  miHistorico                MIHistorico[]
 
   @@map("usuarios")
 }
@@ -156,6 +157,7 @@ model Curso {
   coordenadorProducao   Usuario? @relation("CursoCoordenadorProducao",  fields: [coordenadorProducaoId], references: [id])
   matrizValidadaPor     Usuario? @relation("CursoMatrizValidadaPor",    fields: [matrizValidadaPorId],   references: [id])
   configAlerta          ConfigAlertaCurso?
+  miHistorico           MIHistorico[]
 
   @@map("cursos")
 }
@@ -232,9 +234,10 @@ model Capitulo {
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
 
-  unidade   Unidade               @relation(fields: [unidadeId], references: [id], onDelete: Cascade)
-  objetivos ObjetivoEducacional[]
-  oas       ObjetoAprendizagem[]
+  unidade     Unidade               @relation(fields: [unidadeId], references: [id], onDelete: Cascade)
+  objetivos   ObjetivoEducacional[]
+  oas         ObjetoAprendizagem[]
+  comentarios Comentario[]
 
   @@unique([unidadeId, numero])
   @@map("capitulos")
@@ -352,24 +355,42 @@ model Arquivo {
 }
 
 model Comentario {
-  id        String   @id @default(cuid())
-  texto     String
-  autorId   String
-  oaId      String?
-  etapaOaId String?
-  parentId  String?  // thread de respostas
-  mencoes   String[] // array de usuarioId
-  editado   Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(cuid())
+  texto      String
+  autorId    String
+  oaId       String?
+  etapaOaId  String?
+  capituloId String?  // RF-M2-06: comentário em linha da MI
+  parentId   String?  // thread de respostas
+  mencoes    String[] // array de usuarioId
+  editado    Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  autor     Usuario            @relation(fields: [autorId], references: [id])
-  oa        ObjetoAprendizagem? @relation(fields: [oaId], references: [id], onDelete: Cascade)
-  etapaOa   EtapaOA?           @relation(fields: [etapaOaId], references: [id], onDelete: Cascade)
-  parent    Comentario?        @relation("ComentarioThread", fields: [parentId], references: [id])
-  respostas Comentario[]       @relation("ComentarioThread")
+  autor     Usuario             @relation(fields: [autorId], references: [id])
+  oa        ObjetoAprendizagem? @relation(fields: [oaId],       references: [id], onDelete: Cascade)
+  etapaOa   EtapaOA?            @relation(fields: [etapaOaId],  references: [id], onDelete: Cascade)
+  capitulo  Capitulo?           @relation(fields: [capituloId], references: [id], onDelete: Cascade)
+  parent    Comentario?         @relation("ComentarioThread", fields: [parentId], references: [id])
+  respostas Comentario[]        @relation("ComentarioThread")
 
   @@map("comentarios")
+}
+
+// ─── Histórico de versões da MI (RF-M2-05) ───────────────────────────────────
+
+model MIHistorico {
+  id             String   @id @default(cuid())
+  cursoId        String
+  importadoPorId String
+  snapshot       Json     // MI completa no momento da importação
+  resumo         String?  // ex: "8 capítulos · 42 objetivos importados"
+  createdAt      DateTime @default(now())
+
+  curso        Curso   @relation(fields: [cursoId],        references: [id], onDelete: Cascade)
+  importadoPor Usuario @relation(fields: [importadoPorId], references: [id])
+
+  @@map("mi_historico")
 }
 
 // ─── Notificações ─────────────────────────────────────────────────────────────
