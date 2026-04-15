@@ -540,6 +540,16 @@ export async function persistMC(rows: MCRow[], cursoId: string): Promise<{ criad
     { papel: "VALIDADOR_FINAL",      status: row.validStatus,        dl: row.validDL,        resp: row.validadorNome,   ordem: 7 },
   ];
 
+  /**
+   * Retorna true se o OA tem qualquer progresso registrado na planilha:
+   * progresso > 0, ou algum responsável alocado, ou alguma etapa já iniciada/concluída.
+   * Nesse caso o Setup de Produção deve ser marcado como CONCLUIDA automaticamente.
+   */
+  const temProgresso = (row: MCRow): boolean => {
+    if (row.progressoPct > 0) return true;
+    return etapasMC(row).some((e) => e.resp?.trim() || (e.status && e.status !== "PENDENTE"));
+  };
+
   for (const row of rows) {
     try {
       // ── Unidade ──────────────────────────────────────────────────────────
@@ -615,6 +625,17 @@ export async function persistMC(rows: MCRow[], cursoId: string): Promise<{ criad
             });
           }
 
+          // Se o OA tem progresso registrado, auto-conclui o Setup de Produção
+          if (temProgresso(row)) {
+            const setupEtapa = existing.etapas.find((e) => e.etapaDef.papel === "COORDENADOR_PRODUCAO");
+            if (setupEtapa && setupEtapa.status !== "CONCLUIDA") {
+              await prisma.etapaOA.update({
+                where: { id: setupEtapa.id },
+                data:  { status: "CONCLUIDA" },
+              });
+            }
+          }
+
           atualizados++;
           continue;
         }
@@ -636,8 +657,10 @@ export async function persistMC(rows: MCRow[], cursoId: string): Promise<{ criad
       });
 
       // ── Cria EtapaOAs ─────────────────────────────────────────────────────
+      // Setup auto-concluído se o OA já tem progresso registrado na planilha
+      const statusSetup = temProgresso(row) ? "CONCLUIDA" : "PENDENTE";
       const etapasParaCriar = [
-        { papel: "COORDENADOR_PRODUCAO", status: "PENDENTE", dl: null as Date | null, ordem: 0 },
+        { papel: "COORDENADOR_PRODUCAO", status: statusSetup, dl: null as Date | null, ordem: 0 },
         ...etapasMC(row),
       ];
 
