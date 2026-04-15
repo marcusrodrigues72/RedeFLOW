@@ -1,4 +1,4 @@
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import {
   Box, Card, CardContent, TextField, Button, Typography,
   Alert, CircularProgress, InputAdornment, IconButton, Divider,
@@ -143,6 +143,16 @@ function LoginPage() {
             >
               {isLoading ? <CircularProgress size={22} sx={{ color: "white" }} /> : "Entrar"}
             </Button>
+
+            <Box sx={{ textAlign: "right", mt: 1 }}>
+              <Button
+                component={Link} to="/esqueci-senha"
+                size="small"
+                sx={{ color: "text.secondary", fontSize: "0.8rem", fontWeight: 400, textTransform: "none" }}
+              >
+                Esqueci minha senha
+              </Button>
+            </Box>
           </Box>
 
           <Divider sx={{ my: 2.5 }}>

@@ -145,6 +145,29 @@ export function tmplDeadlineVencido(p: {
   };
 }
 
+/** Enviado quando o usuário solicita recuperação de senha. */
+export function tmplRecuperacaoSenha(p: {
+  email: string;
+  nome:  string;
+  link:  string;
+}): MailPayload {
+  return {
+    to:      p.email,
+    subject: "RedeFLOW — Recuperação de senha",
+    html: layout(`
+      <h2 style="margin:0 0 8px;color:#1e293b;font-size:20px;">🔑 Recuperação de senha</h2>
+      <p style="margin:0 0 20px;color:#475569;font-size:15px;">Olá, <strong>${p.nome}</strong>! Recebemos uma solicitação de recuperação de senha para sua conta.</p>
+      <div style="background:#eff6ff;border-left:4px solid #2b7cee;border-radius:6px;padding:16px 20px;margin-bottom:8px;">
+        <p style="margin:0;color:#1e40af;font-size:14px;">Clique no botão abaixo para criar uma nova senha. O link é válido por <strong>1 hora</strong>.</p>
+      </div>
+      ${btnPrimario(p.link, "Criar nova senha")}
+      <p style="margin:24px 0 0;color:#94a3b8;font-size:12px;">
+        Se você não solicitou a recuperação de senha, ignore este e-mail. Sua senha permanecerá a mesma.
+      </p>
+    `),
+  };
+}
+
 /** Disparado pelo cron diário para etapas com deadline em até 3 dias. */
 export function tmplPrazoProximo(p: {
   email:     string;

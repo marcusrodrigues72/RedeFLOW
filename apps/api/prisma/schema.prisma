@@ -92,6 +92,7 @@ model Usuario {
   updatedAt   DateTime    @updatedAt
 
   refreshTokens              RefreshToken[]
+  passwordResetTokens        PasswordResetToken[]
   membros                    CursoMembro[]
   etapasAtribuidas           EtapaOA[]  @relation("EtapaResponsavelPrincipal")
   etapasAtribuidasSecundario EtapaOA[]  @relation("EtapaResponsavelSecundario")
@@ -103,6 +104,19 @@ model Usuario {
   cursosValidouMatriz        Curso[]    @relation("CursoMatrizValidadaPor")
 
   @@map("usuarios")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  usuarioId String
+  expiresAt DateTime
+  usado     Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@map("password_reset_tokens")
 }
 
 model RefreshToken {

@@ -11,6 +11,8 @@ import {
 import { authenticate } from "../middlewares/authenticate.js";
 import { validate } from "../middlewares/validate.js";
 import { loginSchema, refreshSchema } from "shared";
+import { sendMail, tmplRecuperacaoSenha } from "../lib/mailer.js";
+import crypto from "node:crypto";
 
 // ─── Configuração Microsoft OAuth ─────────────────────────────────────────────
 const MS_TENANT_ID      = process.env["MICROSOFT_TENANT_ID"]     ?? "";
@@ -219,6 +221,82 @@ router.patch("/me", authenticate, async (req, res, next) => {
     });
 
     res.json(usuario);
+  } catch (err) { next(err); }
+});
+
+// ─── Recuperação de senha ─────────────────────────────────────────────────────
+
+// POST /api/auth/esqueci-senha
+router.post("/esqueci-senha", async (req, res, next) => {
+  try {
+    const { email } = z.object({ email: z.string().email() }).parse(req.body);
+
+    // Sempre retorna 200 para não revelar se o e-mail existe
+    const usuario = await prisma.usuario.findUnique({
+      where: { email: email.toLowerCase().trim() },
+      select: { id: true, nome: true, email: true, ativo: true, senhaHash: true },
+    });
+
+    if (usuario && usuario.ativo && usuario.senhaHash) {
+      // Invalida tokens anteriores ainda não usados
+      await prisma.passwordResetToken.updateMany({
+        where: { usuarioId: usuario.id, usado: false },
+        data:  { usado: true },
+      });
+
+      // Gera token seguro (64 hex chars = 256 bits)
+      const token = crypto.randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+
+      await prisma.passwordResetToken.create({
+        data: { token, usuarioId: usuario.id, expiresAt },
+      });
+
+      const link = `${FRONTEND_URL}/redefinir-senha?token=${token}`;
+      await sendMail(tmplRecuperacaoSenha({ email: usuario.email, nome: usuario.nome, link }));
+    }
+
+    res.json({ message: "Se este e-mail estiver cadastrado, você receberá as instruções em breve." });
+  } catch (err) { next(err); }
+});
+
+// POST /api/auth/redefinir-senha
+router.post("/redefinir-senha", async (req, res, next) => {
+  try {
+    const { token, senha } = z.object({
+      token: z.string().min(1),
+      senha: z.string().min(8, "A senha deve ter ao menos 8 caracteres."),
+    }).parse(req.body);
+
+    const resetToken = await prisma.passwordResetToken.findUnique({
+      where: { token },
+      include: { usuario: { select: { id: true, ativo: true } } },
+    });
+
+    if (!resetToken || resetToken.usado || resetToken.expiresAt < new Date() || !resetToken.usuario.ativo) {
+      res.status(400).json({ message: "Link de recuperação inválido ou expirado. Solicite um novo." });
+      return;
+    }
+
+    const senhaHash = await bcrypt.hash(senha, 12);
+
+    // Atualiza senha e invalida o token em uma transação
+    await prisma.$transaction([
+      prisma.usuario.update({
+        where: { id: resetToken.usuarioId },
+        data:  { senhaHash },
+      }),
+      prisma.passwordResetToken.update({
+        where: { id: resetToken.id },
+        data:  { usado: true },
+      }),
+      // Invalida todos os refresh tokens por segurança
+      prisma.refreshToken.deleteMany({
+        where: { usuarioId: resetToken.usuarioId },
+      }),
+    ]);
+
+    res.json({ message: "Senha redefinida com sucesso. Faça login com a nova senha." });
   } catch (err) { next(err); }
 });
 

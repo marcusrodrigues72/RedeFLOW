@@ -10,7 +10,9 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SsoCallbackRouteImport } from './routes/sso-callback'
+import { Route as RedefinirSenhaRouteImport } from './routes/redefinir-senha'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as EsqueciSenhaRouteImport } from './routes/esqueci-senha'
 import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
 import { Route as AuthedRelatoriosRouteImport } from './routes/_authed/relatorios'
@@ -32,9 +34,19 @@ const SsoCallbackRoute = SsoCallbackRouteImport.update({
   path: '/sso-callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RedefinirSenhaRoute = RedefinirSenhaRouteImport.update({
+  id: '/redefinir-senha',
+  path: '/redefinir-senha',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EsqueciSenhaRoute = EsqueciSenhaRouteImport.update({
+  id: '/esqueci-senha',
+  path: '/esqueci-senha',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthedRoute = AuthedRouteImport.update({
@@ -115,7 +127,9 @@ const AuthedCursosCursoIdOasRoute = AuthedCursosCursoIdOasRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthedIndexRoute
+  '/esqueci-senha': typeof EsqueciSenhaRoute
   '/login': typeof LoginRoute
+  '/redefinir-senha': typeof RedefinirSenhaRoute
   '/sso-callback': typeof SsoCallbackRoute
   '/alocacao': typeof AuthedAlocacaoRoute
   '/meu-trabalho': typeof AuthedMeuTrabalhoRoute
@@ -132,7 +146,9 @@ export interface FileRoutesByFullPath {
   '/cursos/$cursoId/setup-producao': typeof AuthedCursosCursoIdSetupProducaoRoute
 }
 export interface FileRoutesByTo {
+  '/esqueci-senha': typeof EsqueciSenhaRoute
   '/login': typeof LoginRoute
+  '/redefinir-senha': typeof RedefinirSenhaRoute
   '/sso-callback': typeof SsoCallbackRoute
   '/alocacao': typeof AuthedAlocacaoRoute
   '/meu-trabalho': typeof AuthedMeuTrabalhoRoute
@@ -152,7 +168,9 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authed': typeof AuthedRouteWithChildren
+  '/esqueci-senha': typeof EsqueciSenhaRoute
   '/login': typeof LoginRoute
+  '/redefinir-senha': typeof RedefinirSenhaRoute
   '/sso-callback': typeof SsoCallbackRoute
   '/_authed/alocacao': typeof AuthedAlocacaoRoute
   '/_authed/meu-trabalho': typeof AuthedMeuTrabalhoRoute
@@ -173,7 +191,9 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/esqueci-senha'
     | '/login'
+    | '/redefinir-senha'
     | '/sso-callback'
     | '/alocacao'
     | '/meu-trabalho'
@@ -190,7 +210,9 @@ export interface FileRouteTypes {
     | '/cursos/$cursoId/setup-producao'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/esqueci-senha'
     | '/login'
+    | '/redefinir-senha'
     | '/sso-callback'
     | '/alocacao'
     | '/meu-trabalho'
@@ -209,7 +231,9 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_authed'
+    | '/esqueci-senha'
     | '/login'
+    | '/redefinir-senha'
     | '/sso-callback'
     | '/_authed/alocacao'
     | '/_authed/meu-trabalho'
@@ -229,7 +253,9 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   AuthedRoute: typeof AuthedRouteWithChildren
+  EsqueciSenhaRoute: typeof EsqueciSenhaRoute
   LoginRoute: typeof LoginRoute
+  RedefinirSenhaRoute: typeof RedefinirSenhaRoute
   SsoCallbackRoute: typeof SsoCallbackRoute
 }
 
@@ -242,11 +268,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SsoCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/redefinir-senha': {
+      id: '/redefinir-senha'
+      path: '/redefinir-senha'
+      fullPath: '/redefinir-senha'
+      preLoaderRoute: typeof RedefinirSenhaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/esqueci-senha': {
+      id: '/esqueci-senha'
+      path: '/esqueci-senha'
+      fullPath: '/esqueci-senha'
+      preLoaderRoute: typeof EsqueciSenhaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authed': {
@@ -396,7 +436,9 @@ const AuthedRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   AuthedRoute: AuthedRouteWithChildren,
+  EsqueciSenhaRoute: EsqueciSenhaRoute,
   LoginRoute: LoginRoute,
+  RedefinirSenhaRoute: RedefinirSenhaRoute,
   SsoCallbackRoute: SsoCallbackRoute,
 }
 export const routeTree = rootRouteImport
