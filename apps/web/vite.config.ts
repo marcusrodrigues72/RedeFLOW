@@ -12,6 +12,16 @@ export default defineConfig({
   resolve: {
     alias: { "@": path.resolve(import.meta.dirname, "./src") },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "mui-vendor": ["@mui/material", "@mui/icons-material", "@emotion/react", "@emotion/styled"],
+          "recharts": ["recharts"],
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {

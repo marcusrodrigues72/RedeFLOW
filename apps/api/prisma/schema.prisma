@@ -159,6 +159,7 @@ model Curso {
   configAlerta          ConfigAlertaCurso?
   miHistorico           MIHistorico[]
 
+  @@index([status])
   @@map("cursos")
 }
 
@@ -303,6 +304,8 @@ model ObjetoAprendizagem {
   arquivos    Arquivo[]
   comentarios Comentario[]
 
+  @@index([capituloId])
+  @@index([status])
   @@map("objetos_aprendizagem")
 }
 
@@ -332,6 +335,10 @@ model EtapaOA {
   responsavelSecundario Usuario?           @relation("EtapaResponsavelSecundario", fields: [responsavelSecundarioId], references: [id])
   comentarios           Comentario[]
 
+  @@index([oaId])
+  @@index([responsavelId])
+  @@index([status])
+  @@index([deadlinePrevisto])
   @@map("etapas_oa")
 }
 
@@ -374,6 +381,9 @@ model Comentario {
   parent    Comentario?         @relation("ComentarioThread", fields: [parentId], references: [id])
   respostas Comentario[]        @relation("ComentarioThread")
 
+  @@index([oaId])
+  @@index([etapaOaId])
+  @@index([capituloId])
   @@map("comentarios")
 }
 
@@ -408,6 +418,7 @@ model Notificacao {
 
   usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
+  @@index([usuarioId, lida])
   @@map("notificacoes")
 }
 
@@ -426,5 +437,6 @@ model AuditLog {
 
   usuario Usuario? @relation(fields: [usuarioId], references: [id])
 
+  @@index([entidadeTipo, entidadeId])
   @@map("audit_logs")
 }

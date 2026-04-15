@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+import compression from "compression";
 import { errorHandler } from "./middlewares/errorHandler.js";
 import apiRouter from "./routes/index.js";
 
@@ -9,6 +10,7 @@ export function createApp() {
 
   // ─── Segurança ────────────────────────────────────────────────────────────
   app.use(helmet());
+  app.use(compression());
 
   const allowedOrigins = (process.env["CORS_ORIGIN"] ?? "http://localhost:5173")
     .split(",")
