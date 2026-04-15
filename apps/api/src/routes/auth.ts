@@ -151,7 +151,7 @@ router.get("/me", authenticate, async (req, res, next) => {
       select: {
         id: true, nome: true, email: true,
         papelGlobal: true, fotoUrl: true, ativo: true,
-        notifEmailAtivo: true,
+        notifEmailAtivo: true, digestDiarioAtivo: true, capacidadeHorasSemanais: true,
       },
     });
 
@@ -168,11 +168,12 @@ router.get("/me", authenticate, async (req, res, next) => {
 
 // PATCH /api/auth/me — auto-edição de perfil (qualquer usuário autenticado)
 const perfilSchema = z.object({
-  nome:                   z.string().min(2).max(100).optional(),
-  email:                  z.string().email().optional(),
-  senhaAtual:             z.string().min(1).optional(),
-  novaSenha:              z.string().min(6).optional(),
-  notifEmailAtivo:        z.boolean().optional(),
+  nome:                    z.string().min(2).max(100).optional(),
+  email:                   z.string().email().optional(),
+  senhaAtual:              z.string().min(1).optional(),
+  novaSenha:               z.string().min(6).optional(),
+  notifEmailAtivo:         z.boolean().optional(),
+  digestDiarioAtivo:       z.boolean().optional(),
   capacidadeHorasSemanais: z.number().int().min(1).max(168).optional(),
 }).refine(
   (d) => !d.novaSenha || d.senhaAtual,
@@ -181,7 +182,7 @@ const perfilSchema = z.object({
 
 router.patch("/me", authenticate, async (req, res, next) => {
   try {
-    const { nome, email, senhaAtual, novaSenha, notifEmailAtivo, capacidadeHorasSemanais } = perfilSchema.parse(req.body);
+    const { nome, email, senhaAtual, novaSenha, notifEmailAtivo, digestDiarioAtivo, capacidadeHorasSemanais } = perfilSchema.parse(req.body);
     const id = req.usuario!.sub;
 
     // Se e-mail mudou, verifica conflito
@@ -206,18 +207,16 @@ router.patch("/me", authenticate, async (req, res, next) => {
     const updateData: Record<string, unknown> = {};
     if (nome  !== undefined) updateData["nome"]  = nome;
     if (email !== undefined) updateData["email"] = email;
-    if (notifEmailAtivo !== undefined) {
-      updateData["notifEmailAtivo"] = notifEmailAtivo;
-    }
-    if (capacidadeHorasSemanais !== undefined) {
-      updateData["capacidadeHorasSemanais"] = capacidadeHorasSemanais;
-    }
+    if (notifEmailAtivo   !== undefined) updateData["notifEmailAtivo"]   = notifEmailAtivo;
+    if (digestDiarioAtivo !== undefined) updateData["digestDiarioAtivo"] = digestDiarioAtivo;
+    if (capacidadeHorasSemanais !== undefined) updateData["capacidadeHorasSemanais"] = capacidadeHorasSemanais;
     if (novaSenha) updateData["senhaHash"] = await bcrypt.hash(novaSenha, 12);
 
     const usuario = await prisma.usuario.update({
       where: { id },
       data:  updateData as Parameters<typeof prisma.usuario.update>[0]["data"],
-      select: { id: true, nome: true, email: true, papelGlobal: true, fotoUrl: true, notifEmailAtivo: true },
+      select: { id: true, nome: true, email: true, papelGlobal: true, fotoUrl: true,
+                notifEmailAtivo: true, digestDiarioAtivo: true, capacidadeHorasSemanais: true },
     });
 
     res.json(usuario);

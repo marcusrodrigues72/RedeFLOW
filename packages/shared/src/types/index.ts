@@ -18,6 +18,7 @@ export interface UsuarioPublico {
   papelGlobal: PapelGlobal;
   fotoUrl: string | null;
   notifEmailAtivo?: boolean;
+  digestDiarioAtivo?: boolean;
   capacidadeHorasSemanais?: number;
 }
 

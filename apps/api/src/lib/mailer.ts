@@ -168,6 +168,124 @@ export function tmplRecuperacaoSenha(p: {
   };
 }
 
+// ─── Digest diário (RF-M7-06) ────────────────────────────────────────────────
+
+export interface DigestItemAtrasado {
+  oaCodigo:   string;
+  oaId:       string;
+  etapaNome:  string;
+  diasAtraso: number;
+}
+
+export interface DigestItemHoje {
+  oaCodigo:  string;
+  oaId:      string;
+  etapaNome: string;
+}
+
+export interface DigestItemMencao {
+  oaId:    string;
+  trecho:  string;   // até 120 chars do texto do comentário
+}
+
+export function tmplDigestoDiario(p: {
+  email:     string;
+  nome:      string;
+  atrasados: DigestItemAtrasado[];
+  hoje:      DigestItemHoje[];
+  mencoes:   DigestItemMencao[];
+}): MailPayload {
+  const data = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" });
+
+  function tabelaAtrasados(): string {
+    if (p.atrasados.length === 0) return "";
+    const linhas = p.atrasados.map((i) => `
+      <tr>
+        <td style="padding:8px 12px;font-family:monospace;font-size:13px;font-weight:700;color:#1e293b;">${i.oaCodigo}</td>
+        <td style="padding:8px 12px;font-size:13px;color:#475569;">${i.etapaNome}</td>
+        <td style="padding:8px 12px;font-size:13px;color:#dc2626;font-weight:700;">${i.diasAtraso}d</td>
+        <td style="padding:8px 12px;">
+          <a href="${APP_URL}/oas/${i.oaId}" style="font-size:12px;color:#2b7cee;text-decoration:none;font-weight:600;">Abrir →</a>
+        </td>
+      </tr>`).join("");
+    return `
+      <div style="margin-bottom:28px;">
+        <h3 style="margin:0 0 12px;color:#dc2626;font-size:15px;">⚠ OAs atrasados (${p.atrasados.length})</h3>
+        <table width="100%" cellpadding="0" cellspacing="0"
+          style="border-collapse:collapse;border:1px solid #fecaca;border-radius:8px;overflow:hidden;">
+          <thead>
+            <tr style="background:#fff5f5;">
+              <th style="padding:8px 12px;text-align:left;font-size:11px;color:#991b1b;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">OA</th>
+              <th style="padding:8px 12px;text-align:left;font-size:11px;color:#991b1b;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Etapa</th>
+              <th style="padding:8px 12px;text-align:left;font-size:11px;color:#991b1b;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Atraso</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>${linhas}</tbody>
+        </table>
+      </div>`;
+  }
+
+  function tabelaHoje(): string {
+    if (p.hoje.length === 0) return "";
+    const linhas = p.hoje.map((i) => `
+      <tr>
+        <td style="padding:8px 12px;font-family:monospace;font-size:13px;font-weight:700;color:#1e293b;">${i.oaCodigo}</td>
+        <td style="padding:8px 12px;font-size:13px;color:#475569;">${i.etapaNome}</td>
+        <td style="padding:8px 12px;">
+          <a href="${APP_URL}/oas/${i.oaId}" style="font-size:12px;color:#2b7cee;text-decoration:none;font-weight:600;">Abrir →</a>
+        </td>
+      </tr>`).join("");
+    return `
+      <div style="margin-bottom:28px;">
+        <h3 style="margin:0 0 12px;color:#d97706;font-size:15px;">⏰ Vencem hoje (${p.hoje.length})</h3>
+        <table width="100%" cellpadding="0" cellspacing="0"
+          style="border-collapse:collapse;border:1px solid #fde68a;border-radius:8px;overflow:hidden;">
+          <thead>
+            <tr style="background:#fffbeb;">
+              <th style="padding:8px 12px;text-align:left;font-size:11px;color:#92400e;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">OA</th>
+              <th style="padding:8px 12px;text-align:left;font-size:11px;color:#92400e;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Etapa</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>${linhas}</tbody>
+        </table>
+      </div>`;
+  }
+
+  function listaMencoes(): string {
+    if (p.mencoes.length === 0) return "";
+    const itens = p.mencoes.map((i) => `
+      <li style="margin-bottom:10px;">
+        <span style="font-size:13px;color:#475569;">"${i.trecho}"</span>
+        &nbsp;<a href="${APP_URL}/oas/${i.oaId}" style="font-size:12px;color:#2b7cee;text-decoration:none;font-weight:600;">Ver →</a>
+      </li>`).join("");
+    return `
+      <div style="margin-bottom:28px;">
+        <h3 style="margin:0 0 12px;color:#7c3aed;font-size:15px;">💬 Menções não lidas (${p.mencoes.length})</h3>
+        <ul style="margin:0;padding-left:18px;list-style:disc;">${itens}</ul>
+      </div>`;
+  }
+
+  const corpo = `
+    <h2 style="margin:0 0 4px;color:#1e293b;font-size:20px;">Bom dia, ${p.nome}!</h2>
+    <p style="margin:0 0 24px;color:#64748b;font-size:14px;">Resumo de pendências — ${data}</p>
+    ${tabelaAtrasados()}
+    ${tabelaHoje()}
+    ${listaMencoes()}
+    ${btnPrimario(`${APP_URL}/meu-trabalho`, "Ver meu trabalho no RedeFLOW")}
+    <p style="margin:24px 0 0;color:#94a3b8;font-size:12px;">
+      Para desativar este resumo, acesse
+      <a href="${APP_URL}/perfil" style="color:#2b7cee;text-decoration:none;">Meu Perfil → Notificações</a>.
+    </p>`;
+
+  return {
+    to:      p.email,
+    subject: `RedeFLOW — Resumo diário: ${p.atrasados.length + p.hoje.length} pendência${(p.atrasados.length + p.hoje.length) !== 1 ? "s" : ""}`,
+    html:    layout(corpo),
+  };
+}
+
 /** Disparado pelo cron diário para etapas com deadline em até 3 dias. */
 export function tmplPrazoProximo(p: {
   email:     string;

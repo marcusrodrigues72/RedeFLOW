@@ -20,8 +20,10 @@ export default function PerfilPage() {
   const user    = useAuthStore((s) => s.user);
   const isAdmin = user?.papelGlobal === "ADMIN";
   const { mutate, isPending } = useAtualizarPerfil();
-  const [cronMsg,     setCronMsg]     = useState<string | null>(null);
-  const [cronPending, setCronPending] = useState(false);
+  const [cronMsg,        setCronMsg]        = useState<string | null>(null);
+  const [cronPending,    setCronPending]    = useState(false);
+  const [digestMsg,      setDigestMsg]      = useState<string | null>(null);
+  const [digestPending,  setDigestPending]  = useState(false);
 
   // Dados pessoais
   const [nome,       setNome]       = useState(user?.nome  ?? "");
@@ -29,7 +31,8 @@ export default function PerfilPage() {
   const [capacidade, setCapacidade] = useState<number>(user?.capacidadeHorasSemanais ?? 40);
 
   // Notificações
-  const [notifEmail, setNotifEmail] = useState(user?.notifEmailAtivo ?? true);
+  const [notifEmail,    setNotifEmail]    = useState(user?.notifEmailAtivo    ?? true);
+  const [digestDiario,  setDigestDiario]  = useState(user?.digestDiarioAtivo  ?? true);
 
   // Senha
   const [senhaAtual,  setSenhaAtual]  = useState("");
@@ -44,7 +47,7 @@ export default function PerfilPage() {
     setSuccessMsg(null);
     setErrorMsg(null);
     mutate(
-      { nome: nome.trim() || undefined, email: email.trim() || undefined, notifEmailAtivo: notifEmail, capacidadeHorasSemanais: capacidade },
+      { nome: nome.trim() || undefined, email: email.trim() || undefined, notifEmailAtivo: notifEmail, digestDiarioAtivo: digestDiario, capacidadeHorasSemanais: capacidade },
       {
         onSuccess: () => setSuccessMsg("Dados atualizados com sucesso."),
         onError: (err: unknown) => {
@@ -168,6 +171,27 @@ export default function PerfilPage() {
               </Typography>
             }
           />
+          <FormControlLabel
+            sx={{ mt: 0.5 }}
+            control={
+              <Switch
+                checked={digestDiario}
+                onChange={(e) => setDigestDiario(e.target.checked)}
+                color="primary"
+                disabled={!notifEmail}
+              />
+            }
+            label={
+              <Box>
+                <Typography variant="body2">
+                  {digestDiario && notifEmail ? "Resumo diário de pendências ativado" : "Resumo diário desativado"}
+                </Typography>
+                <Typography variant="caption" color="text.disabled">
+                  Enviado às 07h00 com OAs atrasados, prazos do dia e menções não lidas.
+                </Typography>
+              </Box>
+            }
+          />
         </>
 
         <Box sx={{ mt: 2.5, display: "flex", justifyContent: "flex-end" }}>
@@ -201,27 +225,59 @@ export default function PerfilPage() {
               {cronMsg}
             </Alert>
           )}
-          <Button
-            variant="outlined"
-            color="warning"
-            size="small"
-            disabled={cronPending}
-            startIcon={cronPending ? <CircularProgress size={14} color="inherit" /> : <PlayArrowOutlinedIcon />}
-            onClick={async () => {
-              setCronPending(true);
-              setCronMsg(null);
-              try {
-                const r = await api.post<{ message: string }>("/admin/run-deadline-checks");
-                setCronMsg(r.data.message);
-              } catch {
-                setCronMsg("Erro ao executar o job. Verifique os logs do servidor.");
-              } finally {
-                setCronPending(false);
-              }
-            }}
-          >
-            Executar verificação de deadlines agora
-          </Button>
+          <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
+            <Button
+              variant="outlined"
+              color="warning"
+              size="small"
+              disabled={cronPending}
+              startIcon={cronPending ? <CircularProgress size={14} color="inherit" /> : <PlayArrowOutlinedIcon />}
+              onClick={async () => {
+                setCronPending(true);
+                setCronMsg(null);
+                try {
+                  const r = await api.post<{ message: string }>("/admin/run-deadline-checks");
+                  setCronMsg(r.data.message);
+                } catch {
+                  setCronMsg("Erro ao executar o job. Verifique os logs do servidor.");
+                } finally {
+                  setCronPending(false);
+                }
+              }}
+            >
+              Verificação de deadlines agora
+            </Button>
+            <Button
+              variant="outlined"
+              color="warning"
+              size="small"
+              disabled={digestPending}
+              startIcon={digestPending ? <CircularProgress size={14} color="inherit" /> : <PlayArrowOutlinedIcon />}
+              onClick={async () => {
+                setDigestPending(true);
+                setDigestMsg(null);
+                try {
+                  const r = await api.post<{ message: string }>("/admin/run-digest");
+                  setDigestMsg(r.data.message);
+                } catch {
+                  setDigestMsg("Erro ao executar o digest. Verifique os logs do servidor.");
+                } finally {
+                  setDigestPending(false);
+                }
+              }}
+            >
+              Digest diário agora
+            </Button>
+          </Box>
+          {digestMsg && (
+            <Alert
+              severity={digestMsg.startsWith("Erro") ? "error" : "success"}
+              sx={{ mt: 2 }}
+              onClose={() => setDigestMsg(null)}
+            >
+              {digestMsg}
+            </Alert>
+          )}
         </Paper>
       )}
 

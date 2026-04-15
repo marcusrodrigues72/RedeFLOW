@@ -19,7 +19,7 @@
 import cron from "node-cron";
 import { prisma } from "./prisma.js";
 import { logger } from "./logger.js";
-import { sendMail, tmplDeadlineVencido, tmplPrazoProximo } from "./mailer.js";
+import { sendMail, tmplDeadlineVencido, tmplPrazoProximo, tmplDigestoDiario } from "./mailer.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -214,15 +214,122 @@ export async function runDeadlineChecks(): Promise<void> {
   logger.info({ inApp, emails: enviados }, "⏰ Scheduler: deadline checks concluídos");
 }
 
+// ─── Digest diário (RF-M7-06) ────────────────────────────────────────────────
+
+export async function runDigestDiario(): Promise<void> {
+  const hoje     = startOfDay();
+  const amanha   = addDays(hoje, 1);
+
+  logger.info("📧 Scheduler: gerando digests diários...");
+
+  // ── Usuários com digest ativo ────────────────────────────────────────────────
+  const usuarios = await prisma.usuario.findMany({
+    where: { ativo: true, notifEmailAtivo: true, digestDiarioAtivo: true },
+    select: { id: true, nome: true, email: true },
+  });
+
+  if (usuarios.length === 0) {
+    logger.info("📧 Nenhum usuário com digest ativo.");
+    return;
+  }
+
+  const usuarioIds = usuarios.map((u) => u.id);
+
+  // ── Etapas atrasadas por usuário ─────────────────────────────────────────────
+  const etapasAtrasadas = await prisma.etapaOA.findMany({
+    where: {
+      responsavelId:   { in: usuarioIds },
+      status:          { in: ["PENDENTE", "EM_ANDAMENTO"] },
+      deadlinePrevisto: { lt: hoje },
+    },
+    select: {
+      responsavelId: true,
+      deadlinePrevisto: true,
+      etapaDef: { select: { nome: true } },
+      oa: { select: { id: true, codigo: true } },
+    },
+  });
+
+  // ── Etapas que vencem hoje por usuário ────────────────────────────────────────
+  const etapasHoje = await prisma.etapaOA.findMany({
+    where: {
+      responsavelId:    { in: usuarioIds },
+      status:           { in: ["PENDENTE", "EM_ANDAMENTO"] },
+      deadlinePrevisto: { gte: hoje, lt: amanha },
+    },
+    select: {
+      responsavelId: true,
+      etapaDef: { select: { nome: true } },
+      oa: { select: { id: true, codigo: true } },
+    },
+  });
+
+  // ── Menções não lidas por usuário ─────────────────────────────────────────────
+  const mencoes = await prisma.notificacao.findMany({
+    where: { usuarioId: { in: usuarioIds }, tipo: "MENCAO", lida: false },
+    select: { usuarioId: true, entidadeId: true, corpo: true },
+  });
+
+  // ── Agrupa por usuário e envia ────────────────────────────────────────────────
+  let enviados = 0;
+
+  for (const u of usuarios) {
+    const atrasados = etapasAtrasadas
+      .filter((e) => e.responsavelId === u.id)
+      .map((e) => ({
+        oaCodigo:   e.oa.codigo,
+        oaId:       e.oa.id,
+        etapaNome:  e.etapaDef.nome,
+        diasAtraso: diffDays(startOfDay(e.deadlinePrevisto!), hoje),
+      }));
+
+    const hoje_ = etapasHoje
+      .filter((e) => e.responsavelId === u.id)
+      .map((e) => ({
+        oaCodigo:  e.oa.codigo,
+        oaId:      e.oa.id,
+        etapaNome: e.etapaDef.nome,
+      }));
+
+    const mencoes_ = mencoes
+      .filter((n) => n.usuarioId === u.id)
+      .map((n) => ({
+        oaId:   n.entidadeId ?? "",
+        trecho: (n.corpo ?? "").slice(0, 120) + ((n.corpo ?? "").length > 120 ? "…" : ""),
+      }));
+
+    // Não envia digest vazio
+    if (atrasados.length === 0 && hoje_.length === 0 && mencoes_.length === 0) continue;
+
+    await sendMail(tmplDigestoDiario({
+      email:     u.email,
+      nome:      u.nome,
+      atrasados,
+      hoje:      hoje_,
+      mencoes:   mencoes_,
+    }));
+    enviados++;
+  }
+
+  logger.info({ enviados }, "📧 Digests diários enviados.");
+}
+
 // ─── Inicialização ────────────────────────────────────────────────────────────
 
 export function startScheduler(): void {
-  // Executa diariamente às 08:00 (fuso do servidor)
+  // Deadline checks às 08:00
   cron.schedule("0 8 * * *", () => {
     runDeadlineChecks().catch((err) =>
       logger.error({ err }, "❌ Erro no scheduler de deadlines")
     );
   });
 
-  logger.info("⏰ Scheduler iniciado — deadline checks às 08:00 diariamente.");
+  // Digest diário às 07:00
+  cron.schedule("0 7 * * *", () => {
+    runDigestDiario().catch((err) =>
+      logger.error({ err }, "❌ Erro no scheduler de digest")
+    );
+  });
+
+  logger.info("⏰ Scheduler iniciado — deadline checks às 08:00, digest às 07:00.");
 }

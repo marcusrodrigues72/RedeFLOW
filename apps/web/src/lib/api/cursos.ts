@@ -526,6 +526,7 @@ export interface AtualizarPerfilPayload {
   senhaAtual?:              string;
   novaSenha?:               string;
   notifEmailAtivo?:         boolean;
+  digestDiarioAtivo?:       boolean;
   capacidadeHorasSemanais?: number;
 }
 

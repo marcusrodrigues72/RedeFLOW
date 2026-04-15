@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { authenticate, requireAdmin } from "../middlewares/authenticate.js";
-import { runDeadlineChecks } from "../lib/scheduler.js";
+import { runDeadlineChecks, runDigestDiario } from "../lib/scheduler.js";
 import { logger } from "../lib/logger.js";
 import { prisma } from "../lib/prisma.js";
 
@@ -17,6 +17,20 @@ router.post("/run-deadline-checks", authenticate, requireAdmin, async (_req, res
     logger.info("⚡ Execução manual do scheduler solicitada por admin.");
     await runDeadlineChecks();
     res.json({ ok: true, message: "Verificação de deadlines executada com sucesso." });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /admin/run-digest
+ * Executa manualmente o job de digest diário (Admin only).
+ */
+router.post("/run-digest", authenticate, requireAdmin, async (_req, res, next) => {
+  try {
+    logger.info("⚡ Execução manual do digest solicitada por admin.");
+    await runDigestDiario();
+    res.json({ ok: true, message: "Digest diário executado com sucesso." });
   } catch (err) {
     next(err);
   }

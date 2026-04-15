@@ -83,6 +83,7 @@ model Usuario {
   ativo       Boolean     @default(true)
   fotoUrl          String?
   notifEmailAtivo  Boolean     @default(true)
+  digestDiarioAtivo Boolean    @default(true)
   mfaSecret        String?
   mfaAtivo         Boolean     @default(false)
   microsoftId      String?     @unique
