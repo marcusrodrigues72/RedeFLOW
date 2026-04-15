@@ -979,61 +979,83 @@ function GanttView({ oas, onSelect }: { oas: OAItem[]; onSelect: (oaId: string) 
 
 // ─── Visão Por Responsável ────────────────────────────────────────────────────
 
-type OAResp = NonNullable<ReturnType<typeof useOAsByCurso>["data"]>[0];
+type OAResp   = NonNullable<ReturnType<typeof useOAsByCurso>["data"]>[0];
+type EtapaItem = OAResp["etapas"][0];
+
+interface GrupoItem {
+  oa:           OAResp;
+  etapa:        EtapaItem;   // etapa relevante para este responsável
+  isSecundario: boolean;
+}
 
 interface GrupoResponsavel {
-  id: string;             // "unassigned" ou usuarioId
-  nome: string;
-  fotoUrl: string | null;
-  oas: OAResp[];
+  id:                  string;
+  nome:                string;
+  fotoUrl:             string | null;
+  items:               GrupoItem[];
   deadlineMaisProximo: Date | null;
-  atrasados: number;
+  atrasados:           number;
 }
 
 function iniciais(nome: string): string {
-  return nome
-    .split(" ")
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase() ?? "")
-    .join("");
+  return nome.split(" ").slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("");
 }
 
+const ETAPA_STATUS_BADGE: Record<string, { label: string; color: string; bg: string }> = {
+  EM_ANDAMENTO: { label: "Em andamento", color: "#f59e0b", bg: "#fffbeb" },
+  PENDENTE:     { label: "Pendente",     color: "#64748b", bg: "#f8fafc" },
+  BLOQUEADA:    { label: "Bloqueado",    color: "#ef4444", bg: "#fff5f5" },
+  CONCLUIDA:    { label: "Concluída",    color: "#10b981", bg: "#f0fdf4" },
+};
+
 function ResponsavelView({ oas, onSelect }: { oas: OAResp[]; onSelect: (id: string) => void }) {
-  // Agrupa pelos responsáveis da etapa corrente (primeira não concluída)
   const gruposMap = new Map<string, GrupoResponsavel>();
 
-  for (const oa of oas) {
-    const etapaAtual = oa.etapas.find((e) => e.status !== "CONCLUIDA");
-    const resp = etapaAtual?.responsavel ?? null;
-    const key  = resp?.id ?? "unassigned";
+  function ensureGrupo(id: string, nome: string, fotoUrl: string | null): GrupoResponsavel {
+    if (!gruposMap.has(id)) gruposMap.set(id, { id, nome, fotoUrl, items: [], deadlineMaisProximo: null, atrasados: 0 });
+    return gruposMap.get(id)!;
+  }
 
-    if (!gruposMap.has(key)) {
-      gruposMap.set(key, {
-        id:                resp?.id ?? "unassigned",
-        nome:              resp?.nome ?? "Não atribuído",
-        fotoUrl:           resp?.fotoUrl ?? null,
-        oas:               [],
-        deadlineMaisProximo: null,
-        atrasados:         0,
-      });
+  function addItem(grupo: GrupoResponsavel, oa: OAResp, etapa: EtapaItem, isSecundario: boolean) {
+    // Um OA aparece no máximo 1× por grupo (a primeira etapa relevante para esse responsável)
+    if (grupo.items.some((i) => i.oa.id === oa.id)) return;
+    grupo.items.push({ oa, etapa, isSecundario });
+    if (oa.status !== "CONCLUIDO" && etapa.deadlinePrevisto) {
+      const dl = new Date(etapa.deadlinePrevisto);
+      dl.setHours(0, 0, 0, 0);
+      if (!grupo.deadlineMaisProximo || dl < grupo.deadlineMaisProximo) grupo.deadlineMaisProximo = dl;
+      if (dl < inicioHoje && etapa.status !== "CONCLUIDA") grupo.atrasados++;
+    }
+  }
+
+  for (const oa of oas) {
+    // Todas as etapas não concluídas, em ordem
+    const etapasAtivas = oa.etapas.filter((e) => e.status !== "CONCLUIDA");
+
+    // Mapeia responsável → primeira etapa relevante para ele
+    const visto = new Map<string, { etapa: EtapaItem; isSecundario: boolean }>();
+    for (const etapa of etapasAtivas) {
+      if (etapa.responsavel && !visto.has(etapa.responsavel.id)) {
+        visto.set(etapa.responsavel.id, { etapa, isSecundario: false });
+      }
+      if (etapa.responsavelSecundario && !visto.has(etapa.responsavelSecundario.id)) {
+        visto.set(etapa.responsavelSecundario.id, { etapa, isSecundario: true });
+      }
     }
 
-    const grupo = gruposMap.get(key)!;
-    grupo.oas.push(oa);
-
-    // deadline mais próximo (futuro ou passado, ignoramos OAs concluídos)
-    if (oa.status !== "CONCLUIDO") {
-      const dl = deadlineEfetivo(oa);
-      if (dl) {
-        if (!grupo.deadlineMaisProximo || dl < grupo.deadlineMaisProximo) {
-          grupo.deadlineMaisProximo = dl;
-        }
-        if (dl < inicioHoje) grupo.atrasados++;
+    if (visto.size === 0) {
+      // Nenhum responsável em qualquer etapa ativa → "Não atribuído"
+      const etapa = etapasAtivas[0];
+      if (etapa) addItem(ensureGrupo("unassigned", "Não atribuído", null), oa, etapa, false);
+    } else {
+      for (const [respId, { etapa, isSecundario }] of visto) {
+        const resp = etapa.responsavel?.id === respId ? etapa.responsavel : etapa.responsavelSecundario;
+        if (resp) addItem(ensureGrupo(resp.id, resp.nome, resp.fotoUrl), oa, etapa, isSecundario);
       }
     }
   }
 
-  // Ordena: atribuídos primeiro (por nome), depois "Não atribuído"
+  // Ordena: atribuídos por nome, "Não atribuído" por último
   const grupos = Array.from(gruposMap.values()).sort((a, b) => {
     if (a.id === "unassigned") return 1;
     if (b.id === "unassigned") return -1;
@@ -1042,25 +1064,22 @@ function ResponsavelView({ oas, onSelect }: { oas: OAResp[]; onSelect: (id: stri
 
   if (grupos.length === 0) {
     return (
-      <Card>
-        <CardContent sx={{ p: 6, textAlign: "center" }}>
-          <Typography color="text.secondary">Nenhum OA encontrado.</Typography>
-        </CardContent>
-      </Card>
+      <Card><CardContent sx={{ p: 6, textAlign: "center" }}>
+        <Typography color="text.secondary">Nenhum OA encontrado.</Typography>
+      </CardContent></Card>
     );
   }
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
       {grupos.map((grupo) => {
-        const dlStr = grupo.deadlineMaisProximo
-          ? grupo.deadlineMaisProximo.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" })
-          : null;
+        const dlStr      = grupo.deadlineMaisProximo?.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" }) ?? null;
         const dlAtrasado = grupo.deadlineMaisProximo ? grupo.deadlineMaisProximo < inicioHoje : false;
 
-        const byStatus = grupo.oas.reduce<Record<StatusOA, number>>(
-          (acc, oa) => { acc[oa.status] = (acc[oa.status] ?? 0) + 1; return acc; },
-          { PENDENTE: 0, EM_ANDAMENTO: 0, BLOQUEADO: 0, CONCLUIDO: 0 },
+        // Breakdown por status da etapa relevante
+        const byEtapaStatus = grupo.items.reduce<Record<string, number>>(
+          (acc, { etapa }) => { acc[etapa.status] = (acc[etapa.status] ?? 0) + 1; return acc; },
+          {},
         );
 
         return (
@@ -1069,58 +1088,47 @@ function ResponsavelView({ oas, onSelect }: { oas: OAResp[]; onSelect: (id: stri
             <Card sx={{ mb: 1.5, borderRadius: 2, boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
               <CardContent sx={{ p: "12px 16px !important" }}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-                  {/* Avatar */}
                   <Avatar
                     src={grupo.fotoUrl ?? undefined}
-                    sx={{
-                      width: 44, height: 44, fontWeight: 700, fontSize: "1rem",
-                      bgcolor: grupo.id === "unassigned" ? "#94a3b8" : "#2b7cee",
-                    }}
+                    sx={{ width: 44, height: 44, fontWeight: 700, fontSize: "1rem",
+                      bgcolor: grupo.id === "unassigned" ? "#94a3b8" : "#2b7cee" }}
                   >
                     {grupo.fotoUrl ? undefined : iniciais(grupo.nome)}
                   </Avatar>
 
-                  {/* Nome + métricas */}
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography sx={{ fontWeight: 700, fontSize: "0.95rem", lineHeight: 1.2 }}>
                       {grupo.nome}
                     </Typography>
                     <Box sx={{ display: "flex", gap: 1.5, mt: 0.5, flexWrap: "wrap" }}>
-                      {(Object.keys(STATUS_CONFIG) as StatusOA[])
-                        .filter((s) => byStatus[s] > 0)
+                      {(["EM_ANDAMENTO", "PENDENTE", "BLOQUEADA"] as const)
+                        .filter((s) => byEtapaStatus[s])
                         .map((s) => (
                           <Box key={s} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                            <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: STATUS_CONFIG[s].color }} />
+                            <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: ETAPA_STATUS_BADGE[s].color }} />
                             <Typography variant="caption" color="text.secondary">
-                              {byStatus[s]} {STATUS_CONFIG[s].label}
+                              {byEtapaStatus[s]} {ETAPA_STATUS_BADGE[s].label}
                             </Typography>
                           </Box>
                         ))}
                     </Box>
                   </Box>
 
-                  {/* Chips de resumo */}
                   <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
                     <Chip
-                      label={`${grupo.oas.length} OA${grupo.oas.length !== 1 ? "s" : ""}`}
+                      label={`${grupo.items.length} OA${grupo.items.length !== 1 ? "s" : ""}`}
                       size="small"
                       sx={{ fontWeight: 700, bgcolor: "#f1f5f9", color: "#475569", fontSize: "0.72rem" }}
                     />
                     {dlStr && (
                       <Tooltip title="Deadline mais próximo">
                         <Chip
-                          icon={dlAtrasado
-                            ? <WarningAmberIcon sx={{ fontSize: "14px !important", color: "#ef4444 !important" }} />
-                            : undefined}
-                          label={dlStr}
-                          size="small"
-                          sx={{
-                            fontWeight: 700,
-                            fontSize: "0.72rem",
+                          icon={dlAtrasado ? <WarningAmberIcon sx={{ fontSize: "14px !important", color: "#ef4444 !important" }} /> : undefined}
+                          label={dlStr} size="small"
+                          sx={{ fontWeight: 700, fontSize: "0.72rem",
                             bgcolor: dlAtrasado ? "#fff5f5" : "#f0fdf4",
                             color:   dlAtrasado ? "#ef4444" : "#10b981",
-                            border:  `1px solid ${dlAtrasado ? "#fecaca" : "#bbf7d0"}`,
-                          }}
+                            border:  `1px solid ${dlAtrasado ? "#fecaca" : "#bbf7d0"}` }}
                         />
                       </Tooltip>
                     )}
@@ -1136,28 +1144,27 @@ function ResponsavelView({ oas, onSelect }: { oas: OAResp[]; onSelect: (id: stri
               </CardContent>
             </Card>
 
-            {/* ── Cards dos OAs deste responsável ── */}
+            {/* ── Cards dos OAs ── */}
             <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 1.5, pl: 1 }}>
-              {grupo.oas.map((oa) => {
-                const tc         = TIPO_CONFIG[oa.tipo];
-                const sc         = STATUS_CONFIG[oa.status];
-                const etapaAtual = oa.etapas.find((e) => e.status !== "CONCLUIDA");
-                const dl         = etapaAtual?.deadlinePrevisto ?? oa.deadlineFinal;
-                const dlDate     = dl ? new Date(dl) : null;
-                const dlAtras    = dlDate ? dlDate < inicioHoje && oa.status !== "CONCLUIDO" : false;
+              {grupo.items.map(({ oa, etapa, isSecundario }) => {
+                const tc      = TIPO_CONFIG[oa.tipo];
+                const eBadge  = ETAPA_STATUS_BADGE[etapa.status] ?? ETAPA_STATUS_BADGE.PENDENTE;
+                const dl      = etapa.deadlinePrevisto ?? oa.deadlineFinal;
+                const dlDate  = dl ? new Date(dl) : null;
+                const dlAtras = dlDate ? dlDate < inicioHoje && etapa.status !== "CONCLUIDA" : false;
 
                 return (
                   <Card
                     key={oa.id}
+                    onClick={() => onSelect(oa.id)}
                     sx={{
                       borderRadius: 2,
                       boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
-                      borderLeft: `3px solid ${sc.color}`,
+                      borderLeft: `3px solid ${eBadge.color}`,
                       cursor: "pointer",
                       "&:hover": { boxShadow: "0 4px 14px rgba(0,0,0,0.11)" },
                       transition: "box-shadow 0.15s",
                     }}
-                    onClick={() => onSelect(oa.id)}
                   >
                     <CardContent sx={{ p: "10px 14px !important" }}>
                       {/* Linha 1: código + tipo */}
@@ -1165,44 +1172,43 @@ function ResponsavelView({ oas, onSelect }: { oas: OAResp[]; onSelect: (id: stri
                         <Typography sx={{ fontFamily: "monospace", fontWeight: 700, fontSize: "0.8rem" }}>
                           {oa.codigo}
                         </Typography>
-                        <Chip
-                          label={tc.label} size="small"
-                          sx={{ height: 16, fontSize: "0.6rem", bgcolor: `${tc.color}18`, color: tc.color }}
-                        />
+                        <Box sx={{ display: "flex", gap: 0.5 }}>
+                          {isSecundario && (
+                            <Chip label="2°" size="small"
+                              sx={{ height: 14, fontSize: "0.55rem", bgcolor: "#e0e7ff", color: "#3730a3", fontWeight: 700 }} />
+                          )}
+                          <Chip label={tc.label} size="small"
+                            sx={{ height: 16, fontSize: "0.6rem", bgcolor: `${tc.color}18`, color: tc.color }} />
+                        </Box>
                       </Box>
 
-                      {/* Linha 2: etapa atual */}
-                      {etapaAtual && (
-                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.75 }}>
-                          {etapaAtual.etapaDef.nome}
-                          {etapaAtual.responsavelSecundario && (
-                            <Typography component="span" variant="caption" color="text.disabled">
-                              {" · "}{etapaAtual.responsavelSecundario.nome}
-                            </Typography>
-                          )}
+                      {/* Linha 2: etapa + status */}
+                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 0.75 }}>
+                        <Typography variant="caption" color="text.secondary" noWrap sx={{ flex: 1, mr: 0.5 }}>
+                          {etapa.etapaDef.nome}
                         </Typography>
-                      )}
+                        <Chip label={eBadge.label} size="small"
+                          sx={{ height: 14, fontSize: "0.55rem", bgcolor: eBadge.bg, color: eBadge.color, fontWeight: 600, flexShrink: 0 }} />
+                      </Box>
 
-                      {/* Linha 3: barra de progresso */}
+                      {/* Linha 3: progresso */}
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.75 }}>
                         <LinearProgress
                           variant="determinate" value={oa.progressoPct}
                           sx={{ flex: 1, height: 4, borderRadius: 2,
-                            "& .MuiLinearProgress-bar": { bgcolor: sc.color } }}
+                            "& .MuiLinearProgress-bar": { bgcolor: eBadge.color } }}
                         />
                         <Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.disabled", minWidth: 24 }}>
                           {oa.progressoPct}%
                         </Typography>
                       </Box>
 
-                      {/* Linha 4: deadline */}
+                      {/* Linha 4: deadline da etapa */}
                       {dl && (
                         <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                           {dlAtras && <WarningAmberIcon sx={{ fontSize: 12, color: "#ef4444" }} />}
-                          <Typography
-                            variant="caption"
-                            sx={{ fontSize: "0.68rem", color: dlAtras ? "#ef4444" : "text.disabled", fontWeight: dlAtras ? 700 : 400 }}
-                          >
+                          <Typography variant="caption"
+                            sx={{ fontSize: "0.68rem", color: dlAtras ? "#ef4444" : "text.disabled", fontWeight: dlAtras ? 700 : 400 }}>
                             DL: {dlDate!.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" })}
                           </Typography>
                         </Box>
