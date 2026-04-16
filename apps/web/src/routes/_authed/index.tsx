@@ -12,6 +12,8 @@ import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import CalendarTodayIcon      from "@mui/icons-material/CalendarToday";
 import CloseIcon              from "@mui/icons-material/Close";
 import OpenInNewIcon          from "@mui/icons-material/OpenInNew";
+import ChevronLeftIcon        from "@mui/icons-material/ChevronLeft";
+import ChevronRightIcon       from "@mui/icons-material/ChevronRight";
 import { useState }           from "react";
 import { useAuthStore }       from "@/stores/auth.store";
 import { useDashboardStats, useCursos, useDashboardDetalhe } from "@/lib/api/cursos";
@@ -294,137 +296,144 @@ function barColor(pct: number, status: string): string {
   return "#94a3b8";
 }
 
+const WINDOW_MONTHS = 6; // meses visíveis na janela de navegação
+
 function TimelineGantt({ cursos }: { cursos: CursoTimeline[] }) {
   const hoje = new Date();
+  const ROW_H   = 52;
+  const LABEL_W = 185;
+  const DATES_W = 120;
 
-  // Calcula janela de datas global
+  // Range total de todos os cursos
   const datas = cursos.flatMap((c) => [
     c.dataInicioEstimada ? new Date(c.dataInicioEstimada).getTime() : null,
     c.dataFimEstimada    ? new Date(c.dataFimEstimada).getTime()    : null,
   ]).filter(Boolean) as number[];
-
   const minTs = Math.min(...datas);
   const maxTs = Math.max(...datas);
-  // Adiciona 4% de padding em cada lado
-  const pad     = (maxTs - minTs) * 0.04 || 86_400_000 * 30;
-  const rangeStart = minTs - pad;
-  const rangeEnd   = maxTs + pad;
-  const totalRange = rangeEnd - rangeStart;
 
-  const todayPct = Math.min(100, Math.max(0, ((hoje.getTime() - rangeStart) / totalRange) * 100));
+  // Janela: inicia 1 mês antes de hoje (ou antes do primeiro projeto se anterior)
+  const naturalStart = new Date(Math.min(hoje.getTime(), minTs));
+  naturalStart.setDate(1);
+  naturalStart.setMonth(naturalStart.getMonth() - 1);
 
-  // Gera ticks mensais
-  const ticks = buildMonthTicks(new Date(rangeStart), new Date(rangeEnd));
+  // Offset de navegação em meses (múltiplos de 3)
+  const [windowOffset, setWindowOffset] = useState(0);
 
-  // Altura da linha do eixo
-  const ROW_H = 44;
-  const LABEL_W = 200;
+  const windowStart = new Date(naturalStart.getFullYear(), naturalStart.getMonth() + windowOffset, 1);
+  const windowEnd   = new Date(windowStart.getFullYear(), windowStart.getMonth() + WINDOW_MONTHS, 1);
+  const totalRange  = windowEnd.getTime() - windowStart.getTime();
+
+  const canPrev = minTs < windowStart.getTime();
+  const canNext = maxTs > windowEnd.getTime();
+
+  const todayPct = ((hoje.getTime() - windowStart.getTime()) / totalRange) * 100;
+  const showToday = todayPct >= 0 && todayPct <= 100;
+
+  const ticks = buildMonthTicks(windowStart, windowEnd);
+
+  const fmtPeriodo = (d: Date) =>
+    d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
   return (
     <Box>
-      {/* Eixo de tempo */}
-      <Box sx={{ display: "flex", ml: `${LABEL_W}px`, mb: 0.5, position: "relative" }}>
-        {ticks.map((tick) => (
-          <Box
-            key={tick.label}
-            sx={{
-              position: "absolute",
-              left: `${tick.pct}%`,
-              transform: "translateX(-50%)",
-              pointerEvents: "none",
-            }}
+      {/* ── Controles de navegação ─────────────────────────────────────────── */}
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
+        <Typography variant="caption" sx={{ fontWeight: 600, color: "text.secondary", fontSize: "0.78rem", textTransform: "capitalize" }}>
+          {fmtPeriodo(windowStart)} — {fmtPeriodo(new Date(windowEnd.getFullYear(), windowEnd.getMonth() - 1, 1))}
+        </Typography>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+          <Tooltip title="Recuar 3 meses">
+            <span>
+              <IconButton size="small" onClick={() => setWindowOffset((o) => o - 3)} disabled={!canPrev}
+                sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1.5 }}>
+                <ChevronLeftIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Button
+            size="small" variant="outlined"
+            onClick={() => setWindowOffset(0)}
+            sx={{ fontSize: "0.72rem", py: 0.3, px: 1.5, minWidth: 0, borderRadius: 1.5, fontWeight: 600 }}
           >
-            <Typography variant="caption" color="text.disabled" sx={{ fontSize: "0.65rem", whiteSpace: "nowrap" }}>
+            Hoje
+          </Button>
+          <Tooltip title="Avançar 3 meses">
+            <span>
+              <IconButton size="small" onClick={() => setWindowOffset((o) => o + 3)} disabled={!canNext}
+                sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1.5 }}>
+                <ChevronRightIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Box>
+      </Box>
+
+      {/* ── Eixo de tempo ─────────────────────────────────────────────────── */}
+      <Box sx={{ display: "flex", ml: `${LABEL_W}px`, mr: `${DATES_W}px`, position: "relative", height: 22, mb: 0.5 }}>
+        {ticks.map((tick) => (
+          <Box key={tick.label} sx={{ position: "absolute", left: `${tick.pct}%`, transform: "translateX(-50%)", pointerEvents: "none" }}>
+            <Typography variant="caption" sx={{ fontSize: "0.7rem", whiteSpace: "nowrap", fontWeight: 600, color: "text.secondary" }}>
               {tick.label}
             </Typography>
           </Box>
         ))}
       </Box>
 
-      {/* Grade + barras */}
-      <Box sx={{ position: "relative", mt: 2.5 }}>
-        {/* Grade vertical (ticks) */}
-        <Box sx={{ position: "absolute", left: LABEL_W, right: 0, top: 0, bottom: 0, pointerEvents: "none", zIndex: 0 }}>
+      {/* ── Grade + barras ────────────────────────────────────────────────── */}
+      <Box sx={{ position: "relative" }}>
+        {/* Grade vertical */}
+        <Box sx={{ position: "absolute", left: LABEL_W, right: DATES_W, top: 0, bottom: 0, pointerEvents: "none", zIndex: 0 }}>
           {ticks.map((tick) => (
-            <Box
-              key={tick.label}
-              sx={{
-                position: "absolute",
-                left: `${tick.pct}%`,
-                top: 0, bottom: 0,
-                borderLeft: "1px dashed",
-                borderColor: "divider",
-                opacity: 0.6,
-              }}
-            />
+            <Box key={tick.label} sx={{ position: "absolute", left: `${tick.pct}%`, top: 0, bottom: 0, borderLeft: "1px dashed", borderColor: "divider", opacity: 0.7 }} />
           ))}
           {/* Linha "hoje" */}
-          {todayPct >= 0 && todayPct <= 100 && (
-            <Tooltip title="Hoje" placement="top">
-              <Box
-                sx={{
-                  position: "absolute",
-                  left: `${todayPct}%`,
-                  top: 0, bottom: 0,
-                  borderLeft: "2px solid #ef4444",
-                  zIndex: 2,
-                  "&::after": {
-                    content: '"▼"',
-                    position: "absolute",
-                    top: -18,
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    color: "#ef4444",
-                    fontSize: "0.6rem",
-                  },
-                }}
-              />
+          {showToday && (
+            <Tooltip title={`Hoje · ${hoje.toLocaleDateString("pt-BR")}`} placement="top">
+              <Box sx={{
+                position: "absolute", left: `${todayPct}%`, top: 0, bottom: 0,
+                borderLeft: "2px solid #ef4444", zIndex: 2,
+                "&::before": {
+                  content: '"▼"', position: "absolute", top: -17, left: "50%",
+                  transform: "translateX(-50%)", color: "#ef4444", fontSize: "0.6rem",
+                },
+              }} />
             </Tooltip>
           )}
         </Box>
 
         {/* Linhas de curso */}
         {cursos.map((curso, idx) => {
-          const start = curso.dataInicioEstimada ? new Date(curso.dataInicioEstimada).getTime() : null;
-          const end   = curso.dataFimEstimada    ? new Date(curso.dataFimEstimada).getTime()    : null;
-
-          const leftPct  = start ? ((start - rangeStart) / totalRange) * 100 : 0;
-          const widthPct = start && end ? ((end - start) / totalRange) * 100 : 0;
-          const color    = barColor(curso.progressoPct, curso.status);
+          const startTs = curso.dataInicioEstimada ? new Date(curso.dataInicioEstimada).getTime() : null;
+          const endTs   = curso.dataFimEstimada    ? new Date(curso.dataFimEstimada).getTime()    : null;
+          const color   = barColor(curso.progressoPct, curso.status);
           const isActive = curso.status === "ATIVO";
 
+          // Visibilidade na janela atual
+          const inWindow = startTs !== null && endTs !== null &&
+            startTs < windowEnd.getTime() && endTs > windowStart.getTime();
+          const extendsLeft  = startTs !== null && startTs < windowStart.getTime();
+          const extendsRight = endTs   !== null && endTs   > windowEnd.getTime();
+
+          // Clamp à janela
+          const visStartTs = startTs !== null ? Math.max(startTs, windowStart.getTime()) : null;
+          const visEndTs   = endTs   !== null ? Math.min(endTs,   windowEnd.getTime())   : null;
+          const leftPct  = visStartTs !== null ? ((visStartTs - windowStart.getTime()) / totalRange) * 100 : 0;
+          const widthPct = visStartTs !== null && visEndTs !== null ? Math.max(((visEndTs - visStartTs) / totalRange) * 100, 0.5) : 0;
+
+          const brLeft  = extendsLeft  ? 0 : 6;
+          const brRight = extendsRight ? 0 : 6;
+
           return (
-            <Box
-              key={curso.id}
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                height: ROW_H,
-                bgcolor: idx % 2 === 0 ? "transparent" : "#fafafa",
-                borderRadius: 1,
-                "&:hover": { bgcolor: "#f0f7ff" },
-                transition: "background 0.12s",
-              }}
-            >
-              {/* Label */}
-              <Box
-                component={Link}
-                to={`/cursos/${curso.id}`}
-                sx={{
-                  width: LABEL_W,
-                  flexShrink: 0,
-                  pr: 2,
-                  textDecoration: "none",
-                  overflow: "hidden",
-                }}
-              >
-                <Typography
-                  variant="body2"
-                  fontWeight={isActive ? 600 : 400}
-                  noWrap
-                  color={isActive ? "text.primary" : "text.secondary"}
-                  sx={{ fontSize: "0.8rem" }}
-                >
+            <Box key={curso.id} sx={{
+              display: "flex", alignItems: "center", height: ROW_H,
+              bgcolor: idx % 2 === 0 ? "transparent" : "#fafafa",
+              borderRadius: 1, "&:hover": { bgcolor: "#f0f7ff" }, transition: "background 0.12s",
+            }}>
+              {/* Label do curso */}
+              <Box component={Link} to={`/cursos/${curso.id}`} sx={{ width: LABEL_W, flexShrink: 0, pr: 1.5, textDecoration: "none", overflow: "hidden" }}>
+                <Typography variant="body2" fontWeight={isActive ? 700 : 400} noWrap
+                  color={isActive ? "text.primary" : "text.secondary"} sx={{ fontSize: "0.8rem" }}>
                   {curso.nome}
                 </Typography>
                 <Typography variant="caption" color="text.disabled" sx={{ fontSize: "0.65rem" }}>
@@ -434,76 +443,68 @@ function TimelineGantt({ cursos }: { cursos: CursoTimeline[] }) {
 
               {/* Área da barra */}
               <Box sx={{ flex: 1, position: "relative", height: "100%", display: "flex", alignItems: "center" }}>
-                {start && end ? (
-                  <Tooltip
-                    arrow
-                    placement="top"
+                {inWindow ? (
+                  <Tooltip arrow placement="top"
                     title={
-                      <Box>
-                        <Typography sx={{ display: "block", fontSize: "0.8rem", fontWeight: 700, color: "#1e293b" }}>{curso.nome}</Typography>
-                        <Typography sx={{ display: "block", fontSize: "0.75rem", color: "#475569" }}>
-                          {new Date(start).toLocaleDateString("pt-BR")} → {new Date(end).toLocaleDateString("pt-BR")}
-                          {" "}(estimado via OAs)
+                      <Box sx={{ minWidth: 180 }}>
+                        <Typography sx={{ display: "block", fontSize: "0.82rem", fontWeight: 700, color: "#1e293b", mb: 0.5 }}>
+                          {curso.nome}
                         </Typography>
                         <Typography sx={{ display: "block", fontSize: "0.75rem", color: "#475569" }}>
+                          📅 {startTs ? new Date(startTs).toLocaleDateString("pt-BR") : "?"} → {endTs ? new Date(endTs).toLocaleDateString("pt-BR") : "?"}
+                        </Typography>
+                        <Typography sx={{ display: "block", fontSize: "0.75rem", color: "#475569", mt: 0.25 }}>
                           {curso.progressoPct}% concluído · {curso.totalOAs} OAs
                         </Typography>
+                        {(extendsLeft || extendsRight) && (
+                          <Typography sx={{ display: "block", fontSize: "0.68rem", color: "#94a3b8", mt: 0.5, fontStyle: "italic" }}>
+                            {extendsLeft && extendsRight ? "Projeto além dos limites da janela" :
+                             extendsLeft  ? "Início antes da janela atual" :
+                                           "Término além da janela atual"}
+                          </Typography>
+                        )}
                       </Box>
                     }
                     componentsProps={{
-                      tooltip: {
-                        sx: {
-                          bgcolor: "white",
-                          color: "#1e293b",
-                          border: "1px solid #e2e8f0",
-                          boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
-                          borderRadius: 1.5,
-                          px: 1.5, py: 1,
-                        },
-                      },
-                      arrow: {
-                        sx: {
-                          color: "white",
-                          "&::before": { border: "1px solid #e2e8f0" },
-                        },
-                      },
+                      tooltip: { sx: { bgcolor: "white", color: "#1e293b", border: "1px solid #e2e8f0", boxShadow: "0 4px 16px rgba(0,0,0,0.12)", borderRadius: 1.5, px: 1.5, py: 1 } },
+                      arrow:   { sx: { color: "white", "&::before": { border: "1px solid #e2e8f0" } } },
                     }}
                   >
-                    <Box
-                      sx={{
-                        position: "absolute",
-                        left: `${leftPct}%`,
-                        width: `${Math.max(widthPct, 1)}%`,
-                        height: 28,
-                        borderRadius: 1.5,
-                        bgcolor: `${color}22`,
-                        border: `1px solid ${color}55`,
-                        overflow: "hidden",
-                        cursor: "pointer",
-                      }}
-                    >
+                    <Box sx={{
+                      position: "absolute", left: `${leftPct}%`, width: `${widthPct}%`, height: 30,
+                      borderTopLeftRadius: brLeft, borderBottomLeftRadius: brLeft,
+                      borderTopRightRadius: brRight, borderBottomRightRadius: brRight,
+                      bgcolor: `${color}20`, border: `1.5px solid ${color}66`,
+                      overflow: "hidden", cursor: "pointer",
+                    }}>
+                      {/* Indicador de extensão esquerda */}
+                      {extendsLeft && (
+                        <Box sx={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 5, bgcolor: color, opacity: 0.85 }} />
+                      )}
                       {/* Barra de progresso */}
-                      <Box
-                        sx={{
-                          position: "absolute",
-                          left: 0, top: 0, bottom: 0,
-                          width: `${curso.progressoPct}%`,
-                          bgcolor: color,
-                          opacity: 0.7,
-                          borderRadius: "inherit",
-                          transition: "width 0.5s ease",
-                        }}
-                      />
-                      {/* Label de % */}
-                      <Box sx={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", px: 1 }}>
-                        <Typography
-                          variant="caption"
-                          sx={{ fontSize: "0.65rem", fontWeight: 700, color, whiteSpace: "nowrap", zIndex: 1 }}
-                        >
+                      <Box sx={{
+                        position: "absolute", left: 0, top: 0, bottom: 0,
+                        width: `${curso.progressoPct}%`, bgcolor: color, opacity: 0.65,
+                        transition: "width 0.5s ease",
+                      }} />
+                      {/* Label % dentro da barra */}
+                      <Box sx={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", px: 1, gap: 0.5 }}>
+                        <Typography variant="caption" sx={{ fontSize: "0.68rem", fontWeight: 800, color, whiteSpace: "nowrap", zIndex: 1, textShadow: "0 0 4px #fff" }}>
                           {curso.progressoPct}%
                         </Typography>
                       </Box>
+                      {/* Indicador de extensão direita */}
+                      {extendsRight && (
+                        <Box sx={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 5, bgcolor: color, opacity: 0.85 }} />
+                      )}
                     </Box>
+                  </Tooltip>
+                ) : startTs !== null && endTs !== null ? (
+                  /* Barra fora da janela — mostra seta direcional */
+                  <Tooltip title={`${curso.nome} · fora do período visível`} placement="top">
+                    <Typography variant="caption" color="text.disabled" sx={{ fontSize: "0.65rem", pl: 1, fontStyle: "italic", cursor: "default" }}>
+                      {startTs > windowEnd.getTime() ? "▶ período futuro" : "◀ período passado"}
+                    </Typography>
                   </Tooltip>
                 ) : (
                   <Typography variant="caption" color="text.disabled" sx={{ fontSize: "0.65rem", pl: 1 }}>
@@ -512,18 +513,25 @@ function TimelineGantt({ cursos }: { cursos: CursoTimeline[] }) {
                 )}
               </Box>
 
-              {/* Datas à direita */}
-              <Box sx={{ width: 140, pl: 1.5, flexShrink: 0 }}>
-                {start && end ? (
+              {/* Coluna de datas + % */}
+              <Box sx={{ width: DATES_W, pl: 1.5, flexShrink: 0 }}>
+                {startTs && endTs ? (
                   <Box>
-                    <Typography variant="caption" color="text.disabled" sx={{ fontSize: "0.65rem", display: "block" }}>
-                      {new Date(start).toLocaleDateString("pt-BR", { month: "short", year: "2-digit" })}
-                      {" → "}
-                      {new Date(end).toLocaleDateString("pt-BR", { month: "short", year: "2-digit" })}
+                    <Typography variant="caption" sx={{ fontSize: "0.67rem", display: "block", color: "text.secondary", fontWeight: 500, lineHeight: 1.3 }}>
+                      {new Date(startTs).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
                     </Typography>
-                    <Typography variant="caption" sx={{ fontSize: "0.6rem", color: "#94a3b8" }}>
-                      {curso.totalOAs} OAs
+                    <Typography variant="caption" sx={{ fontSize: "0.65rem", display: "block", color: "text.disabled", lineHeight: 1.3 }}>
+                      → {new Date(endTs).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "2-digit" })}
                     </Typography>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 0.4 }}>
+                      <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: color, flexShrink: 0 }} />
+                      <Typography variant="caption" sx={{ fontSize: "0.68rem", color, fontWeight: 800, lineHeight: 1 }}>
+                        {curso.progressoPct}%
+                      </Typography>
+                      <Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.disabled", lineHeight: 1 }}>
+                        · {curso.totalOAs} OAs
+                      </Typography>
+                    </Box>
                   </Box>
                 ) : null}
               </Box>
@@ -532,7 +540,7 @@ function TimelineGantt({ cursos }: { cursos: CursoTimeline[] }) {
         })}
       </Box>
 
-      {/* Legenda */}
+      {/* ── Legenda ───────────────────────────────────────────────────────── */}
       <Box sx={{ display: "flex", gap: 2.5, mt: 2.5, pt: 2, borderTop: "1px solid", borderColor: "divider", flexWrap: "wrap" }}>
         {[
           { color: "#94a3b8", label: "Não iniciado (<25%)" },
