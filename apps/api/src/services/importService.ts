@@ -8,7 +8,8 @@ const TIPO_MAP: Record<string, string> = {
   // Vídeo
   "roteiro de vídeo": "VIDEO", "roteiro de video": "VIDEO",
   "vídeo": "VIDEO", "video": "VIDEO",
-  "videoaula": "VIDEO", "podcast": "VIDEO",
+  "videoaula": "VIDEO", "vídeoaula": "VIDEO",
+  "podcast": "VIDEO",
   // Slide
   "slide": "SLIDE", "slides": "SLIDE",
   "apresentação": "SLIDE", "apresentacao": "SLIDE",
@@ -28,6 +29,15 @@ const TIPO_MAP: Record<string, string> = {
   "atividade": "TAREFA", "atividade interativa": "TAREFA",
   "discussão": "TAREFA", "discussao": "TAREFA",
   "projeto": "TAREFA", "seminário": "TAREFA", "seminario": "TAREFA",
+  "estudo de caso": "TAREFA",
+  // Infográfico (tipo nativo — letra "I")
+  "infográfico": "INFOGRAFICO", "infografico": "INFOGRAFICO",
+  "infográfico interativo": "INFOGRAFICO", "infografico interativo": "INFOGRAFICO",
+  "mapa mental": "INFOGRAFICO", "mapa conceitual": "INFOGRAFICO",
+  "mapa": "INFOGRAFICO",
+  // Timeline / Linha do tempo (tipo nativo — letra "L")
+  "linha do tempo": "TIMELINE", "timeline": "TIMELINE",
+  "cronograma": "TIMELINE", "linha de tempo": "TIMELINE",
 };
 
 const STATUS_ETAPA_MAP: Record<string, string> = {
@@ -761,12 +771,14 @@ function mapTiposMI(raw: string): string[] {
   for (const p of partes) {
     if (TIPO_MAP[p]) { tipos.push(TIPO_MAP[p]!); continue; }
     // Correspondência parcial por palavra-chave
-    if (/v[íi]deo|video|roteiro/.test(p)) { tipos.push("VIDEO"); continue; }
-    if (/slide/.test(p))                  { tipos.push("SLIDE"); continue; }
-    if (/quiz|question|avalia/.test(p))   { tipos.push("QUIZ"); continue; }
-    if (/plano.*aula|aula.*plano/.test(p)){ tipos.push("PLANO_AULA"); continue; }
-    if (/f[óo]rum|forum|atividade|discuss/.test(p)) { tipos.push("TAREFA"); continue; }
-    if (/ebook|e-book|livro|apostila/.test(p)) { tipos.push("EBOOK"); continue; }
+    if (/v[íi]deo|video|roteiro|podcast/.test(p)) { tipos.push("VIDEO"); continue; }
+    if (/slide/.test(p))                           { tipos.push("SLIDE"); continue; }
+    if (/quiz|question|avalia/.test(p))            { tipos.push("QUIZ"); continue; }
+    if (/plano.*aula|aula.*plano/.test(p))         { tipos.push("PLANO_AULA"); continue; }
+    if (/f[óo]rum|forum|atividade|discuss|seminár|estudo.*caso/.test(p)) { tipos.push("TAREFA"); continue; }
+    if (/ebook|e-book|livro|apostila/.test(p))     { tipos.push("EBOOK"); continue; }
+    if (/infogr[áa]f|mapa.*(mental|conceitual)/.test(p)) { tipos.push("INFOGRAFICO"); continue; }
+    if (/linha.*tempo|^timeline$|cronograma/.test(p))     { tipos.push("TIMELINE"); continue; }
     // Tipo não reconhecido — registra como TAREFA para não perder o OA
     tipos.push("TAREFA");
   }
@@ -984,7 +996,16 @@ export function parseMI(buffer: Buffer, filename: string): MICapitulo[] {
 
       if (tipoRaw) {
         for (const tipo of mapTiposMI(tipoRaw)) {
-          cap.oaDefs.push({ oeNumero: oeNum, tipo, quantidade: qtd });
+          // Acumula quantidade se já existe entrada para o mesmo (oeNumero, tipo) no capítulo.
+          // Isso trata o caso em que linhas diferentes da MI listam o mesmo tipo de OA para o
+          // mesmo OE (ex.: "Mapa mental" e "Infográfico" → ambos INFOGRAFICO, OE 1):
+          // resulta em U#C#O1I1 + U#C#O1I2 em vez de dois U#C#O1I1 conflitantes.
+          const existing = cap.oaDefs.find((d) => d.oeNumero === oeNum && d.tipo === tipo);
+          if (existing) {
+            existing.quantidade += qtd;
+          } else {
+            cap.oaDefs.push({ oeNumero: oeNum, tipo, quantidade: qtd });
+          }
         }
       }
     }
