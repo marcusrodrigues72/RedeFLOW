@@ -165,6 +165,9 @@ const TIPO_LABEL: Record<string, string> = {
   EBOOK:      "Ebook",
   PLANO_AULA: "Plano de Aula",
   TAREFA:     "Tarefa",
+  INFOGRAFICO: "Infográfico",
+  TIMELINE:   "Timeline",
+  ANIMACAO:   "Animação",
 };
 
 const STATUS_ETAPA_LABEL: Record<string, string> = {

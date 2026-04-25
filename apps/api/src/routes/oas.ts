@@ -11,6 +11,7 @@ router.use(authenticate);
 
 router.get("/meu-trabalho",          ctrl.meuTrabalho);
 router.get("/:id",                   ctrl.buscar);
+router.delete("/:id",                ctrl.excluirOA);
 router.patch("/:id",                 ctrl.atualizarOA);
 router.patch("/:id/etapas/:etapaId", ctrl.atualizarEtapa);
 

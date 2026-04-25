@@ -4,7 +4,7 @@
 set -euo pipefail
 
 EC2_USER="ubuntu"
-EC2_HOST="54.145.212.36"
+EC2_HOST="54.198.193.75"
 EC2_KEY="/Users/marcusrodrigues/Projetos/Redeflow/education-20260408.pem"
 REMOTE_DIR="/home/ubuntu/redeflow"
 

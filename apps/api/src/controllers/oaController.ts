@@ -44,6 +44,33 @@ export class OAController {
     } catch (err) { next(err); }
   };
 
+  // DELETE /oas/:id  (apenas ADMIN global ou do curso)
+  excluirOA = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { prisma: db } = await import("../lib/prisma.js");
+      const oaId    = req.params["id"] as string;
+      const usuario = await db.usuario.findUnique({ where: { id: req.usuario!.sub }, select: { papelGlobal: true } });
+      let isAdmin   = usuario?.papelGlobal === "ADMIN";
+      if (!isAdmin) {
+        const oa = await db.objetoAprendizagem.findUnique({
+          where:  { id: oaId },
+          select: { capitulo: { select: { unidade: { select: { cursoId: true } } } } },
+        });
+        const cursoId = oa?.capitulo?.unidade?.cursoId;
+        const membro  = cursoId ? await db.cursoMembro.findUnique({
+          where: { cursoId_usuarioId: { cursoId, usuarioId: req.usuario!.sub } },
+        }) : null;
+        isAdmin = membro?.papel === "ADMIN";
+      }
+      if (!isAdmin) {
+        res.status(403).json({ message: "Apenas administradores podem excluir OAs." });
+        return;
+      }
+      await oaRepository.deleteOA(oaId);
+      res.status(204).send();
+    } catch (err) { next(err); }
+  };
+
   // PATCH /oas/:id
   atualizarOA = async (req: Request, res: Response, next: NextFunction) => {
     try {

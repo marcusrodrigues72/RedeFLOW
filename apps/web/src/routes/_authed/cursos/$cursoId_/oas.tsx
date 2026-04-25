@@ -2,9 +2,10 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Box, Typography, Chip, Button, Card, CardContent, TextField, InputAdornment,
   Select, MenuItem, FormControl, Skeleton, Alert, LinearProgress,
-  Table, TableHead, TableRow, TableCell, TableBody,
+  Table, TableHead, TableRow, TableCell, TableBody, Checkbox,
   Tabs, Tab, Tooltip, ToggleButtonGroup, ToggleButton,
   Drawer, IconButton, CircularProgress, Divider, Avatar,
+  Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
 } from "@mui/material";
 import ArrowBackIcon            from "@mui/icons-material/ArrowBack";
 import SearchIcon               from "@mui/icons-material/Search";
@@ -18,10 +19,18 @@ import CloseIcon         from "@mui/icons-material/Close";
 import OpenInNewIcon     from "@mui/icons-material/OpenInNew";
 import SendIcon          from "@mui/icons-material/Send";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import ExpandMoreIcon    from "@mui/icons-material/ExpandMore";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import HourglassEmptyIcon     from "@mui/icons-material/HourglassEmpty";
+import BlockIcon              from "@mui/icons-material/Block";
+import ErrorOutlineIcon       from "@mui/icons-material/ErrorOutline";
+import TrendingUpIcon         from "@mui/icons-material/TrendingUp";
+import AccessTimeIcon         from "@mui/icons-material/AccessTime";
+import SchoolIcon             from "@mui/icons-material/School";
 import { useState, useCallback, useRef } from "react";
-import { useOAsByCurso, useCurso, useAtualizarEtapaGeral, useComentariosOA, useAdicionarComentario, useExcluirComentario, useAuditLogOA } from "@/lib/api/cursos";
+import { useOAsByCurso, useCurso, useAtualizarEtapaGeral, useComentariosOA, useAdicionarComentario, useExcluirComentario, useAuditLogOA, useExcluirOA, useExcluirOAsEmMassa } from "@/lib/api/cursos";
 import { useAuthStore } from "@/stores/auth.store";
-import type { StatusOA, TipoOA, StatusEtapa } from "shared";
+import type { StatusOA, TipoOA, StatusEtapa, CursoDetalhe } from "shared";
 
 export const Route = createFileRoute("/_authed/cursos/$cursoId_/oas")({
   component: OAsPage,
@@ -43,6 +52,7 @@ const TIPO_CONFIG: Record<TipoOA, { label: string; color: string }> = {
   TAREFA:      { label: "Tarefa",        color: "#dc2626" },
   INFOGRAFICO: { label: "Infográfico",   color: "#7e22ce" },
   TIMELINE:    { label: "Timeline",      color: "#0f766e" },
+  ANIMACAO:    { label: "Animação",      color: "#db2777" },
 };
 
 const ETAPA_STATUS_COLOR: Record<string, string> = {
@@ -69,6 +79,103 @@ const OA_TO_ETAPA: Record<StatusOA, StatusEtapa> = {
 
 type Visao = "lista" | "kanban" | "gantt" | "responsavel";
 type FiltroDeadline = "" | "vencido" | "semana" | "mes";
+
+// ─── Painel de KPIs ──────────────────────────────────────────────────────────
+
+type OAParaKPI = { status: StatusOA; progressoPct: number; etapas: { status: StatusEtapa; deadlinePrevisto: string | null }[] };
+
+function minutosParaHoras(min: string | null | undefined): string {
+  if (!min) return "—";
+  const v = parseFloat(min);
+  if (isNaN(v) || v === 0) return "—";
+  const h = v / 60;
+  return `${Number.isInteger(h) ? h : h.toFixed(1)}h`;
+}
+
+function KPICard({
+  valor, label, icon, cor, destaque,
+}: {
+  valor: string | number; label: string; icon: React.ReactNode;
+  cor: string; destaque?: boolean;
+}) {
+  return (
+    <Card sx={{
+      flex: "1 1 130px", minWidth: 0, borderRadius: 2,
+      borderTop: `3px solid ${cor}`,
+      boxShadow: destaque ? `0 0 0 1.5px ${cor}40, 0 2px 8px rgba(0,0,0,0.08)` : "0 1px 4px rgba(0,0,0,0.06)",
+    }}>
+      <CardContent sx={{ p: "12px 16px !important" }}>
+        <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+          <Box>
+            <Typography sx={{ fontSize: "1.6rem", fontWeight: 800, lineHeight: 1, color: cor }}>
+              {valor}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: "block", mt: 0.5 }}>
+              {label}
+            </Typography>
+          </Box>
+          <Box sx={{ color: cor, opacity: 0.25, mt: 0.25 }}>
+            {icon}
+          </Box>
+        </Box>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PainelKPIs({ oas, curso }: { oas: OAParaKPI[]; curso?: CursoDetalhe }) {
+  const total       = oas.length;
+  const concluidos  = oas.filter((o) => o.status === "CONCLUIDO").length;
+  const emAndamento = oas.filter((o) => o.status === "EM_ANDAMENTO").length;
+  const bloqueados  = oas.filter((o) => o.status === "BLOQUEADO").length;
+  const atrasados   = oas.filter((o) =>
+    o.status !== "CONCLUIDO" &&
+    o.etapas.some((e) => e.status !== "CONCLUIDA" && e.deadlinePrevisto && new Date(e.deadlinePrevisto) < inicioHoje)
+  ).length;
+  const progresso   = total > 0 ? Math.round(oas.reduce((s, o) => s + o.progressoPct, 0) / total) : 0;
+
+  // CH somada de todos os capítulos do curso
+  const todosCapitulos = curso?.unidades.flatMap((u) => u.capitulos) ?? [];
+  const chSincTotal  = todosCapitulos.reduce((s, c) => s + (parseFloat(c.chSincrona  ?? "0") || 0), 0);
+  const chAsyncTotal = todosCapitulos.reduce((s, c) => s + (parseFloat(c.chAssincrona ?? "0") || 0), 0);
+  const chSincStr  = minutosParaHoras(String(chSincTotal  || ""));
+  const chAsyncStr = minutosParaHoras(String(chAsyncTotal || ""));
+
+  if (total === 0) return null;
+
+  return (
+    <Box sx={{ display: "flex", gap: 1.5, mb: 3, flexWrap: "wrap" }}>
+      <KPICard valor={total}       label="Total de OAs"   icon={<SchoolIcon sx={{ fontSize: 28 }} />}            cor="#475569" />
+      <KPICard valor={concluidos}  label="Concluídos"     icon={<CheckCircleOutlineIcon sx={{ fontSize: 28 }} />} cor="#10b981" destaque={concluidos > 0} />
+      <KPICard valor={emAndamento} label="Em Andamento"   icon={<TrendingUpIcon sx={{ fontSize: 28 }} />}         cor="#f59e0b" destaque={emAndamento > 0} />
+      <KPICard valor={bloqueados}  label="Bloqueados"     icon={<BlockIcon sx={{ fontSize: 28 }} />}              cor="#ef4444" destaque={bloqueados > 0} />
+      <KPICard valor={atrasados}   label="Atrasados"      icon={<ErrorOutlineIcon sx={{ fontSize: 28 }} />}       cor={atrasados > 0 ? "#ef4444" : "#94a3b8"} destaque={atrasados > 0} />
+      <Card sx={{ flex: "1 1 160px", minWidth: 0, borderRadius: 2, borderTop: "3px solid #2b7cee", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+        <CardContent sx={{ p: "12px 16px !important" }}>
+          <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+            <Box sx={{ flex: 1 }}>
+              <Typography sx={{ fontSize: "1.6rem", fontWeight: 800, lineHeight: 1, color: "#2b7cee" }}>
+                {progresso}%
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: "block", mt: 0.5 }}>
+                Progresso Geral
+              </Typography>
+              <LinearProgress
+                variant="determinate" value={progresso}
+                sx={{ mt: 1, height: 4, borderRadius: 2, bgcolor: "#e2e8f0", "& .MuiLinearProgress-bar": { bgcolor: "#2b7cee" } }}
+              />
+            </Box>
+            <Box sx={{ color: "#2b7cee", opacity: 0.25, mt: 0.25, ml: 1 }}>
+              <HourglassEmptyIcon sx={{ fontSize: 28 }} />
+            </Box>
+          </Box>
+        </CardContent>
+      </Card>
+      <KPICard valor={chSincStr}  label="CH Síncrona"   icon={<AccessTimeIcon sx={{ fontSize: 28 }} />} cor="#7c3aed" />
+      <KPICard valor={chAsyncStr} label="CH Assíncrona" icon={<AccessTimeIcon sx={{ fontSize: 28 }} />} cor="#0891b2" />
+    </Box>
+  );
+}
 
 // ── helpers de intervalo ──────────────────────────────────────────────────────
 const inicioHoje = (() => { const d = new Date(); d.setHours(0,0,0,0); return d; })();
@@ -108,11 +215,29 @@ function OAsPage() {
   const [filtroResponsavel,   setFiltroResponsavel] = useState("");
   const [filtroStatusEtapa,   setFiltroStatusEtapa] = useState("");
   const [visao,               setVisao]           = useState<Visao>("lista");
+  const [agrupamentoLista,    setAgrupamentoLista] = useState<"capitulo" | "responsavel">("capitulo");
   const [selectedOaId,        setSelectedOaId]    = useState<string | null>(null);
+  const [oaParaExcluir,       setOaParaExcluir]   = useState<{ id: string; codigo: string } | null>(null);
+  const [selectedIds,         setSelectedIds]      = useState<Set<string>>(new Set());
+  const [confirmarMassa,      setConfirmarMassa]   = useState(false);
   const { mutate: atualizarEtapa }                = useAtualizarEtapaGeral();
+  const { mutate: excluirOA, isPending: excluindo } = useExcluirOA(cursoId);
+  const { mutate: excluirEmMassa, isPending: excluindoMassa } = useExcluirOAsEmMassa(cursoId);
   const user                                      = useAuthStore((s) => s.user);
   const isAdmin = user?.papelGlobal === "ADMIN" ||
     curso?.membros.some((m) => m.usuarioId === user?.id && m.papel === "ADMIN");
+
+  const handleToggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const handleSelectAll = useCallback((ids: string[], checked: boolean) => {
+    setSelectedIds(checked ? new Set(ids) : new Set());
+  }, []);
 
   const { data: oas = [], isLoading, isError } = useOAsByCurso(cursoId, {
     status: filtroStatus || undefined,
@@ -161,6 +286,23 @@ function OAsPage() {
     return acc;
   }, {});
 
+  // Agrupamento por responsável para a ListaView
+  const gruposResponsavel = oasFiltrados.reduce<Record<string, typeof oasFiltrados>>((acc, oa) => {
+    const etapaAtiva = oa.etapas.find((e) => e.status !== "CONCLUIDA" && e.responsavel);
+    const nome = etapaAtiva?.responsavel?.nome ?? "Não atribuído";
+    acc[nome] = acc[nome] ?? [];
+    acc[nome]!.push(oa);
+    return acc;
+  }, {});
+  // Ordena: nomes alfabéticos, "Não atribuído" por último
+  const gruposResponsavelOrdenado = Object.fromEntries(
+    Object.entries(gruposResponsavel).sort(([a], [b]) => {
+      if (a === "Não atribuído") return 1;
+      if (b === "Não atribuído") return -1;
+      return a.localeCompare(b);
+    })
+  );
+
   const handleStatusChange = useCallback((oa: (typeof oas)[0], novoStatus: StatusOA) => {
     const etapaAtual = oa.etapas.find((e) => e.status !== "CONCLUIDA");
     if (!etapaAtual) return;
@@ -194,17 +336,42 @@ function OAsPage() {
         )}
       </Box>
 
+      {/* ── Painel de KPIs ── */}
+      {!isLoading && <PainelKPIs oas={oas} curso={curso ?? undefined} />}
+
       {/* ── Abas de visão ── */}
-      <Tabs
-        value={visao}
-        onChange={(_, v) => setVisao(v as Visao)}
-        sx={{ mb: 2.5, borderBottom: "1px solid", borderColor: "divider" }}
-      >
-        <Tab value="lista"       label="Lista"         icon={<TableRowsIcon sx={{ fontSize: 18 }} />}        iconPosition="start" sx={{ minHeight: 40, fontWeight: 600 }} />
-        <Tab value="kanban"      label="Kanban"        icon={<ViewKanbanIcon sx={{ fontSize: 18 }} />}       iconPosition="start" sx={{ minHeight: 40, fontWeight: 600 }} />
-        <Tab value="gantt"       label="Gantt"         icon={<ViewTimelineIcon sx={{ fontSize: 18 }} />}     iconPosition="start" sx={{ minHeight: 40, fontWeight: 600 }} />
-        <Tab value="responsavel" label="Por responsável" icon={<PeopleAltOutlinedIcon sx={{ fontSize: 18 }} />} iconPosition="start" sx={{ minHeight: 40, fontWeight: 600 }} />
-      </Tabs>
+      <Box sx={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", borderBottom: "1px solid", borderColor: "divider", mb: 2.5 }}>
+        <Tabs
+          value={visao}
+          onChange={(_, v) => { setVisao(v as Visao); setSelectedIds(new Set()); }}
+          sx={{ "& .MuiTabs-root": { borderBottom: "none" } }}
+        >
+          <Tab value="lista"       label="Lista"         icon={<TableRowsIcon sx={{ fontSize: 18 }} />}           iconPosition="start" sx={{ minHeight: 40, fontWeight: 600 }} />
+          <Tab value="kanban"      label="Kanban"        icon={<ViewKanbanIcon sx={{ fontSize: 18 }} />}          iconPosition="start" sx={{ minHeight: 40, fontWeight: 600 }} />
+          <Tab value="gantt"       label="Gantt"         icon={<ViewTimelineIcon sx={{ fontSize: 18 }} />}        iconPosition="start" sx={{ minHeight: 40, fontWeight: 600 }} />
+          <Tab value="responsavel" label="Por responsável" icon={<PeopleAltOutlinedIcon sx={{ fontSize: 18 }} />} iconPosition="start" sx={{ minHeight: 40, fontWeight: 600 }} />
+        </Tabs>
+
+        {/* Toggle de agrupamento — só visível na visão Lista */}
+        {visao === "lista" && (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+            <Typography variant="caption" color="text.disabled" fontWeight={600}>Agrupar por:</Typography>
+            <ToggleButtonGroup
+              value={agrupamentoLista}
+              exclusive
+              size="small"
+              onChange={(_, v) => { if (v) setAgrupamentoLista(v); }}
+            >
+              <ToggleButton value="capitulo" sx={{ fontSize: "0.7rem", px: 1.5, py: 0.4, fontWeight: 600 }}>
+                Capítulo
+              </ToggleButton>
+              <ToggleButton value="responsavel" sx={{ fontSize: "0.7rem", px: 1.5, py: 0.4, fontWeight: 600 }}>
+                Responsável
+              </ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
+        )}
+      </Box>
 
       {/* ── Filtros ── */}
       <Box sx={{ display: "flex", gap: 2, mb: 3, flexWrap: "wrap", alignItems: "center" }}>
@@ -320,13 +487,96 @@ function OAsPage() {
           </CardContent>
         </Card>
       ) : visao === "lista" ? (
-        <ListaView grupos={grupos} onStatusChange={handleStatusChange} onSelect={setSelectedOaId} />
+        <ListaView
+          grupos={agrupamentoLista === "responsavel" ? gruposResponsavelOrdenado : grupos}
+          onStatusChange={handleStatusChange}
+          onSelect={setSelectedOaId}
+          isAdmin={!!isAdmin}
+          onDelete={setOaParaExcluir}
+          selectedIds={selectedIds}
+          onToggleSelect={handleToggleSelect}
+          onSelectAll={handleSelectAll}
+          agrupamento={agrupamentoLista}
+        />
       ) : visao === "kanban" ? (
         <KanbanView oas={oasFiltrados} onSelect={setSelectedOaId} />
       ) : visao === "gantt" ? (
         <GanttView oas={oasFiltrados} onSelect={setSelectedOaId} />
       ) : (
         <ResponsavelView oas={oasFiltrados} onSelect={setSelectedOaId} />
+      )}
+
+      {/* ── Dialog de confirmação de exclusão individual ── */}
+      <Dialog open={!!oaParaExcluir} onClose={() => setOaParaExcluir(null)}>
+        <DialogTitle>Excluir OA</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Tem certeza que deseja excluir o OA <strong>{oaParaExcluir?.codigo}</strong>? Esta ação é irreversível e removerá todas as etapas, arquivos e comentários associados.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOaParaExcluir(null)} disabled={excluindo}>Cancelar</Button>
+          <Button
+            color="error" variant="contained" disabled={excluindo}
+            onClick={() => {
+              if (!oaParaExcluir) return;
+              excluirOA(oaParaExcluir.id, { onSuccess: () => setOaParaExcluir(null) });
+            }}
+          >
+            {excluindo ? "Excluindo..." : "Excluir"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Dialog de confirmação de exclusão em massa ── */}
+      <Dialog open={confirmarMassa} onClose={() => !excluindoMassa && setConfirmarMassa(false)}>
+        <DialogTitle>Excluir {selectedIds.size} OA{selectedIds.size > 1 ? "s" : ""}</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Tem certeza que deseja excluir <strong>{selectedIds.size} OA{selectedIds.size > 1 ? "s" : ""}</strong>?
+            Esta ação é irreversível e removerá todas as etapas, arquivos e comentários associados a cada OA.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmarMassa(false)} disabled={excluindoMassa}>Cancelar</Button>
+          <Button
+            color="error" variant="contained" disabled={excluindoMassa}
+            onClick={() => {
+              excluirEmMassa([...selectedIds], {
+                onSuccess: () => { setSelectedIds(new Set()); setConfirmarMassa(false); },
+              });
+            }}
+          >
+            {excluindoMassa ? "Excluindo..." : `Excluir ${selectedIds.size} OA${selectedIds.size > 1 ? "s" : ""}`}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Barra flutuante de seleção ── */}
+      {selectedIds.size > 0 && isAdmin && (
+        <Box sx={{
+          position: "fixed", bottom: 28, left: "50%", transform: "translateX(-50%)",
+          bgcolor: "grey.900", color: "white",
+          px: 3, py: 1.5, borderRadius: 3,
+          display: "flex", alignItems: "center", gap: 2,
+          boxShadow: "0 4px 24px rgba(0,0,0,0.3)",
+          zIndex: 1200, whiteSpace: "nowrap",
+        }}>
+          <Typography fontWeight={600} sx={{ fontSize: "0.875rem" }}>
+            {selectedIds.size} OA{selectedIds.size > 1 ? "s" : ""} selecionado{selectedIds.size > 1 ? "s" : ""}
+          </Typography>
+          <Button
+            variant="contained" color="error" size="small"
+            startIcon={<DeleteOutlineIcon sx={{ fontSize: 16 }} />}
+            onClick={() => setConfirmarMassa(true)}
+            sx={{ fontWeight: 700, fontSize: "0.75rem" }}
+          >
+            Excluir selecionados
+          </Button>
+          <IconButton size="small" onClick={() => setSelectedIds(new Set())} sx={{ color: "rgba(255,255,255,0.7)", "&:hover": { color: "white" } }}>
+            <CloseIcon sx={{ fontSize: 18 }} />
+          </IconButton>
+        </Box>
       )}
 
       {/* ── Drawer de detalhes do OA ── */}
@@ -377,24 +627,72 @@ function ListaView({
   grupos,
   onStatusChange,
   onSelect,
+  isAdmin,
+  onDelete,
+  selectedIds,
+  onToggleSelect,
+  onSelectAll,
+  agrupamento = "capitulo",
 }: {
   grupos: Record<string, ReturnType<typeof useOAsByCurso>["data"]>;
   onStatusChange: (oa: any, status: StatusOA) => void;
   onSelect: (oaId: string) => void;
+  isAdmin: boolean;
+  onDelete: (oa: { id: string; codigo: string }) => void;
+  selectedIds: Set<string>;
+  onToggleSelect: (id: string) => void;
+  onSelectAll: (ids: string[], checked: boolean) => void;
+  agrupamento?: "capitulo" | "responsavel";
 }) {
+  const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
+  function toggleGrupoLista(key: string) {
+    setExpandidos((prev) => { const next = new Set(prev); if (next.has(key)) next.delete(key); else next.add(key); return next; });
+  }
+
   return (
     <>
-      {Object.entries(grupos).map(([grupo, items]) => (
-        <Box key={grupo} sx={{ mb: 3 }}>
-          <Typography variant="caption" sx={{ fontWeight: 700, color: "text.disabled", letterSpacing: "0.06em", mb: 1, display: "block" }}>
-            {grupo.toUpperCase()}
-          </Typography>
-          <Card>
+      {Object.entries(grupos).map(([grupo, items]) => {
+        const grupoIds = items!.map((oa) => oa.id);
+        const todosGrupoSelecionados = grupoIds.length > 0 && grupoIds.every((id) => selectedIds.has(id));
+        const algunsGrupoSelecionados = grupoIds.some((id) => selectedIds.has(id)) && !todosGrupoSelecionados;
+        const expandido = expandidos.has(grupo);
+        return (
+        <Box key={grupo} sx={{ mb: expandido ? 3 : 1 }}>
+          <Box
+            onClick={() => toggleGrupoLista(grupo)}
+            sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: expandido ? 1 : 0,
+              cursor: "pointer", userSelect: "none",
+              "&:hover .grupo-label": { color: "text.secondary" },
+            }}
+          >
+            <ExpandMoreIcon
+              sx={{ fontSize: "1rem", color: "text.disabled", transition: "transform 0.2s",
+                transform: expandido ? "rotate(180deg)" : "rotate(0deg)" }}
+            />
+            <Typography className="grupo-label" variant="caption"
+              sx={{ fontWeight: 700, color: "text.disabled", letterSpacing: "0.06em", transition: "color 0.15s" }}>
+              {grupo.toUpperCase()}
+            </Typography>
+            <Typography variant="caption" sx={{ color: "text.disabled", fontWeight: 400, ml: 0.5 }}>
+              ({grupoIds.length})
+            </Typography>
+          </Box>
+          {expandido && <Card>
             <CardContent sx={{ p: 0, pb: "0 !important" }}>
               <Table size="small">
                 <TableHead>
                   <TableRow sx={{ bgcolor: "#f8fafc" }}>
-                    {["Código", "Tipo", "Progresso", "Status", "Etapa Atual", "Responsável", "DL Etapa", "DL Final", ""].map((h) => (
+                    {isAdmin && (
+                      <TableCell padding="checkbox" sx={{ pl: 1 }}>
+                        <Checkbox
+                          size="small"
+                          checked={todosGrupoSelecionados}
+                          indeterminate={algunsGrupoSelecionados}
+                          onChange={(e) => onSelectAll(grupoIds, e.target.checked)}
+                        />
+                      </TableCell>
+                    )}
+                    {["Código", "Tipo", ...(agrupamento === "responsavel" ? ["Capítulo"] : []), "Progresso", "Status", "Etapa Atual", "Responsável", "DL Etapa", "DL Final", ""].map((h) => (
                       <TableCell key={h} sx={{ fontWeight: 700, fontSize: "0.75rem", color: "text.secondary", py: 1.5, whiteSpace: "nowrap" }}>{h}</TableCell>
                     ))}
                   </TableRow>
@@ -404,8 +702,22 @@ function ListaView({
                     const etapaAtual = oa.etapas.find((e) => e.status === "EM_ANDAMENTO" || e.status === "PENDENTE");
                     const concluida  = oa.status === "CONCLUIDO";
                     const tc = TIPO_CONFIG[oa.tipo];
+                    const isSelected = selectedIds.has(oa.id);
                     return (
-                      <TableRow key={oa.id} sx={{ "&:hover": { bgcolor: "action.hover" } }}>
+                      <TableRow
+                        key={oa.id}
+                        selected={isSelected}
+                        sx={{ "&:hover": { bgcolor: "action.hover" }, ...(isSelected && { bgcolor: "primary.50" }) }}
+                      >
+                        {isAdmin && (
+                          <TableCell padding="checkbox" sx={{ pl: 1 }}>
+                            <Checkbox
+                              size="small"
+                              checked={isSelected}
+                              onChange={() => onToggleSelect(oa.id)}
+                            />
+                          </TableCell>
+                        )}
                         <TableCell sx={{ py: 1.5, fontFamily: "monospace", fontWeight: 600, fontSize: "0.8rem" }}>
                           {oa.codigo}
                         </TableCell>
@@ -413,6 +725,11 @@ function ListaView({
                           <Chip label={tc.label} size="small"
                             sx={{ bgcolor: `${tc.color}18`, color: tc.color, fontWeight: 600, fontSize: "0.7rem" }} />
                         </TableCell>
+                        {agrupamento === "responsavel" && (
+                          <TableCell sx={{ fontSize: "0.75rem", color: "text.secondary", whiteSpace: "nowrap" }}>
+                            U{oa.capitulo.unidade.numero}/C{oa.capitulo.numero} — {oa.capitulo.nome}
+                          </TableCell>
+                        )}
                         <TableCell sx={{ width: 120 }}>
                           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                             <LinearProgress variant="determinate" value={oa.progressoPct}
@@ -454,11 +771,21 @@ function ListaView({
                           <DataCell iso={oa.deadlineFinal} concluida={concluida} />
                         </TableCell>
                         <TableCell align="right">
-                          <Button size="small" variant="outlined"
-                            onClick={() => onSelect(oa.id)}
-                            sx={{ fontSize: "0.7rem", py: 0.25 }}>
-                            Detalhes
-                          </Button>
+                          <Box sx={{ display: "flex", gap: 0.5, justifyContent: "flex-end", alignItems: "center" }}>
+                            <Button size="small" variant="outlined"
+                              onClick={() => onSelect(oa.id)}
+                              sx={{ fontSize: "0.7rem", py: 0.25 }}>
+                              Detalhes
+                            </Button>
+                            {isAdmin && (
+                              <Tooltip title="Excluir OA">
+                                <IconButton size="small" color="error"
+                                  onClick={() => onDelete({ id: oa.id, codigo: oa.codigo })}>
+                                  <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                          </Box>
                         </TableCell>
                       </TableRow>
                     );
@@ -466,9 +793,10 @@ function ListaView({
                 </TableBody>
               </Table>
             </CardContent>
-          </Card>
+          </Card>}
         </Box>
-      ))}
+        );
+      })}
     </>
   );
 }
@@ -631,6 +959,10 @@ type OAItem = NonNullable<ReturnType<typeof useOAsByCurso>["data"]>[0];
 
 function GanttView({ oas, onSelect }: { oas: OAItem[]; onSelect: (oaId: string) => void }) {
   const [zoom, setZoom] = useState<"mes" | "semana">("mes");
+  const [expandidosGantt, setExpandidosGantt] = useState<Set<string>>(new Set());
+  function toggleGrupoGantt(key: string) {
+    setExpandidosGantt((prev) => { const next = new Set(prev); if (next.has(key)) next.delete(key); else next.add(key); return next; });
+  }
 
   // Coleta todas as datas relevantes para calcular o range
   const allTs: number[] = [];
@@ -748,13 +1080,24 @@ function GanttView({ oas, onSelect }: { oas: OAItem[]; onSelect: (oaId: string) 
             </Box>
 
             {/* ── Grupos e linhas de OA ── */}
-            {Object.entries(grupos).map(([grupo, items]) => (
+            {Object.entries(grupos).map(([grupo, items]) => {
+              const expandidoGantt = expandidosGantt.has(grupo);
+              return (
               <Box key={grupo}>
 
-                {/* Cabeçalho do grupo */}
-                <Box sx={{ display: "flex", bgcolor: "#f8fafc", borderBottom: "1px solid", borderColor: "divider" }}>
-                  <Box sx={{ width: LABEL_W, flexShrink: 0, px: 2, py: 0.75,
-                    borderRight: "1px solid", borderColor: "divider" }}>
+                {/* Cabeçalho do grupo (clicável) */}
+                <Box
+                  onClick={() => toggleGrupoGantt(grupo)}
+                  sx={{ display: "flex", bgcolor: "#f8fafc", borderBottom: "1px solid", borderColor: "divider",
+                    cursor: "pointer", "&:hover": { bgcolor: "#f1f5f9" }, transition: "background 0.15s" }}
+                >
+                  <Box sx={{ width: LABEL_W, flexShrink: 0, px: 1.5, py: 0.75,
+                    borderRight: "1px solid", borderColor: "divider",
+                    display: "flex", alignItems: "center", gap: 0.5 }}>
+                    <ExpandMoreIcon
+                      sx={{ fontSize: "0.95rem", color: "text.disabled", flexShrink: 0,
+                        transition: "transform 0.2s", transform: expandidoGantt ? "rotate(180deg)" : "rotate(0deg)" }}
+                    />
                     <Typography variant="caption" fontWeight={700} color="text.disabled"
                       sx={{ letterSpacing: "0.05em" }} noWrap>
                       {grupo.toUpperCase()}
@@ -768,8 +1111,8 @@ function GanttView({ oas, onSelect }: { oas: OAItem[]; onSelect: (oaId: string) 
                   </Box>
                 </Box>
 
-                {/* Linhas de OA */}
-                {items.map((oa) => {
+                {/* Linhas de OA (colapsável) */}
+                {expandidoGantt && items.map((oa) => {
                   const etapasComDL  = oa.etapas.filter((e) => e.deadlinePrevisto);
                   const hasDates     = etapasComDL.length > 0 || !!oa.deadlineFinal;
                   const tc           = TIPO_CONFIG[oa.tipo];
@@ -941,7 +1284,8 @@ function GanttView({ oas, onSelect }: { oas: OAItem[]; onSelect: (oaId: string) 
                   );
                 })}
               </Box>
-            ))}
+              );
+            })}
           </Box>
         </Box>
 
@@ -1009,6 +1353,16 @@ const ETAPA_STATUS_BADGE: Record<string, { label: string; color: string; bg: str
 };
 
 function ResponsavelView({ oas, onSelect }: { oas: OAResp[]; onSelect: (id: string) => void }) {
+  const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
+
+  function toggleGrupo(id: string) {
+    setExpandidos((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
   const gruposMap = new Map<string, GrupoResponsavel>();
 
   function ensureGrupo(id: string, nome: string, fotoUrl: string | null): GrupoResponsavel {
@@ -1082,10 +1436,16 @@ function ResponsavelView({ oas, onSelect }: { oas: OAResp[]; onSelect: (id: stri
           {},
         );
 
+        const expandido = expandidos.has(grupo.id);
+
         return (
           <Box key={grupo.id}>
-            {/* ── Cabeçalho do grupo ── */}
-            <Card sx={{ mb: 1.5, borderRadius: 2, boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+            {/* ── Cabeçalho do grupo (clicável) ── */}
+            <Card
+              onClick={() => toggleGrupo(grupo.id)}
+              sx={{ mb: expandido ? 1.5 : 0, borderRadius: 2, boxShadow: "0 1px 4px rgba(0,0,0,0.06)", cursor: "pointer",
+                "&:hover": { boxShadow: "0 2px 8px rgba(0,0,0,0.10)" }, transition: "box-shadow 0.15s" }}
+            >
               <CardContent sx={{ p: "12px 16px !important" }}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
                   <Avatar
@@ -1139,13 +1499,17 @@ function ResponsavelView({ oas, onSelect }: { oas: OAResp[]; onSelect: (id: stri
                         sx={{ fontWeight: 700, fontSize: "0.72rem", bgcolor: "#fff5f5", color: "#ef4444", border: "1px solid #fecaca" }}
                       />
                     )}
+                    <ExpandMoreIcon
+                      sx={{ color: "text.secondary", fontSize: "1.2rem", transition: "transform 0.2s",
+                        transform: expandido ? "rotate(180deg)" : "rotate(0deg)" }}
+                    />
                   </Box>
                 </Box>
               </CardContent>
             </Card>
 
-            {/* ── Cards dos OAs ── */}
-            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 1.5, pl: 1 }}>
+            {/* ── Cards dos OAs (colapsável) ── */}
+            {expandido && <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 1.5, pl: 1 }}>
               {grupo.items.map(({ oa, etapa, isSecundario }) => {
                 const tc      = TIPO_CONFIG[oa.tipo];
                 const eBadge  = ETAPA_STATUS_BADGE[etapa.status] ?? ETAPA_STATUS_BADGE.PENDENTE;
@@ -1217,7 +1581,7 @@ function ResponsavelView({ oas, onSelect }: { oas: OAResp[]; onSelect: (id: stri
                   </Card>
                 );
               })}
-            </Box>
+            </Box>}
           </Box>
         );
       })}

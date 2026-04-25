@@ -1,9 +1,9 @@
-import { type Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 
 export class CursoRepository {
-  findAll(usuarioId: string, isAdmin = false) {
-    return prisma.curso.findMany({
+  async findAll(usuarioId: string, isAdmin = false) {
+    const cursos = await prisma.curso.findMany({
       where: isAdmin ? {} : { membros: { some: { usuarioId } } },
       include: {
         unidades: { select: { id: true, numero: true, nome: true } },
@@ -12,6 +12,22 @@ export class CursoRepository {
       },
       orderBy: { createdAt: "desc" },
     });
+
+    if (cursos.length === 0) return cursos.map((c) => ({ ...c, progressoPct: 0 }));
+
+    const ids = cursos.map((c) => c.id);
+    const rows = await prisma.$queryRaw<{ id: string; pct: number }[]>`
+      SELECT c.id, COALESCE(ROUND(AVG(oa."progressoPct")), 0)::int AS pct
+      FROM "cursos" c
+      LEFT JOIN "unidades" u ON u."cursoId" = c.id
+      LEFT JOIN "capitulos" cap ON cap."unidadeId" = u.id
+      LEFT JOIN "objetos_aprendizagem" oa ON oa."capituloId" = cap.id
+      WHERE c.id IN (${Prisma.join(ids)})
+      GROUP BY c.id
+    `;
+
+    const pctMap = new Map(rows.map((r) => [r.id, Number(r.pct)]));
+    return cursos.map((c) => ({ ...c, progressoPct: pctMap.get(c.id) ?? 0 }));
   }
 
   findById(id: string) {

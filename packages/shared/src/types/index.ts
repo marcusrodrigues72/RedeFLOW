@@ -6,7 +6,7 @@ export type PapelEtapa  =
   | "CONTEUDISTA" | "DESIGNER_INSTRUCIONAL" | "PROFESSOR_ATOR"
   | "PROFESSOR_TECNICO" | "ACESSIBILIDADE" | "EDITOR_VIDEO" | "DESIGNER_GRAFICO"
   | "PRODUTOR_FINAL" | "VALIDADOR_FINAL";
-export type TipoOA = "VIDEO" | "SLIDE" | "QUIZ" | "EBOOK" | "PLANO_AULA" | "TAREFA" | "INFOGRAFICO" | "TIMELINE";
+export type TipoOA = "VIDEO" | "SLIDE" | "QUIZ" | "EBOOK" | "PLANO_AULA" | "TAREFA" | "INFOGRAFICO" | "TIMELINE" | "ANIMACAO";
 export type StatusOA = "PENDENTE" | "EM_ANDAMENTO" | "BLOQUEADO" | "CONCLUIDO";
 export type StatusEtapa = "PENDENTE" | "EM_ANDAMENTO" | "CONCLUIDA" | "BLOQUEADA";
 export type StatusCurso = "RASCUNHO" | "ATIVO" | "ARQUIVADO";
@@ -37,6 +37,7 @@ export interface CursoResumo {
   dataInicio: string | null;
   dataFim: string | null;
   createdAt: string;
+  progressoPct: number;
   _count: { unidades: number };
   membros: { usuarioId: string; papel: PapelGlobal }[];
 }
@@ -49,15 +50,19 @@ export interface ObjetivoResumo {
 }
 
 export interface UnidadeResumo {
-  id: string;
-  numero: number;
-  nome: string;
+  id:           string;
+  numero:       number;
+  nome:         string;
+  chSincrona:   string | null;
+  chAssincrona: string | null;
+  chAtividades: string | null;
   capitulos: {
-    id: string;
-    numero: number;
-    nome: string;
+    id:           string;
+    numero:       number;
+    nome:         string;
+    chSincrona:   string | null;
     chAssincrona: string | null;
-    chSincrona: string | null;
+    chAtividades: string | null;
     _count: { oas: number; comentarios: number };
     objetivos: ObjetivoResumo[];
   }[];
@@ -357,10 +362,16 @@ export interface AuditLogEntry {
 
 // ─── MI Histórico (RF-M2-05) ──────────────────────────────────────────────────
 
+export interface MIAlteracao {
+  tipo:      string; // CAPITULO_ADICIONADO | CAPITULO_REMOVIDO | CAPITULO_MODIFICADO
+  descricao: string; // ex: "U1C3: chAssincrona 20h → 25h, 1 OA adicionado"
+}
+
 export interface MIHistoricoResumo {
-  id:        string;
-  resumo:    string | null;
-  createdAt: string;
+  id:          string;
+  resumo:      string | null;
+  alteracoes:  MIAlteracao[] | null;
+  createdAt:   string;
   importadoPor: { id: string; nome: string; fotoUrl: string | null };
 }
 
@@ -378,6 +389,7 @@ export interface ComentarioMI {
   mencoes:   string[];
   parentId:  string | null;
   autor:     { id: string; nome: string; fotoUrl: string | null };
+  respostas?: ComentarioMI[];
 }
 
 // ─── Import ───────────────────────────────────────────────────────────────────

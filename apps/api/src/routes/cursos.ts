@@ -7,6 +7,8 @@ import { prisma }          from "../lib/prisma.js";
 import { exportMC }        from "../services/exportService.js";
 import { persistMI }       from "../services/importService.js";
 import type { MICapitulo } from "../services/importService.js";
+import { sendMail, tmplMencaoComentarioMI } from "../lib/mailer.js";
+import { computarDiffMI }  from "../controllers/cursoController.js";
 import { z }               from "zod";
 
 const router   = Router();
@@ -389,7 +391,7 @@ router.post("/:id/membros", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// PATCH /:id/membros/:usuarioId — atualiza apenas papeisProducao de um membro existente
+// PATCH /:id/membros/:usuarioId — atualiza papeisProducao e/ou papel de um membro existente
 router.patch("/:id/membros/:usuarioId", async (req, res, next) => {
   try {
     const cursoId = req.params["id"] as string;
@@ -398,10 +400,16 @@ router.patch("/:id/membros/:usuarioId", async (req, res, next) => {
       const membroSolicitante = await prisma.cursoMembro.findUnique({ where: { cursoId_usuarioId: { cursoId, usuarioId: req.usuario!.sub } } });
       if (membroSolicitante?.papel !== "ADMIN") { res.status(403).json({ message: "Apenas administradores podem gerenciar membros do curso." }); return; }
     }
-    const { papeisProducao } = z.object({ papeisProducao: z.array(z.string()) }).parse(req.body);
+    const { papeisProducao, papel } = z.object({
+      papeisProducao: z.array(z.string()).optional(),
+      papel:          z.enum(["ADMIN", "COLABORADOR", "LEITOR"]).optional(),
+    }).parse(req.body);
     const membro = await prisma.cursoMembro.update({
       where:  { cursoId_usuarioId: { cursoId: req.params["id"] as string, usuarioId: req.params["usuarioId"] as string } },
-      data:   { papeisProducao },
+      data:   {
+        ...(papeisProducao !== undefined && { papeisProducao }),
+        ...(papel          !== undefined && { papel }),
+      },
       include: { usuario: { select: { id: true, nome: true, email: true, fotoUrl: true, papelGlobal: true } } },
     });
     res.json(membro);
@@ -712,6 +720,78 @@ router.patch("/:id/membros/:usuarioId/notif", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ─── RF-M2-02: Edição inline de CH por capítulo ──────────────────────────────
+
+const chCapituloSchema = z.object({
+  chSincrona:   z.number().min(0).max(999).nullable().optional(),
+  chAssincrona: z.number().min(0).max(999).nullable().optional(),
+  chAtividades: z.number().min(0).max(999).nullable().optional(),
+});
+
+/** PATCH /:id/capitulos/:capituloId/ch — atualiza CH de um capítulo e recalcula totais da unidade */
+router.patch("/:id/capitulos/:capituloId/ch", async (req, res, next) => {
+  try {
+    const cursoId    = req.params["id"] as string;
+    const capituloId = req.params["capituloId"] as string;
+
+    // Verifica acesso (membro do curso)
+    const usuario = await prisma.usuario.findUnique({ where: { id: req.usuario!.sub }, select: { papelGlobal: true } });
+    if (usuario?.papelGlobal !== "ADMIN") {
+      const membro = await prisma.cursoMembro.findUnique({
+        where: { cursoId_usuarioId: { cursoId, usuarioId: req.usuario!.sub } },
+      });
+      if (!membro) { res.status(403).json({ message: "Sem acesso ao curso." }); return; }
+    }
+
+    // Verifica que o capítulo pertence ao curso
+    const capitulo = await prisma.capitulo.findFirst({
+      where: { id: capituloId, unidade: { cursoId } },
+      select: { id: true, unidadeId: true },
+    });
+    if (!capitulo) { res.status(404).json({ message: "Capítulo não encontrado." }); return; }
+
+    const payload = chCapituloSchema.parse(req.body);
+
+    // Monta o objeto de update apenas com campos presentes
+    const data: Record<string, number | null> = {};
+    if ("chSincrona"   in payload) data["chSincrona"]   = payload.chSincrona   ?? null;
+    if ("chAssincrona" in payload) data["chAssincrona"] = payload.chAssincrona ?? null;
+    if ("chAtividades" in payload) data["chAtividades"] = payload.chAtividades ?? null;
+
+    // Atualiza o capítulo
+    const capAtualizado = await prisma.capitulo.update({
+      where: { id: capituloId },
+      data,
+      select: { id: true, numero: true, chSincrona: true, chAssincrona: true, chAtividades: true },
+    });
+
+    // Recalcula totais da unidade somando todos os capítulos
+    const todosCaps = await prisma.capitulo.findMany({
+      where:  { unidadeId: capitulo.unidadeId },
+      select: { chSincrona: true, chAssincrona: true, chAtividades: true },
+    });
+    const soma = todosCaps.reduce(
+      (acc, c) => ({
+        chSincrona:   acc.chSincrona   + Number(c.chSincrona   ?? 0),
+        chAssincrona: acc.chAssincrona + Number(c.chAssincrona ?? 0),
+        chAtividades: acc.chAtividades + Number(c.chAtividades ?? 0),
+      }),
+      { chSincrona: 0, chAssincrona: 0, chAtividades: 0 },
+    );
+
+    await prisma.unidade.update({
+      where: { id: capitulo.unidadeId },
+      data: {
+        chSincrona:   soma.chSincrona   > 0 ? soma.chSincrona   : null,
+        chAssincrona: soma.chAssincrona > 0 ? soma.chAssincrona : null,
+        chAtividades: soma.chAtividades > 0 ? soma.chAtividades : null,
+      },
+    });
+
+    res.json({ capitulo: capAtualizado, unidadeTotais: soma });
+  } catch (err) { next(err); }
+});
+
 // ─── RF-M2-05: Histórico de versões da MI ────────────────────────────────────
 
 /** GET /:id/mi/historico — lista versões da MI (mais recentes primeiro) */
@@ -722,9 +802,10 @@ router.get("/:id/mi/historico", async (req, res, next) => {
       where:   { cursoId },
       orderBy: { createdAt: "desc" },
       select: {
-        id:        true,
-        resumo:    true,
-        createdAt: true,
+        id:         true,
+        resumo:     true,
+        alteracoes: true,
+        createdAt:  true,
         importadoPor: { select: { id: true, nome: true, fotoUrl: true } },
       },
     });
@@ -775,12 +856,20 @@ router.post("/:id/mi/restaurar/:versaoId", async (req, res, next) => {
     // Salva nova entrada no histórico marcando a restauração
     const totalUnidades = new Set(caps.map((c) => c.unidade)).size;
     const totalOAs      = caps.reduce((s, c) => s + c.oaDefs.reduce((ss, d) => ss + d.quantidade, 0), 0);
+    // Diff em relação à versão atual antes da restauração
+    const versaoAtual = await prisma.mIHistorico.findFirst({
+      where: { cursoId }, orderBy: { createdAt: "desc" }, select: { snapshot: true },
+    });
+    const alteracoesRestauro = versaoAtual?.snapshot
+      ? computarDiffMI(versaoAtual.snapshot as unknown as MICapitulo[], caps)
+      : null;
     await prisma.mIHistorico.create({
       data: {
         cursoId,
         importadoPorId: req.usuario!.sub,
         snapshot:       versao.snapshot as never,
         resumo: `[Restauração] ${totalUnidades} unidade(s) · ${result.capitulosAtualizados} capítulos · ${totalOAs} OA(s)`,
+        alteracoes: alteracoesRestauro as never ?? undefined,
       },
     });
 
@@ -796,29 +885,38 @@ router.post("/:id/mi/restaurar/:versaoId", async (req, res, next) => {
 // ─── RF-M2-06: Comentários por capítulo da MI ────────────────────────────────
 
 const comentarioMISchema = z.object({
-  texto: z.string().min(1).max(2000),
+  texto:    z.string().min(1).max(2000),
+  parentId: z.string().cuid().optional().nullable(),
 });
 
-/** GET /:id/capitulos/:capituloId/comentarios */
+const COMENTARIO_SELECT = {
+  id: true, texto: true, editado: true, createdAt: true, mencoes: true, parentId: true,
+  autor: { select: { id: true, nome: true, fotoUrl: true } },
+} as const;
+
+/** GET /:id/capitulos/:capituloId/comentarios — retorna raízes com respostas aninhadas */
 router.get("/:id/capitulos/:capituloId/comentarios", async (req, res, next) => {
   try {
     const capituloId = req.params["capituloId"] as string;
-    // Verifica que o capítulo pertence ao curso
     const cap = await prisma.capitulo.findFirst({
       where: { id: capituloId, unidade: { cursoId: req.params["id"] as string } },
       select: { id: true },
     });
     if (!cap) { res.status(404).json({ message: "Capítulo não encontrado." }); return; }
 
-    const comentarios = await prisma.comentario.findMany({
-      where:   { capituloId },
+    // Busca raízes (sem parentId) e inclui suas respostas diretas
+    const raizes = await prisma.comentario.findMany({
+      where:   { capituloId, parentId: null },
       orderBy: { createdAt: "asc" },
       select: {
-        id: true, texto: true, editado: true, createdAt: true, mencoes: true, parentId: true,
-        autor: { select: { id: true, nome: true, fotoUrl: true } },
+        ...COMENTARIO_SELECT,
+        respostas: {
+          orderBy: { createdAt: "asc" },
+          select: COMENTARIO_SELECT,
+        },
       },
     });
-    res.json(comentarios);
+    res.json(raizes);
   } catch (err) { next(err); }
 });
 
@@ -830,11 +928,19 @@ router.post("/:id/capitulos/:capituloId/comentarios", async (req, res, next) => 
 
     const cap = await prisma.capitulo.findFirst({
       where: { id: capituloId, unidade: { cursoId } },
-      select: { id: true },
+      select: { id: true, nome: true, unidade: { select: { cursoId: true } } },
     });
     if (!cap) { res.status(404).json({ message: "Capítulo não encontrado." }); return; }
 
-    const { texto } = comentarioMISchema.parse(req.body);
+    const { texto, parentId } = comentarioMISchema.parse(req.body);
+
+    // Valida parentId (deve pertencer ao mesmo capítulo)
+    if (parentId) {
+      const parent = await prisma.comentario.findUnique({ where: { id: parentId }, select: { capituloId: true } });
+      if (!parent || parent.capituloId !== capituloId) {
+        res.status(400).json({ message: "Comentário pai inválido." }); return;
+      }
+    }
 
     // Extrai @menções do texto e resolve IDs de membros do curso
     const nomesMencionados = [...new Set(
@@ -851,32 +957,82 @@ router.post("/:id/capitulos/:capituloId/comentarios", async (req, res, next) => 
         .map((m) => m.usuario.id);
     }
 
+    const autorId   = req.usuario!.sub;
     const comentario = await prisma.comentario.create({
-      data: { texto, capituloId, autorId: req.usuario!.sub, mencoes },
-      select: {
-        id: true, texto: true, editado: true, createdAt: true, mencoes: true, parentId: true,
-        autor: { select: { id: true, nome: true, fotoUrl: true } },
-      },
+      data: { texto, capituloId, autorId, mencoes, parentId: parentId ?? null },
+      select: COMENTARIO_SELECT,
     });
 
-    // Notificações in-app para mencionados
-    const autorId = req.usuario!.sub;
-    const idsNotificar = [...new Set(mencoes)].filter((id) => id !== autorId);
+    // IDs a notificar: mencionados + autor do comentário pai (se resposta)
+    const idsExtra: string[] = [];
+    if (parentId) {
+      const parentAutor = await prisma.comentario.findUnique({ where: { id: parentId }, select: { autorId: true } });
+      if (parentAutor && parentAutor.autorId !== autorId) idsExtra.push(parentAutor.autorId);
+    }
+    const idsNotificar = [...new Set([...mencoes, ...idsExtra])].filter((id) => id !== autorId);
+
     if (idsNotificar.length > 0) {
-      const autor = await prisma.usuario.findUnique({ where: { id: autorId }, select: { nome: true } });
+      const [autor, usuariosNotif] = await Promise.all([
+        prisma.usuario.findUnique({ where: { id: autorId }, select: { nome: true } }),
+        prisma.usuario.findMany({
+          where: { id: { in: idsNotificar } },
+          select: { id: true, nome: true, email: true, notifEmailAtivo: true },
+        }),
+      ]);
+      const autorNome    = autor?.nome ?? "Alguém";
+      const capituloNome = cap.nome ?? `Capítulo ${capituloId}`;
+
+      // Notificações in-app
       await prisma.notificacao.createMany({
         data: idsNotificar.map((usuarioId) => ({
           usuarioId,
           tipo:         "MENCAO",
-          titulo:       `${autor?.nome ?? "Alguém"} mencionou você em um comentário da MI`,
+          titulo:       mencoes.includes(usuarioId)
+            ? `${autorNome} mencionou você em um comentário da MI`
+            : `${autorNome} respondeu seu comentário na MI`,
           corpo:        texto.slice(0, 120),
           entidadeTipo: "CAPITULO",
           entidadeId:   capituloId,
         })),
       });
+
+      // E-mails para usuários com notif ativa que foram mencionados
+      const mencionadosComEmail = usuariosNotif.filter(
+        (u) => mencoes.includes(u.id) && u.notifEmailAtivo,
+      );
+      await Promise.all(mencionadosComEmail.map((u) =>
+        sendMail(tmplMencaoComentarioMI({
+          email:        u.email,
+          nome:         u.nome,
+          autorNome,
+          capituloNome,
+          trecho:       texto.slice(0, 200),
+          cursoId,
+        }))
+      ));
     }
 
     res.status(201).json(comentario);
+  } catch (err) { next(err); }
+});
+
+/** PATCH /:id/capitulos/:capituloId/comentarios/:comentarioId — editar próprio comentário */
+router.patch("/:id/capitulos/:capituloId/comentarios/:comentarioId", async (req, res, next) => {
+  try {
+    const comentarioId = req.params["comentarioId"] as string;
+    const { texto } = z.object({ texto: z.string().min(1).max(2000) }).parse(req.body);
+
+    const c = await prisma.comentario.findUnique({ where: { id: comentarioId }, select: { autorId: true } });
+    if (!c || c.autorId !== req.usuario!.sub) {
+      res.status(403).json({ message: "Sem permissão para editar este comentário." }); return;
+    }
+
+    const updated = await prisma.comentario.update({
+      where: { id: comentarioId },
+      data:  { texto, editado: true },
+      select: COMENTARIO_SELECT,
+    });
+    res.json(updated);
   } catch (err) { next(err); }
 });
 
@@ -884,7 +1040,6 @@ router.post("/:id/capitulos/:capituloId/comentarios", async (req, res, next) => 
 router.delete("/:id/capitulos/:capituloId/comentarios/:comentarioId", async (req, res, next) => {
   try {
     const c = await prisma.comentario.findUnique({ where: { id: req.params["comentarioId"] as string } });
-    // Autor pode excluir o próprio; admin global também
     const usuario = await prisma.usuario.findUnique({ where: { id: req.usuario!.sub }, select: { papelGlobal: true } });
     if (!c || (c.autorId !== req.usuario!.sub && usuario?.papelGlobal !== "ADMIN")) {
       res.status(403).json({ message: "Sem permissão para excluir este comentário." }); return;

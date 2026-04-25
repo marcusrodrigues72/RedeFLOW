@@ -29,6 +29,7 @@ const PASSOS = ["Configuração", "Análise", "Revisão", "Concluído"];
 const TIPO_LABELS: Record<string, string> = {
   VIDEO: "Vídeo", SLIDE: "Slide", QUIZ: "Quiz",
   EBOOK: "E-book", PLANO_AULA: "Plano de Aula", TAREFA: "Tarefa",
+  INFOGRAFICO: "Infográfico", TIMELINE: "Timeline", ANIMACAO: "Animação",
 };
 
 type TipoImport = "MC" | "MI";

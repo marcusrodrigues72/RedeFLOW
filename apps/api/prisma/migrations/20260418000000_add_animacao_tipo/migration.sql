@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "TipoOA" ADD VALUE 'ANIMACAO';

@@ -25,6 +25,7 @@ const TIPO_CONFIG: Record<TipoOA, { label: string; color: string }> = {
   TAREFA:      { label: "Tarefa",        color: "#dc2626" },
   INFOGRAFICO: { label: "Infográfico",   color: "#7e22ce" },
   TIMELINE:    { label: "Timeline",      color: "#0f766e" },
+  ANIMACAO:    { label: "Animação",      color: "#db2777" },
 };
 
 const ETAPA_STATUS: Record<StatusEtapa, { label: string; color: string; bg: string }> = {

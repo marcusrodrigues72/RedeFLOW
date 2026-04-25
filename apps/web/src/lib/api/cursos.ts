@@ -190,6 +190,28 @@ export function useAtualizarOA(oaId: string) {
   });
 }
 
+export function useExcluirOA(cursoId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (oaId: string) => api.delete(`/oas/${oaId}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: cursoKeys.oas(cursoId) });
+      qc.invalidateQueries({ queryKey: cursoKeys.stats() });
+    },
+  });
+}
+
+export function useExcluirOAsEmMassa(cursoId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (oaIds: string[]) => Promise.all(oaIds.map((id) => api.delete(`/oas/${id}`))),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: cursoKeys.oas(cursoId) });
+      qc.invalidateQueries({ queryKey: cursoKeys.stats() });
+    },
+  });
+}
+
 export function useImportarMIPreview(cursoId: string) {
   return useMutation({
     mutationFn: (file: File) => {
@@ -463,8 +485,11 @@ export function useRemoverMembro(cursoId: string) {
 export function useAtualizarPapeisProducao(cursoId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ usuarioId, papeisProducao }: { usuarioId: string; papeisProducao: string[] }) =>
-      api.patch(`/cursos/${cursoId}/membros/${usuarioId}`, { papeisProducao }).then((r) => r.data),
+    mutationFn: ({ usuarioId, papeisProducao, papel }: { usuarioId: string; papeisProducao?: string[]; papel?: string }) =>
+      api.patch(`/cursos/${cursoId}/membros/${usuarioId}`, {
+        ...(papeisProducao !== undefined && { papeisProducao }),
+        ...(papel          !== undefined && { papel }),
+      }).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: cursoKeys.detail(cursoId) }),
   });
 }
@@ -514,6 +539,53 @@ export function useImportarConfirmar(cursoId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: cursoKeys.list() });
       qc.invalidateQueries({ queryKey: cursoKeys.stats() });
+    },
+  });
+}
+
+// ─── RF-M2-02: Edição inline de CH por capítulo ──────────────────────────────
+
+export interface AtualizarCHPayload {
+  chSincrona?:   number | null;
+  chAssincrona?: number | null;
+  chAtividades?: number | null;
+}
+
+export function useAtualizarCHCapitulo(cursoId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ capituloId, ...payload }: AtualizarCHPayload & { capituloId: string }) =>
+      api.patch(`/cursos/${cursoId}/capitulos/${capituloId}/ch`, payload).then((r) => r.data),
+    // Atualização otimista: altera o cache imediatamente para feedback instantâneo
+    onMutate: async ({ capituloId, ...payload }) => {
+      await qc.cancelQueries({ queryKey: cursoKeys.detail(cursoId) });
+      const snapshot = qc.getQueryData(cursoKeys.detail(cursoId));
+      qc.setQueryData(cursoKeys.detail(cursoId), (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          unidades: old.unidades.map((u: any) => ({
+            ...u,
+            capitulos: u.capitulos.map((c: any) =>
+              c.id === capituloId
+                ? {
+                    ...c,
+                    ...("chSincrona"   in payload && { chSincrona:   payload.chSincrona   != null ? String(payload.chSincrona)   : null }),
+                    ...("chAssincrona" in payload && { chAssincrona: payload.chAssincrona != null ? String(payload.chAssincrona) : null }),
+                    ...("chAtividades" in payload && { chAtividades: payload.chAtividades != null ? String(payload.chAtividades) : null }),
+                  }
+                : c,
+            ),
+          })),
+        };
+      });
+      return { snapshot };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.snapshot) qc.setQueryData(cursoKeys.detail(cursoId), ctx.snapshot);
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: cursoKeys.detail(cursoId) });
     },
   });
 }
@@ -573,11 +645,25 @@ export function useComentariosMI(cursoId: string, capituloId: string | null) {
 export function useAdicionarComentarioMI(cursoId: string, capituloId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (texto: string) =>
-      api.post<ComentarioMI>(`/cursos/${cursoId}/capitulos/${capituloId}/comentarios`, { texto }).then((r) => r.data),
+    mutationFn: (payload: { texto: string; parentId?: string | null }) =>
+      api.post<ComentarioMI>(`/cursos/${cursoId}/capitulos/${capituloId}/comentarios`, payload).then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: comentarioMIKeys.list(cursoId, capituloId) });
-      qc.invalidateQueries({ queryKey: cursoKeys.detail(cursoId) }); // atualiza _count.comentarios
+      qc.invalidateQueries({ queryKey: cursoKeys.detail(cursoId) });
+    },
+  });
+}
+
+export function useEditarComentarioMI(cursoId: string, capituloId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ comentarioId, texto }: { comentarioId: string; texto: string }) =>
+      api.patch<ComentarioMI>(
+        `/cursos/${cursoId}/capitulos/${capituloId}/comentarios/${comentarioId}`,
+        { texto },
+      ).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: comentarioMIKeys.list(cursoId, capituloId) });
     },
   });
 }

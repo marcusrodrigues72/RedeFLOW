@@ -34,6 +34,7 @@ enum TipoOA {
   TAREFA
   INFOGRAFICO
   TIMELINE
+  ANIMACAO
 }
 
 enum StatusOA {
@@ -395,6 +396,7 @@ model MIHistorico {
   importadoPorId String
   snapshot       Json     // MI completa no momento da importação
   resumo         String?  // ex: "8 capítulos · 42 objetivos importados"
+  alteracoes     Json?    // RF-M2-05: lista de campos modificados em relação à versão anterior
   createdAt      DateTime @default(now())
 
   curso        Curso   @relation(fields: [cursoId],        references: [id], onDelete: Cascade)

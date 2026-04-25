@@ -286,6 +286,32 @@ export function tmplDigestoDiario(p: {
   };
 }
 
+/** Disparado quando alguém é mencionado em um comentário da MI (RF-M2-06). */
+export function tmplMencaoComentarioMI(p: {
+  email:        string;
+  nome:         string;
+  autorNome:    string;
+  capituloNome: string;
+  trecho:       string;
+  cursoId:      string;
+}): MailPayload {
+  return {
+    to:      p.email,
+    subject: `RedeFLOW — ${p.autorNome} mencionou você em um comentário da MI`,
+    html: layout(`
+      <h2 style="margin:0 0 8px;color:#1e293b;font-size:20px;">💬 Você foi mencionado</h2>
+      <p style="margin:0 0 20px;color:#475569;font-size:15px;">
+        Olá, <strong>${p.nome}</strong>! <strong>${p.autorNome}</strong> mencionou você em um comentário na Matriz Instrucional.
+      </p>
+      <div style="background:#f5f3ff;border-left:4px solid #7c3aed;border-radius:6px;padding:16px 20px;">
+        <p style="margin:0;color:#4c1d95;font-size:13px;font-style:italic;">"${p.trecho}"</p>
+        <p style="margin:8px 0 0;color:#7c3aed;font-size:12px;">📋 ${p.capituloNome}</p>
+      </div>
+      ${btnPrimario(`${APP_URL}/cursos/${p.cursoId}`, "Ver comentário no RedeFLOW")}
+    `),
+  };
+}
+
 /** Disparado pelo cron diário para etapas com deadline em até 3 dias. */
 export function tmplPrazoProximo(p: {
   email:     string;

@@ -38,6 +38,12 @@ const TIPO_MAP: Record<string, string> = {
   // Timeline / Linha do tempo (tipo nativo — letra "L")
   "linha do tempo": "TIMELINE", "timeline": "TIMELINE",
   "cronograma": "TIMELINE", "linha de tempo": "TIMELINE",
+  // Animação (tipo nativo — letra "A")
+  "animação": "ANIMACAO", "animacao": "ANIMACAO",
+  "animação / vídeo animado com audio": "ANIMACAO",
+  "animacao / video animado com audio": "ANIMACAO",
+  "vídeo animado": "ANIMACAO", "video animado": "ANIMACAO",
+  "vídeo animado com audio": "ANIMACAO", "video animado com audio": "ANIMACAO",
 };
 
 const STATUS_ETAPA_MAP: Record<string, string> = {
@@ -155,6 +161,8 @@ export interface MIOADef {
   oeNumero: number;
   tipo: string;       // VIDEO | SLIDE | QUIZ | etc.
   quantidade: number;
+  /** Texto bruto original da célula na MI (usado internamente para deduplicação de fontes) */
+  fonteRaw?: string;
 }
 
 export interface MICapitulo {
@@ -449,13 +457,23 @@ export function parseBuffer(buffer: Buffer, filename: string): MCRow[] {
   return result;
 }
 
+/** Formato esperado de código de OA: U{n}C{n}O{n}{letra}{n} */
+const CODIGO_OA_RE = /^U\d+C\d+O\d+[VSQEPTILA]\d+$/;
+
 export function buildPreview(rows: MCRow[]): ImportPreview {
   const unidadeMap = new Map<number, number>();
   const avisos: string[] = [];
 
   for (const r of rows) {
+    if (!r.codigo) {
+      avisos.push(`Linha sem código de OA (U${r.unidade}C${r.capitulo})`);
+      continue;
+    }
+    if (!CODIGO_OA_RE.test(r.codigo)) {
+      avisos.push(`Código inválido: "${r.codigo}" (U${r.unidade}C${r.capitulo}) — será ignorado na importação.`);
+      continue;
+    }
     unidadeMap.set(r.unidade, (unidadeMap.get(r.unidade) ?? 0) + 1);
-    if (!r.codigo) avisos.push(`Linha sem código de OA (U${r.unidade}C${r.capitulo})`);
   }
 
   return {
@@ -562,6 +580,13 @@ export async function persistMC(rows: MCRow[], cursoId: string): Promise<{ criad
 
   for (const row of rows) {
     try {
+      // Bug fix 4: rejeita códigos com formato inválido antes de qualquer persistência
+      if (!row.codigo || !CODIGO_OA_RE.test(row.codigo)) {
+        if (row.codigo) avisosMC.push(`Código inválido ignorado: "${row.codigo}" (U${row.unidade}C${row.capitulo})`);
+        ignorados++;
+        continue;
+      }
+
       // ── Unidade ──────────────────────────────────────────────────────────
       if (!unidadeCache.has(row.unidade)) {
         const uni = await prisma.unidade.upsert({
@@ -718,7 +743,7 @@ export async function persistMC(rows: MCRow[], cursoId: string): Promise<{ criad
 
 const TIPO_LETRA: Record<string, string> = {
   VIDEO: "V", SLIDE: "S", QUIZ: "Q", EBOOK: "E", PLANO_AULA: "P", TAREFA: "T",
-  INFOGRAFICO: "I", TIMELINE: "L",
+  INFOGRAFICO: "I", TIMELINE: "L", ANIMACAO: "A",
 };
 
 const BLOOM_MAP: Record<string, string> = {
@@ -905,17 +930,22 @@ export function parseMI(buffer: Buffer, filename: string): MICapitulo[] {
       .filter((r) => r[capColIdx]?.trim() && !isNaN(Number(r[capColIdx]?.trim())));
 
     // Fallback: se tipoOA não foi encontrado pelo cabeçalho, tenta detectar por conteúdo
-    // (busca uma coluna onde ≥2 células contêm valores reconhecidos de tipo de OA)
+    // (busca uma coluna onde ≥3 células contêm valores reconhecidos de tipo de OA)
     if (colMap.tipoOA < 0 && dataRows.length > 0) {
       const tipoKeys = new Set(Object.keys(TIPO_MAP).map(normH));
       const sampleRows = dataRows.slice(0, Math.min(30, dataRows.length));
       const ncols = rows[headerIdx]?.length ?? 30;
+      // Bug fix 2: exclui colunas já identificadas como atividade para evitar falso positivo
+      const excludeCols = new Set(
+        [colMap.atividadeFormativa, colMap.atividadeSomativa].filter((c) => c >= 0)
+      );
       for (let ci = 0; ci < ncols; ci++) {
+        if (excludeCols.has(ci)) continue;
         const hits = sampleRows.filter((r) => {
           const v = normH(r[ci]?.toString() ?? "");
           return v && tipoKeys.has(v);
         }).length;
-        if (hits >= 2) {
+        if (hits >= 3) {  // Bug fix 2: threshold 3 (era 2) reduz falsos positivos
           colMap.tipoOA = ci;
           logger.info(
             { sheetName, colIdx: ci, headerCell: rows[headerIdx]?.[ci] },
@@ -991,20 +1021,30 @@ export function parseMI(buffer: Buffer, filename: string): MICapitulo[] {
       }
 
       const tipoRaw = gc(colMap.tipoOA).trim();
-      // Quantidade: usa o valor da planilha; se vazio/zero, assume 1 (padrão PU43)
-      const qtd     = parseInt(gc(colMap.qtdOA)) || 1;
+      // Bug fix 1: quando a coluna qtdOA foi detectada, blank/0 significa "sem OA a criar"
+      // (evita que atividades formativas/somativas sem quantidade explícita virem OAs).
+      // Só usa o fallback de 1 quando a coluna não foi encontrada no cabeçalho.
+      const qtdRaw = gc(colMap.qtdOA).trim();
+      const qtd = colMap.qtdOA >= 0
+        ? (parseInt(qtdRaw) || 0)
+        : (parseInt(qtdRaw) || 1);
 
-      if (tipoRaw) {
+      if (tipoRaw && qtd > 0) {
+        const fonteNorm = tipoRaw.toLowerCase();
         for (const tipo of mapTiposMI(tipoRaw)) {
-          // Acumula quantidade se já existe entrada para o mesmo (oeNumero, tipo) no capítulo.
-          // Isso trata o caso em que linhas diferentes da MI listam o mesmo tipo de OA para o
-          // mesmo OE (ex.: "Mapa mental" e "Infográfico" → ambos INFOGRAFICO, OE 1):
-          // resulta em U#C#O1I1 + U#C#O1I2 em vez de dois U#C#O1I1 conflitantes.
           const existing = cap.oaDefs.find((d) => d.oeNumero === oeNum && d.tipo === tipo);
           if (existing) {
-            existing.quantidade += qtd;
+            if (existing.fonteRaw === fonteNorm) {
+              // Mesma fonte (linha duplicada na MI) → acumula normalmente
+              existing.quantidade += qtd;
+            } else {
+              // Bug fix 3: fontes distintas mapeiam para o mesmo tipo (ex.: "mapa mental" +
+              // "infográfico" → ambos INFOGRAFICO). Usa o máximo para evitar duplicação indevida
+              // de OAs quando um dos itens é atividade pedagógica, não objeto a produzir.
+              existing.quantidade = Math.max(existing.quantidade, qtd);
+            }
           } else {
-            cap.oaDefs.push({ oeNumero: oeNum, tipo, quantidade: qtd });
+            cap.oaDefs.push({ oeNumero: oeNum, tipo, quantidade: qtd, fonteRaw: fonteNorm });
           }
         }
       }
@@ -1197,6 +1237,27 @@ export async function persistMI(caps: MICapitulo[], cursoId: string, options: { 
             await prisma.objetoAprendizagem.delete({ where: { id: existing.id } });
           }
 
+          // Bug fix 5: se já existe OA do mesmo tipo+numero neste capítulo mas com oeNum
+          // diferente (importado via MC com código distinto), pula a criação para evitar
+          // duplicata originada de divergência entre o oeNum da MI e o código real da MC.
+          const existingAltOeNum = await prisma.objetoAprendizagem.findFirst({
+            where: {
+              capituloId: capitulo.id,
+              tipo:       def.tipo as any,
+              numero:     n,
+              NOT:        { codigo },
+            },
+            select: { codigo: true, capitulo: { select: { unidade: { select: { cursoId: true } } } } },
+          });
+          if (existingAltOeNum?.capitulo?.unidade?.cursoId === cursoId) {
+            logger.warn(
+              { codigoMI: codigo, codigoExistente: existingAltOeNum.codigo },
+              "persistMI: OA com mesmo tipo/numero já existe com código diferente (conflito oeNum MI×MC) — pulando."
+            );
+            oasIgnorados++;
+            continue;
+          }
+
           const oa = await prisma.objetoAprendizagem.create({
             data: {
               capituloId:   capitulo.id,
@@ -1219,7 +1280,8 @@ export async function persistMI(caps: MICapitulo[], cursoId: string, options: { 
                 { papel: "DESIGNER_INSTRUCIONAL", ordem: 2 },
                 { papel: "PROFESSOR_ATOR",        ordem: 3 },
                 { papel: "EDITOR_VIDEO",          ordem: 4 },
-                { papel: "VALIDADOR_FINAL",       ordem: 5 },
+                { papel: "PRODUTOR_FINAL",        ordem: 5 },
+                { papel: "VALIDADOR_FINAL",       ordem: 6 },
               ]
             : [
                 { papel: "COORDENADOR_PRODUCAO",  ordem: 0 },
@@ -1227,7 +1289,8 @@ export async function persistMI(caps: MICapitulo[], cursoId: string, options: { 
                 { papel: "DESIGNER_INSTRUCIONAL", ordem: 2 },
                 { papel: "ACESSIBILIDADE",        ordem: 3 },
                 { papel: "DESIGNER_GRAFICO",      ordem: 4 },
-                { papel: "VALIDADOR_FINAL",       ordem: 5 },
+                { papel: "PRODUTOR_FINAL",        ordem: 5 },
+                { papel: "VALIDADOR_FINAL",       ordem: 6 },
               ];
 
           for (const etapa of etapasParaCriar) {

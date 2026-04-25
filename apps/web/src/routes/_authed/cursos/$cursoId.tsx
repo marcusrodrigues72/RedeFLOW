@@ -19,6 +19,11 @@ import ChatBubbleOutlineIcon    from "@mui/icons-material/ChatBubbleOutline";
 import RestoreIcon              from "@mui/icons-material/Restore";
 import SendIcon                 from "@mui/icons-material/Send";
 import DeleteIcon               from "@mui/icons-material/Delete";
+import EditIcon                 from "@mui/icons-material/Edit";
+import ReplyIcon                from "@mui/icons-material/Reply";
+import CheckIcon                from "@mui/icons-material/Check";
+import CloseIcon                from "@mui/icons-material/Close";
+import DiffIcon                 from "@mui/icons-material/CompareArrows";
 import { useState, useRef }     from "react";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
@@ -29,11 +34,11 @@ import PersonAddIcon   from "@mui/icons-material/PersonAdd";
 import SearchIcon      from "@mui/icons-material/Search";
 import InputAdornment  from "@mui/material/InputAdornment";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
-import { useCurso, useOAsByCurso, useAdicionarMembro, useRemoverMembro, useAtualizarCurso, useExcluirCurso, useAtribuicaoPreview, useAtribuirResponsaveis, useExportarMC, useAtualizarPapeisProducao, useMIHistorico, useRestaurarMI, useComentariosMI, useAdicionarComentarioMI, useExcluirComentarioMI } from "@/lib/api/cursos";
+import { useCurso, useOAsByCurso, useAdicionarMembro, useRemoverMembro, useAtualizarCurso, useExcluirCurso, useAtribuicaoPreview, useAtribuirResponsaveis, useExportarMC, useAtualizarPapeisProducao, useMIHistorico, useRestaurarMI, useComentariosMI, useAdicionarComentarioMI, useEditarComentarioMI, useExcluirComentarioMI, useAtualizarCHCapitulo } from "@/lib/api/cursos";
 import { useUsuarios } from "@/lib/api/usuarios";
 import { useAuthStore } from "@/stores/auth.store";
 import { useConfigAlertasCurso, useSalvarConfigAlertasCurso, useAtualizarNotifMembro } from "@/lib/api/notificacoes";
-import type { PapelEtapa, MIHistoricoResumo } from "shared";
+import type { PapelEtapa, MIHistoricoResumo, ComentarioMI } from "shared";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import NotificationsNoneIcon   from "@mui/icons-material/NotificationsNone";
 import CircularProgress        from "@mui/material/CircularProgress";
@@ -43,6 +48,55 @@ import Slider                  from "@mui/material/Slider";
 export const Route = createFileRoute("/_authed/cursos/$cursoId")({
   component: CursoDetalhePage,
 });
+
+// ─── RF-M2-02: Célula CH editável inline ─────────────────────────────────────
+function CHCell({ value, onSave }: { value: string | null; onSave: (v: number | null) => void }) {
+  const [editando, setEditando] = useState(false);
+  const [draft,    setDraft]    = useState("");
+
+  const iniciar = () => { setDraft(value != null ? String(Number(value)) : ""); setEditando(true); };
+
+  const salvar = () => {
+    const t = draft.trim().replace(",", ".");
+    const n = t === "" ? null : parseFloat(t);
+    onSave(n != null && !isNaN(n) && n >= 0 ? n : null);
+    setEditando(false);
+  };
+
+  if (editando) {
+    return (
+      <TextField
+        autoFocus size="small" value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={salvar}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") { e.preventDefault(); salvar(); }
+          if (e.key === "Escape") setEditando(false);
+        }}
+        inputProps={{ style: { padding: "3px 6px", width: 48, fontSize: "0.75rem", textAlign: "center" } }}
+        sx={{ "& .MuiOutlinedInput-root": { borderRadius: 1 } }}
+      />
+    );
+  }
+  return (
+    <Tooltip title="Clique para editar (em horas)">
+      <Box
+        onClick={iniciar}
+        sx={{
+          cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center",
+          px: 1, py: 0.25, borderRadius: 1, minWidth: 44,
+          color: value && Number(value) > 0 ? "text.primary" : "text.disabled",
+          fontSize: "0.75rem", fontWeight: value && Number(value) > 0 ? 600 : 400,
+          "&:hover": { bgcolor: "#eff6ff", color: "primary.main" },
+        }}
+      >
+        {value && Number(value) > 0
+          ? `${Number(value) % 1 === 0 ? Number(value) : Number(value).toFixed(1)}h`
+          : "—"}
+      </Box>
+    </Tooltip>
+  );
+}
 
 
 function CursoDetalhePage() {
@@ -60,6 +114,7 @@ function CursoDetalhePage() {
 
   const { mutate: atualizar, isPending: atualizando } = useAtualizarCurso(cursoId);
   const { mutate: excluir,   isPending: excluindo   } = useExcluirCurso();
+  const { mutate: atualizarCH } = useAtualizarCHCapitulo(cursoId);
   const { mutate: exportar,  isPending: exportando  } = useExportarMC(cursoId, curso?.codigo ?? "");
   const { data: oasDoCurso = [] }                     = useOAsByCurso(cursoId, {});
 
@@ -313,87 +368,140 @@ function CursoDetalhePage() {
               </Button>
             </Box>
 
-            {curso.unidades.map((unidade) => (
-              <Accordion key={unidade.id} defaultExpanded={curso.unidades.length === 1}
-                sx={{ mb: 1.5, "&:before": { display: "none" }, borderRadius: "12px !important", overflow: "hidden" }}>
-                <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ bgcolor: "#f8fafc", px: 3 }}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                    <Chip label={`U${unidade.numero}`} size="small"
-                      sx={{ bgcolor: "primary.main", color: "white", fontWeight: 700, fontSize: "0.7rem" }} />
-                    <Typography fontWeight={700}>{unidade.nome}</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {unidade.capitulos.length} capítulos
-                    </Typography>
-                  </Box>
-                </AccordionSummary>
-                <AccordionDetails sx={{ p: 0 }}>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow sx={{ bgcolor: "#fafafa" }}>
-                        {["Capítulo", "CH Assínc.", "Objetivos Educacionais", ""].map((h, i) => (
-                          <TableCell key={i} sx={{ fontWeight: 700, fontSize: "0.75rem", color: "text.secondary", py: 1.5 }}>{h}</TableCell>
-                        ))}
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {unidade.capitulos.map((cap) => (
-                        <TableRow key={cap.id} sx={{ verticalAlign: "top", "&:hover": { bgcolor: "action.hover" } }}>
-                          <TableCell sx={{ py: 1.5, minWidth: 180 }}>
-                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                              <Typography variant="caption" color="text.disabled"
-                                sx={{ fontFamily: "monospace", minWidth: 32 }}>C{cap.numero}</Typography>
-                              <Typography variant="body2" fontWeight={500}>{cap.nome}</Typography>
-                            </Box>
-                          </TableCell>
-                          <TableCell sx={{ py: 1.5, whiteSpace: "nowrap" }}>
-                            <Typography variant="body2" color="text.secondary">
-                              {cap.chAssincrona ? `${cap.chAssincrona}h` : "—"}
-                            </Typography>
-                          </TableCell>
-                          <TableCell sx={{ py: 1.5 }}>
-                            {cap.objetivos.length === 0 ? (
-                              <Typography variant="caption" color="text.disabled">—</Typography>
-                            ) : (
-                              <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-                                {cap.objetivos.map((oe) => (
-                                  <Box key={oe.id} sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
-                                    <Typography variant="caption" color="text.disabled"
-                                      sx={{ fontFamily: "monospace", minWidth: 24, mt: 0.1 }}>
-                                      OE{oe.numero}
-                                    </Typography>
-                                    <Box sx={{ flex: 1 }}>
-                                      <Typography variant="caption">{oe.descricao}</Typography>
-                                      {oe.nivelBloom && (
-                                        <Chip label={oe.nivelBloom} size="small"
-                                          sx={{ ml: 0.75, height: 16, fontSize: "0.6rem", bgcolor: "#eff6ff", color: "primary.main" }} />
-                                      )}
-                                    </Box>
-                                  </Box>
-                                ))}
-                              </Box>
-                            )}
-                          </TableCell>
-                          {/* Ícone de comentários */}
-                          <TableCell sx={{ py: 1.5, width: 48, textAlign: "right" }}>
-                            <Tooltip title={`${cap._count.comentarios} comentário(s)`}>
-                              <IconButton size="small" onClick={() => setComentarioCapId(cap.id)}>
-                                <Badge
-                                  badgeContent={cap._count.comentarios || undefined}
-                                  color="primary"
-                                  sx={{ "& .MuiBadge-badge": { fontSize: "0.6rem", minWidth: 16, height: 16 } }}
-                                >
-                                  <ChatBubbleOutlineIcon sx={{ fontSize: 18, color: "text.disabled" }} />
-                                </Badge>
-                              </IconButton>
+            {curso.unidades.map((unidade) => {
+              // RF-M2-02: totais calculados em tempo real a partir dos capítulos
+              const totalAssinc = unidade.capitulos.reduce((s, c) => s + Number(c.chAssincrona ?? 0), 0);
+              const totalSinc   = unidade.capitulos.reduce((s, c) => s + Number(c.chSincrona   ?? 0), 0);
+              const totalAtiv   = unidade.capitulos.reduce((s, c) => s + Number(c.chAtividades  ?? 0), 0);
+              const fmt = (v: number) => v > 0 ? `${v % 1 === 0 ? v : v.toFixed(1)}h` : null;
+
+              return (
+                <Accordion key={unidade.id} defaultExpanded={curso.unidades.length === 1}
+                  sx={{ mb: 1.5, "&:before": { display: "none" }, borderRadius: "12px !important", overflow: "hidden" }}>
+                  <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ bgcolor: "#f8fafc", px: 3 }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+                      <Chip label={`U${unidade.numero}`} size="small"
+                        sx={{ bgcolor: "primary.main", color: "white", fontWeight: 700, fontSize: "0.7rem" }} />
+                      <Typography fontWeight={700}>{unidade.nome}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {unidade.capitulos.length} capítulos
+                      </Typography>
+                      {/* Totais de CH calculados automaticamente */}
+                      {(totalAssinc > 0 || totalSinc > 0 || totalAtiv > 0) && (
+                        <Box sx={{ display: "flex", gap: 0.75, ml: "auto" }}>
+                          {fmt(totalAssinc) && (
+                            <Chip label={`Assínc. ${fmt(totalAssinc)}`} size="small"
+                              sx={{ bgcolor: "#eff6ff", color: "primary.main", fontSize: "0.65rem", height: 20, fontWeight: 600 }} />
+                          )}
+                          {fmt(totalSinc) && (
+                            <Chip label={`Sínc. ${fmt(totalSinc)}`} size="small"
+                              sx={{ bgcolor: "#f0fdf4", color: "#166534", fontSize: "0.65rem", height: 20, fontWeight: 600 }} />
+                          )}
+                          {fmt(totalAtiv) && (
+                            <Chip label={`Ativ. ${fmt(totalAtiv)}`} size="small"
+                              sx={{ bgcolor: "#fef9c3", color: "#854d0e", fontSize: "0.65rem", height: 20, fontWeight: 600 }} />
+                          )}
+                        </Box>
+                      )}
+                    </Box>
+                  </AccordionSummary>
+                  <AccordionDetails sx={{ p: 0 }}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow sx={{ bgcolor: "#fafafa" }}>
+                          <TableCell sx={{ fontWeight: 700, fontSize: "0.75rem", color: "text.secondary", py: 1.5 }}>Capítulo</TableCell>
+                          <TableCell sx={{ fontWeight: 700, fontSize: "0.75rem", color: "text.secondary", py: 1.5, width: 70, textAlign: "center" }}>
+                            <Tooltip title="Carga Horária Assíncrona — clique para editar">
+                              <span>Assínc.</span>
                             </Tooltip>
                           </TableCell>
+                          <TableCell sx={{ fontWeight: 700, fontSize: "0.75rem", color: "text.secondary", py: 1.5, width: 70, textAlign: "center" }}>
+                            <Tooltip title="Carga Horária Síncrona — clique para editar">
+                              <span>Sínc.</span>
+                            </Tooltip>
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 700, fontSize: "0.75rem", color: "text.secondary", py: 1.5, width: 70, textAlign: "center" }}>
+                            <Tooltip title="Carga Horária de Atividades — clique para editar">
+                              <span>Ativ.</span>
+                            </Tooltip>
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 700, fontSize: "0.75rem", color: "text.secondary", py: 1.5 }}>Objetivos Educacionais</TableCell>
+                          <TableCell sx={{ width: 48 }} />
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </AccordionDetails>
-              </Accordion>
-            ))}
+                      </TableHead>
+                      <TableBody>
+                        {unidade.capitulos.map((cap) => (
+                          <TableRow key={cap.id} sx={{ verticalAlign: "top", "&:hover": { bgcolor: "action.hover" } }}>
+                            <TableCell sx={{ py: 1.5, minWidth: 160 }}>
+                              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                <Typography variant="caption" color="text.disabled"
+                                  sx={{ fontFamily: "monospace", minWidth: 32 }}>C{cap.numero}</Typography>
+                                <Typography variant="body2" fontWeight={500}>{cap.nome}</Typography>
+                              </Box>
+                            </TableCell>
+                            {/* CH editável inline — RF-M2-02 */}
+                            <TableCell sx={{ py: 1, textAlign: "center" }}>
+                              <CHCell
+                                value={cap.chAssincrona}
+                                onSave={(v) => atualizarCH({ capituloId: cap.id, chAssincrona: v })}
+                              />
+                            </TableCell>
+                            <TableCell sx={{ py: 1, textAlign: "center" }}>
+                              <CHCell
+                                value={cap.chSincrona}
+                                onSave={(v) => atualizarCH({ capituloId: cap.id, chSincrona: v })}
+                              />
+                            </TableCell>
+                            <TableCell sx={{ py: 1, textAlign: "center" }}>
+                              <CHCell
+                                value={cap.chAtividades}
+                                onSave={(v) => atualizarCH({ capituloId: cap.id, chAtividades: v })}
+                              />
+                            </TableCell>
+                            <TableCell sx={{ py: 1.5 }}>
+                              {cap.objetivos.length === 0 ? (
+                                <Typography variant="caption" color="text.disabled">—</Typography>
+                              ) : (
+                                <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                                  {cap.objetivos.map((oe) => (
+                                    <Box key={oe.id} sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
+                                      <Typography variant="caption" color="text.disabled"
+                                        sx={{ fontFamily: "monospace", minWidth: 24, mt: 0.1 }}>
+                                        OE{oe.numero}
+                                      </Typography>
+                                      <Box sx={{ flex: 1 }}>
+                                        <Typography variant="caption">{oe.descricao}</Typography>
+                                        {oe.nivelBloom && (
+                                          <Chip label={oe.nivelBloom} size="small"
+                                            sx={{ ml: 0.75, height: 16, fontSize: "0.6rem", bgcolor: "#eff6ff", color: "primary.main" }} />
+                                        )}
+                                      </Box>
+                                    </Box>
+                                  ))}
+                                </Box>
+                              )}
+                            </TableCell>
+                            <TableCell sx={{ py: 1.5, width: 48, textAlign: "right" }}>
+                              <Tooltip title={`${cap._count.comentarios} comentário(s)`}>
+                                <IconButton size="small" onClick={() => setComentarioCapId(cap.id)}>
+                                  <Badge
+                                    badgeContent={cap._count.comentarios || undefined}
+                                    color="primary"
+                                    sx={{ "& .MuiBadge-badge": { fontSize: "0.6rem", minWidth: 16, height: 16 } }}
+                                  >
+                                    <ChatBubbleOutlineIcon sx={{ fontSize: 18, color: "text.disabled" }} />
+                                  </Badge>
+                                </IconButton>
+                              </Tooltip>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </AccordionDetails>
+                </Accordion>
+              );
+            })}
           </Box>
         )
       )}
@@ -418,7 +526,7 @@ function CursoDetalhePage() {
       )}
 
       {/* Aba 2 — Equipe */}
-      {aba === 2 && <EquipeTab cursoId={cursoId} membros={curso.membros} />}
+      {aba === 2 && <EquipeTab cursoId={cursoId} membros={curso.membros} isAdmin={isAdmin} />}
 
       {/* Aba 3 — Alertas */}
       {aba === 3 && <AlertasTab cursoId={cursoId} membros={curso.membros} isAdmin={isAdmin} />}
@@ -530,9 +638,10 @@ const PAPEIS_PRODUCAO_OPCOES: { value: string; label: string }[] = [
   { value: "VALIDADOR_FINAL",        label: "Validador Final" },
 ];
 
-function EquipeTab({ cursoId, membros }: {
+function EquipeTab({ cursoId, membros, isAdmin }: {
   cursoId: string;
   membros: { usuarioId: string; papel: string; papeisProducao: string[]; usuario: { id: string; nome: string; email: string; fotoUrl: string | null } }[];
+  isAdmin: boolean;
 }) {
   const { mutate: adicionar, isPending: adicionando }  = useAdicionarMembro(cursoId);
   const { mutate: remover }                            = useRemoverMembro(cursoId);
@@ -613,8 +722,28 @@ function EquipeTab({ cursoId, membros }: {
                     </TableCell>
                     <TableCell><Typography variant="body2" color="text.secondary">{m.usuario.email}</Typography></TableCell>
                     <TableCell>
-                      <Chip label={pc.label} size="small"
-                        sx={{ bgcolor: pc.bg, color: pc.color, fontWeight: 600, fontSize: "0.7rem" }} />
+                      {isAdmin ? (
+                        <Select
+                          size="small"
+                          value={m.papel}
+                          onChange={(e) => atualizarRoles({ usuarioId: m.usuarioId, papel: e.target.value })}
+                          sx={{
+                            fontSize: "0.75rem", height: 28, fontWeight: 600,
+                            bgcolor: pc.bg, color: pc.color,
+                            "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+                            "& .MuiSelect-icon": { color: pc.color },
+                          }}
+                        >
+                          {(Object.keys(PAPEL_EQUIPE_CONFIG) as string[]).map((p) => (
+                            <MenuItem key={p} value={p} sx={{ fontSize: "0.75rem" }}>
+                              {PAPEL_EQUIPE_CONFIG[p]!.label}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      ) : (
+                        <Chip label={pc.label} size="small"
+                          sx={{ bgcolor: pc.bg, color: pc.color, fontWeight: 600, fontSize: "0.7rem" }} />
+                      )}
                     </TableCell>
                     <TableCell sx={{ minWidth: 220 }}>
                       <Select
@@ -1110,12 +1239,19 @@ function LoadingSkeleton() {
 
 // ─── Drawer: Histórico de versões da MI (RF-M2-05) ───────────────────────────
 
+const TIPO_ICON: Record<string, string> = {
+  CAPITULO_ADICIONADO: "➕",
+  CAPITULO_REMOVIDO:   "➖",
+  CAPITULO_MODIFICADO: "✏️",
+};
+
 function MIHistoricoDrawer({
   open, cursoId, isAdmin, onClose,
 }: { open: boolean; cursoId: string; isAdmin: boolean; onClose: () => void }) {
   const { data: versoes = [], isLoading } = useMIHistorico(cursoId);
   const { mutate: restaurar, isPending: restaurando } = useRestaurarMI(cursoId);
-  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [confirmId,   setConfirmId]   = useState<string | null>(null);
+  const [expandedId,  setExpandedId]  = useState<string | null>(null);
   const [snack, setSnack] = useState<string | null>(null);
 
   const handleRestaurar = (versaoId: string) => {
@@ -1127,7 +1263,7 @@ function MIHistoricoDrawer({
 
   return (
     <Drawer anchor="right" open={open} onClose={onClose}
-      PaperProps={{ sx: { width: { xs: "100%", sm: 480 }, p: 0 } }}>
+      PaperProps={{ sx: { width: { xs: "100%", sm: 500 }, display: "flex", flexDirection: "column" } }}>
       <Box sx={{ p: 3, borderBottom: "1px solid", borderColor: "divider", display: "flex", alignItems: "center", gap: 1.5 }}>
         <HistoryIcon sx={{ color: "text.secondary" }} />
         <Typography fontWeight={700} fontSize="1rem">Histórico de versões da MI</Typography>
@@ -1140,46 +1276,82 @@ function MIHistoricoDrawer({
           <Typography color="text.secondary" sx={{ p: 2 }}>Nenhuma versão registrada ainda.</Typography>
         ) : (
           <List disablePadding>
-            {versoes.map((v: MIHistoricoResumo, idx) => (
-              <ListItem key={v.id} disablePadding
-                sx={{ mb: 1.5, borderRadius: 2, border: "1px solid", borderColor: "divider", flexDirection: "column", alignItems: "flex-start", p: 2 }}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, width: "100%", mb: 0.5 }}>
-                  <Avatar src={v.importadoPor.fotoUrl ?? undefined} sx={{ width: 28, height: 28, fontSize: "0.75rem" }}>
-                    {v.importadoPor.nome[0]?.toUpperCase()}
-                  </Avatar>
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="body2" fontWeight={600}>{v.importadoPor.nome}</Typography>
-                    <Typography variant="caption" color="text.disabled">
-                      {new Date(v.createdAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
-                    </Typography>
-                  </Box>
-                  {idx === 0 && (
-                    <Chip label="Atual" size="small" sx={{ bgcolor: "#dcfce7", color: "#166534", fontSize: "0.65rem", height: 20 }} />
-                  )}
-                </Box>
-                {v.resumo && (
-                  <Typography variant="caption" color="text.secondary" sx={{ mb: 1 }}>{v.resumo}</Typography>
-                )}
-                {isAdmin && idx > 0 && (
-                  confirmId === v.id ? (
-                    <Box sx={{ display: "flex", gap: 1 }}>
-                      <Button size="small" variant="contained" color="warning"
-                        disabled={restaurando}
-                        startIcon={restaurando ? <CircularProgress size={14} color="inherit" /> : <RestoreIcon />}
-                        onClick={() => handleRestaurar(v.id)}>
-                        Confirmar restauração
-                      </Button>
-                      <Button size="small" onClick={() => setConfirmId(null)}>Cancelar</Button>
+            {versoes.map((v: MIHistoricoResumo, idx) => {
+              const temAlteracoes = v.alteracoes && v.alteracoes.length > 0;
+              const expandido = expandedId === v.id;
+              return (
+                <ListItem key={v.id} disablePadding
+                  sx={{ mb: 1.5, borderRadius: 2, border: "1px solid", borderColor: "divider",
+                        flexDirection: "column", alignItems: "flex-start", p: 2 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, width: "100%", mb: 0.5 }}>
+                    <Avatar src={v.importadoPor.fotoUrl ?? undefined} sx={{ width: 28, height: 28, fontSize: "0.75rem" }}>
+                      {v.importadoPor.nome[0]?.toUpperCase()}
+                    </Avatar>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="body2" fontWeight={600}>{v.importadoPor.nome}</Typography>
+                      <Typography variant="caption" color="text.disabled">
+                        {new Date(v.createdAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
+                      </Typography>
                     </Box>
-                  ) : (
-                    <Button size="small" variant="outlined" startIcon={<RestoreIcon />}
-                      onClick={() => setConfirmId(v.id)}>
-                      Restaurar esta versão
-                    </Button>
-                  )
-                )}
-              </ListItem>
-            ))}
+                    {idx === 0 && (
+                      <Chip label="Atual" size="small" sx={{ bgcolor: "#dcfce7", color: "#166534", fontSize: "0.65rem", height: 20 }} />
+                    )}
+                  </Box>
+
+                  {v.resumo && (
+                    <Typography variant="caption" color="text.secondary" sx={{ mb: temAlteracoes ? 0.5 : 1 }}>
+                      {v.resumo}
+                    </Typography>
+                  )}
+
+                  {/* Campos modificados (RF-M2-05) */}
+                  {temAlteracoes && (
+                    <Box sx={{ width: "100%", mb: 1 }}>
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 0.5, cursor: "pointer", mb: expandido ? 0.5 : 0 }}
+                        onClick={() => setExpandedId(expandido ? null : v.id)}
+                      >
+                        <DiffIcon sx={{ fontSize: 14, color: "text.disabled" }} />
+                        <Typography variant="caption" color="primary" sx={{ fontWeight: 600 }}>
+                          {v.alteracoes!.length} alteração(ões) detectada(s)
+                        </Typography>
+                        <Typography variant="caption" color="text.disabled" sx={{ ml: "auto" }}>
+                          {expandido ? "▲ ocultar" : "▼ ver"}
+                        </Typography>
+                      </Box>
+                      {expandido && (
+                        <Box sx={{ pl: 1, borderLeft: "2px solid", borderColor: "divider", display: "flex", flexDirection: "column", gap: 0.25 }}>
+                          {v.alteracoes!.map((a, i) => (
+                            <Typography key={i} variant="caption" color="text.secondary">
+                              {TIPO_ICON[a.tipo] ?? "•"} {a.descricao}
+                            </Typography>
+                          ))}
+                        </Box>
+                      )}
+                    </Box>
+                  )}
+
+                  {isAdmin && idx > 0 && (
+                    confirmId === v.id ? (
+                      <Box sx={{ display: "flex", gap: 1 }}>
+                        <Button size="small" variant="contained" color="warning"
+                          disabled={restaurando}
+                          startIcon={restaurando ? <CircularProgress size={14} color="inherit" /> : <RestoreIcon />}
+                          onClick={() => handleRestaurar(v.id)}>
+                          Confirmar restauração
+                        </Button>
+                        <Button size="small" onClick={() => setConfirmId(null)}>Cancelar</Button>
+                      </Box>
+                    ) : (
+                      <Button size="small" variant="outlined" startIcon={<RestoreIcon />}
+                        onClick={() => setConfirmId(v.id)}>
+                        Restaurar esta versão
+                      </Button>
+                    )
+                  )}
+                </ListItem>
+              );
+            })}
           </List>
         )}
       </Box>
@@ -1194,25 +1366,105 @@ function MIHistoricoDrawer({
 
 // ─── Drawer: Comentários por capítulo da MI (RF-M2-06) ───────────────────────
 
+function ComentarioCard({
+  c, userId, cursoId, capituloId, onReply,
+}: {
+  c: ComentarioMI;
+  userId: string | undefined;
+  cursoId: string;
+  capituloId: string;
+  onReply: (c: ComentarioMI) => void;
+}) {
+  const { mutate: excluir }  = useExcluirComentarioMI(cursoId, capituloId);
+  const { mutate: editar, isPending: editando } = useEditarComentarioMI(cursoId, capituloId);
+  const [modoEdicao, setModoEdicao] = useState(false);
+  const [textoEdicao, setTextoEdicao] = useState(c.texto);
+  const isMine = c.autor.id === userId;
+
+  const salvarEdicao = () => {
+    const t = textoEdicao.trim();
+    if (!t || t === c.texto) { setModoEdicao(false); return; }
+    editar({ comentarioId: c.id, texto: t }, { onSuccess: () => setModoEdicao(false) });
+  };
+
+  return (
+    <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: isMine ? "#eff6ff" : "#f8fafc",
+               border: "1px solid", borderColor: isMine ? "#bfdbfe" : "divider" }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+        <Avatar src={c.autor.fotoUrl ?? undefined} sx={{ width: 24, height: 24, fontSize: "0.7rem" }}>
+          {c.autor.nome[0]?.toUpperCase()}
+        </Avatar>
+        <Typography variant="caption" fontWeight={600}>{c.autor.nome}</Typography>
+        {c.editado && (
+          <Typography variant="caption" color="text.disabled" sx={{ fontStyle: "italic" }}>(editado)</Typography>
+        )}
+        <Typography variant="caption" color="text.disabled" sx={{ ml: "auto" }}>
+          {new Date(c.createdAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
+        </Typography>
+        <Tooltip title="Responder">
+          <IconButton size="small" onClick={() => onReply(c)} sx={{ color: "text.disabled" }}>
+            <ReplyIcon sx={{ fontSize: 14 }} />
+          </IconButton>
+        </Tooltip>
+        {isMine && !modoEdicao && (
+          <Tooltip title="Editar">
+            <IconButton size="small" onClick={() => { setTextoEdicao(c.texto); setModoEdicao(true); }} sx={{ color: "text.disabled" }}>
+              <EditIcon sx={{ fontSize: 14 }} />
+            </IconButton>
+          </Tooltip>
+        )}
+        {isMine && (
+          <Tooltip title="Excluir">
+            <IconButton size="small" onClick={() => excluir(c.id)} sx={{ color: "text.disabled" }}>
+              <DeleteIcon sx={{ fontSize: 14 }} />
+            </IconButton>
+          </Tooltip>
+        )}
+      </Box>
+
+      {modoEdicao ? (
+        <Box sx={{ display: "flex", gap: 0.5, alignItems: "flex-end", mt: 0.5 }}>
+          <TextField
+            multiline maxRows={4} size="small" fullWidth autoFocus
+            value={textoEdicao}
+            onChange={(e) => setTextoEdicao(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); salvarEdicao(); } }}
+          />
+          <IconButton size="small" color="primary" disabled={editando} onClick={salvarEdicao}>
+            {editando ? <CircularProgress size={14} color="inherit" /> : <CheckIcon sx={{ fontSize: 16 }} />}
+          </IconButton>
+          <IconButton size="small" onClick={() => setModoEdicao(false)}>
+            <CloseIcon sx={{ fontSize: 16 }} />
+          </IconButton>
+        </Box>
+      ) : (
+        <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>{c.texto}</Typography>
+      )}
+    </Box>
+  );
+}
+
 function ComentariosMIDrawer({
   open, cursoId, capituloId, capituloNome, onClose,
 }: { open: boolean; cursoId: string; capituloId: string; capituloNome: string; onClose: () => void }) {
   const user = useAuthStore((s) => s.user);
   const { data: comentarios = [], isLoading } = useComentariosMI(cursoId, capituloId);
   const { mutate: adicionar, isPending: adicionando } = useAdicionarComentarioMI(cursoId, capituloId);
-  const { mutate: excluir } = useExcluirComentarioMI(cursoId, capituloId);
-  const [texto, setTexto] = useState("");
+  const [texto,       setTexto]       = useState("");
+  const [respondendo, setRespondendo] = useState<ComentarioMI | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleEnviar = () => {
     const t = texto.trim();
     if (!t) return;
-    adicionar(t, { onSuccess: () => setTexto("") });
+    adicionar({ texto: t, parentId: respondendo?.id ?? null }, {
+      onSuccess: () => { setTexto(""); setRespondendo(null); },
+    });
   };
 
   return (
     <Drawer anchor="right" open={open} onClose={onClose}
-      PaperProps={{ sx: { width: { xs: "100%", sm: 440 }, display: "flex", flexDirection: "column" } }}>
+      PaperProps={{ sx: { width: { xs: "100%", sm: 460 }, display: "flex", flexDirection: "column" } }}>
       <Box sx={{ p: 3, borderBottom: "1px solid", borderColor: "divider", display: "flex", alignItems: "center", gap: 1.5 }}>
         <ChatBubbleOutlineIcon sx={{ color: "text.secondary" }} />
         <Box sx={{ flex: 1 }}>
@@ -1230,38 +1482,47 @@ function ComentariosMIDrawer({
             Nenhum comentário ainda. Seja o primeiro!
           </Typography>
         ) : comentarios.map((c) => (
-          <Box key={c.id}
-            sx={{ p: 1.5, borderRadius: 2, bgcolor: c.autor.id === user?.id ? "#eff6ff" : "#f8fafc",
-                  border: "1px solid", borderColor: c.autor.id === user?.id ? "#bfdbfe" : "divider" }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
-              <Avatar src={c.autor.fotoUrl ?? undefined} sx={{ width: 24, height: 24, fontSize: "0.7rem" }}>
-                {c.autor.nome[0]?.toUpperCase()}
-              </Avatar>
-              <Typography variant="caption" fontWeight={600}>{c.autor.nome}</Typography>
-              <Typography variant="caption" color="text.disabled" sx={{ ml: "auto" }}>
-                {new Date(c.createdAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
-              </Typography>
-              {c.autor.id === user?.id && (
-                <Tooltip title="Excluir">
-                  <IconButton size="small" onClick={() => excluir(c.id)} sx={{ ml: 0.5, color: "text.disabled" }}>
-                    <DeleteIcon sx={{ fontSize: 14 }} />
-                  </IconButton>
-                </Tooltip>
-              )}
-            </Box>
-            <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>{c.texto}</Typography>
+          <Box key={c.id}>
+            <ComentarioCard
+              c={c} userId={user?.id} cursoId={cursoId} capituloId={capituloId}
+              onReply={(r) => { setRespondendo(r); setTimeout(() => inputRef.current?.focus(), 50); }}
+            />
+            {/* Respostas aninhadas */}
+            {c.respostas && c.respostas.length > 0 && (
+              <Box sx={{ pl: 3, mt: 0.75, display: "flex", flexDirection: "column", gap: 0.75,
+                         borderLeft: "2px solid", borderColor: "divider" }}>
+                {c.respostas.map((r) => (
+                  <ComentarioCard
+                    key={r.id} c={r} userId={user?.id} cursoId={cursoId} capituloId={capituloId}
+                    onReply={(rr) => { setRespondendo(rr); setTimeout(() => inputRef.current?.focus(), 50); }}
+                  />
+                ))}
+              </Box>
+            )}
           </Box>
         ))}
       </Box>
 
       <Divider />
+      {respondendo && (
+        <Box sx={{ px: 2, pt: 1.5, display: "flex", alignItems: "center", gap: 1,
+                   bgcolor: "#f0f9ff", borderTop: "1px solid #bae6fd" }}>
+          <ReplyIcon sx={{ fontSize: 14, color: "#0284c7" }} />
+          <Typography variant="caption" color="#0284c7" sx={{ flex: 1 }}>
+            Respondendo a <strong>{respondendo.autor.nome}</strong>
+          </Typography>
+          <IconButton size="small" onClick={() => setRespondendo(null)}>
+            <CloseIcon sx={{ fontSize: 14 }} />
+          </IconButton>
+        </Box>
+      )}
       <Box sx={{ p: 2, display: "flex", gap: 1, alignItems: "flex-end" }}>
         <TextField
           inputRef={inputRef}
           multiline maxRows={4}
           size="small"
           fullWidth
-          placeholder="Escreva um comentário... (@nome para mencionar)"
+          placeholder={respondendo ? `Responder a ${respondendo.autor.nome}...` : "Escreva um comentário... (@nome para mencionar)"}
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleEnviar(); } }}

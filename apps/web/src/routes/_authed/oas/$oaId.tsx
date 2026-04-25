@@ -46,6 +46,7 @@ const TIPO_CONFIG: Record<TipoOA, { label: string; color: string }> = {
   TAREFA:      { label: "Tarefa",        color: "#dc2626" },
   INFOGRAFICO: { label: "Infográfico",   color: "#7e22ce" },
   TIMELINE:    { label: "Timeline",      color: "#0f766e" },
+  ANIMACAO:    { label: "Animação",      color: "#db2777" },
 };
 
 const STATUS_ETAPA: Record<StatusEtapa, { label: string; icon: React.ReactNode }> = {
@@ -58,10 +59,22 @@ const STATUS_ETAPA: Record<StatusEtapa, { label: string; icon: React.ReactNode }
 function OADetalhePage() {
   const { oaId } = Route.useParams();
   const { data: oa, isLoading, isError } = useOA(oaId);
-  const { mutate: atualizarEtapa, isPending } = useAtualizarEtapa(oaId);
+  const { mutate: _atualizarEtapa, isPending } = useAtualizarEtapa(oaId);
   const user      = useAuthStore((s) => s.user);
   const [snackMsg, setSnackMsg] = useState<string | null>(null);
+  const [snackSeverity, setSnackSeverity] = useState<"success" | "error">("success");
   const [abaEsquerda, setAbaEsquerda] = useState<"pipeline" | "historico">("pipeline");
+
+  // Wrapper que exibe erros da API no snackbar
+  const atualizarEtapa: typeof _atualizarEtapa = (vars, opts) =>
+    _atualizarEtapa(vars, {
+      ...opts,
+      onError: (err: any) => {
+        const msg = err?.response?.data?.message ?? err?.message ?? "Erro ao atualizar etapa.";
+        setSnackSeverity("error");
+        setSnackMsg(msg);
+      },
+    });
 
   if (isLoading) return <LoadingSkeleton />;
   if (isError || !oa) return <Alert severity="error">OA não encontrado.</Alert>;
@@ -146,7 +159,7 @@ function OADetalhePage() {
                 const precisaArtefato = etapa.etapaDef.temArtefato || etapa.etapaDef.papel === "PROFESSOR_ATOR";
                 const artefatoFaltando = precisaArtefato && !etapa.linkArtefato && !isAdmin;
                 return (
-                  <Step key={etapa.id} completed={etapa.status === "CONCLUIDA"}>
+                  <Step key={etapa.id} completed={etapa.status === "CONCLUIDA"} expanded={isAdmin ? true : undefined}>
                     <StepLabel
                       icon={cfg.icon}
                       optional={
@@ -158,7 +171,7 @@ function OADetalhePage() {
                             const subsequentes = oa.etapas.filter((e) => e.ordem > etapa.ordem && e.deadlinePrevisto);
                             atualizarEtapa(
                               { etapaId: etapa.id, data: { deadlinePrevisto: novaData, recalcularSequencia: true } },
-                              { onSuccess: () => setSnackMsg(subsequentes.length > 0 ? `${subsequentes.length} etapa(s) subsequente(s) ajustada(s) automaticamente.` : "Deadline atualizado.") }
+                              { onSuccess: () => { setSnackSeverity("success"); setSnackMsg(subsequentes.length > 0 ? `${subsequentes.length} etapa(s) subsequente(s) ajustada(s) automaticamente.` : "Deadline atualizado."); } }
                             );
                           }}
                         />
@@ -173,7 +186,7 @@ function OADetalhePage() {
                           }} />
                       </Box>
                     </StepLabel>
-                    {isAtiva && (
+                    {(isAtiva || isAdmin) && (
                       <StepContent>
                         <Box sx={{ display: "flex", gap: 2, mt: 1, flexWrap: "wrap", alignItems: "center" }}>
                           <FormControl size="small" sx={{ minWidth: 160 }}>
@@ -285,10 +298,13 @@ function OADetalhePage() {
         </Card>
 
         <Snackbar
-          open={!!snackMsg} autoHideDuration={4000} onClose={() => setSnackMsg(null)}
-          message={snackMsg}
+          open={!!snackMsg} autoHideDuration={6000} onClose={() => setSnackMsg(null)}
           anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-        />
+        >
+          <Alert onClose={() => setSnackMsg(null)} severity={snackSeverity} sx={{ width: "100%" }}>
+            {snackMsg}
+          </Alert>
+        </Snackbar>
 
         {/* Comentários */}
         <ComentariosCard oaId={oaId} membros={curso.membros} />

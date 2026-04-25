@@ -94,6 +94,10 @@ export const oaRepository = {
     });
   },
 
+  deleteOA(id: string) {
+    return prisma.objetoAprendizagem.delete({ where: { id } });
+  },
+
   updateOA(oaId: string, data: { linkObjeto?: string | null }) {
     return prisma.objetoAprendizagem.update({
       where: { id: oaId },

@@ -7,6 +7,44 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 
+export interface AlteracaoMI { tipo: string; descricao: string; }
+
+/** Compara dois snapshots da MI e retorna a lista de campos modificados. */
+export function computarDiffMI(anterior: MICapitulo[], novo: MICapitulo[]): AlteracaoMI[] {
+  const alteracoes: AlteracaoMI[] = [];
+  const antMap = new Map(anterior.map((c) => [`${c.unidade}-${c.numero}`, c]));
+  const novMap = new Map(novo.map((c) => [`${c.unidade}-${c.numero}`, c]));
+
+  for (const [key, cap] of novMap) {
+    if (!antMap.has(key)) {
+      alteracoes.push({ tipo: "CAPITULO_ADICIONADO", descricao: `U${cap.unidade}C${cap.numero} "${cap.nome}": capítulo adicionado` });
+    }
+  }
+  for (const [key, cap] of antMap) {
+    if (!novMap.has(key)) {
+      alteracoes.push({ tipo: "CAPITULO_REMOVIDO", descricao: `U${cap.unidade}C${cap.numero} "${cap.nome}": capítulo removido` });
+    }
+  }
+  for (const [key, capNovo] of novMap) {
+    const capAnt = antMap.get(key);
+    if (!capAnt) continue;
+    const mudancas: string[] = [];
+    if (capAnt.nome !== capNovo.nome)
+      mudancas.push(`nome: "${capAnt.nome}" → "${capNovo.nome}"`);
+    if (capAnt.chAssincrona !== capNovo.chAssincrona)
+      mudancas.push(`CH Assínc.: ${capAnt.chAssincrona}min → ${capNovo.chAssincrona}min`);
+    if (capAnt.chSincrona !== capNovo.chSincrona)
+      mudancas.push(`CH Sínc.: ${capAnt.chSincrona}min → ${capNovo.chSincrona}min`);
+    const oasAnt = capAnt.oaDefs.reduce((s, d) => s + d.quantidade, 0);
+    const oasNov = capNovo.oaDefs.reduce((s, d) => s + d.quantidade, 0);
+    if (oasAnt !== oasNov)
+      mudancas.push(`OAs: ${oasAnt} → ${oasNov}`);
+    if (mudancas.length > 0)
+      alteracoes.push({ tipo: "CAPITULO_MODIFICADO", descricao: `U${capNovo.unidade}C${capNovo.numero}: ${mudancas.join(" · ")}` });
+  }
+  return alteracoes;
+}
+
 /** Salva um snapshot da MI no histórico após importação bem-sucedida. */
 async function salvarMIHistorico(
   caps: MICapitulo[],
@@ -17,8 +55,18 @@ async function salvarMIHistorico(
   const totalUnidades = new Set(caps.map((c) => c.unidade)).size;
   const totalOAs      = caps.reduce((s, c) => s + c.oaDefs.reduce((ss, d) => ss + d.quantidade, 0), 0);
   const resumo = `${totalUnidades} unidade(s) · ${result.capitulosAtualizados} capítulos · ${result.objetivosCriados} objetivos · ${totalOAs} OA(s)`;
+
+  // Calcula diff em relação à versão anterior (se houver)
+  let alteracoes: AlteracaoMI[] | null = null;
+  const versaoAnterior = await prisma.mIHistorico.findFirst({
+    where: { cursoId }, orderBy: { createdAt: "desc" }, select: { snapshot: true },
+  });
+  if (versaoAnterior?.snapshot) {
+    alteracoes = computarDiffMI(versaoAnterior.snapshot as unknown as MICapitulo[], caps);
+  }
+
   await prisma.mIHistorico.create({
-    data: { cursoId, importadoPorId: usuarioId, snapshot: caps as never, resumo },
+    data: { cursoId, importadoPorId: usuarioId, snapshot: caps as never, resumo, alteracoes: alteracoes as never ?? undefined },
   });
 }
 

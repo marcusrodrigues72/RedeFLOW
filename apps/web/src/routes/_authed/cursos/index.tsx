@@ -186,13 +186,22 @@ function CursoCard({ curso, isAdmin, onDuplicar }: { curso: CursoResumo; isAdmin
             {curso.codigo}
           </Typography>
 
-          {/* Progresso placeholder */}
+          {/* Progresso */}
           <Box sx={{ mb: 2 }}>
             <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
               <Typography variant="caption" color="text.secondary">Progresso</Typography>
-              <Typography variant="caption" fontWeight={600}>—</Typography>
+              <Typography variant="caption" fontWeight={600}>{curso.progressoPct}%</Typography>
             </Box>
-            <LinearProgress variant="determinate" value={0} sx={{ height: 5 }} />
+            <LinearProgress
+              variant="determinate"
+              value={curso.progressoPct}
+              sx={{
+                height: 5,
+                "& .MuiLinearProgress-bar": {
+                  bgcolor: curso.progressoPct >= 80 ? "#10b981" : curso.progressoPct >= 40 ? "#f59e0b" : "primary.main",
+                },
+              }}
+            />
           </Box>
 
           {/* Meta */}

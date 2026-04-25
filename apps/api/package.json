@@ -10,7 +10,8 @@
     "start:prod": "prisma migrate deploy && node dist/server.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "echo 'lint ok'"
+    "lint": "echo 'lint ok'",
+    "db:fix-produtor-final": "tsx prisma/fix-produtor-final.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
