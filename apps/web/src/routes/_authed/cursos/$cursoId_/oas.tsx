@@ -27,7 +27,7 @@ import ErrorOutlineIcon       from "@mui/icons-material/ErrorOutline";
 import TrendingUpIcon         from "@mui/icons-material/TrendingUp";
 import AccessTimeIcon         from "@mui/icons-material/AccessTime";
 import SchoolIcon             from "@mui/icons-material/School";
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useOAsByCurso, useCurso, useAtualizarEtapaGeral, useComentariosOA, useAdicionarComentario, useExcluirComentario, useAuditLogOA, useExcluirOA, useExcluirOAsEmMassa } from "@/lib/api/cursos";
 import { useAuthStore } from "@/stores/auth.store";
 import type { StatusOA, TipoOA, StatusEtapa, CursoDetalhe } from "shared";
@@ -958,13 +958,18 @@ function KanbanView({ oas, onSelect }: { oas: OAKanban[]; onSelect: (oaId: strin
 type OAItem = NonNullable<ReturnType<typeof useOAsByCurso>["data"]>[0];
 
 function GanttView({ oas, onSelect }: { oas: OAItem[]; onSelect: (oaId: string) => void }) {
-  const [zoom, setZoom] = useState<"mes" | "semana">("mes");
-  const [expandidosGantt, setExpandidosGantt] = useState<Set<string>>(new Set());
-  function toggleGrupoGantt(key: string) {
-    setExpandidosGantt((prev) => { const next = new Set(prev); if (next.has(key)) next.delete(key); else next.add(key); return next; });
-  }
+  const [zoom, setZoom]       = useState<"mes" | "semana">("mes");
+  // "colapsados" em vez de "expandidos": padrão = todos expandidos (Set vazio)
+  const [colapsados, setColapsados] = useState<Set<string>>(new Set());
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Coleta todas as datas relevantes para calcular o range
+  const PX_PER_DAY = zoom === "semana" ? 16 : 4;
+  const LABEL_W    = 220;
+  const ROW_H      = 42;
+  const GROUP_H    = 34;
+  const HEADER_H   = 36;
+
+  // ── Coleta todas as datas ─────────────────────────────────────────────────
   const allTs: number[] = [];
   for (const oa of oas) {
     for (const e of oa.etapas) {
@@ -986,304 +991,352 @@ function GanttView({ oas, onSelect }: { oas: OAItem[]; onSelect: (oaId: string) 
     );
   }
 
-  // Range com margem de 14 dias em cada extremidade
+  // ── Range com margem ──────────────────────────────────────────────────────
   const rangeStart = new Date(Math.min(...allTs));
-  rangeStart.setDate(rangeStart.getDate() - 14);
+  rangeStart.setDate(rangeStart.getDate() - 7);
   rangeStart.setHours(0, 0, 0, 0);
 
   const rangeEnd = new Date(Math.max(...allTs));
   rangeEnd.setDate(rangeEnd.getDate() + 14);
-  rangeEnd.setHours(23, 59, 59, 0);
+  rangeEnd.setHours(23, 59, 59, 999);
 
-  const totalMs = rangeEnd.getTime() - rangeStart.getTime();
-  const pct = (d: Date) =>
-    Math.max(0, Math.min(100, ((d.getTime() - rangeStart.getTime()) / totalMs) * 100));
+  const toPx = (d: Date) =>
+    Math.round(((d.getTime() - rangeStart.getTime()) / 86_400_000) * PX_PER_DAY);
 
-  // Cabeçalho: meses
-  const months: { label: string; left: number; width: number }[] = [];
-  const cur = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), 1);
-  while (cur <= rangeEnd) {
-    const mStart = new Date(cur);
-    const mEnd   = new Date(cur.getFullYear(), cur.getMonth() + 1, 0, 23, 59, 59);
-    const left   = pct(mStart < rangeStart ? rangeStart : mStart);
-    const right  = pct(mEnd   > rangeEnd   ? rangeEnd   : mEnd);
+  const totalChartW = Math.ceil(
+    ((rangeEnd.getTime() - rangeStart.getTime()) / 86_400_000) * PX_PER_DAY
+  );
+  const todayPx = toPx(hoje);
+
+  // ── Cabeçalho de meses ───────────────────────────────────────────────────
+  const months: { label: string; leftPx: number; widthPx: number }[] = [];
+  const mCur = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), 1);
+  while (mCur <= rangeEnd) {
+    const mStart   = new Date(Math.max(mCur.getTime(), rangeStart.getTime()));
+    const mEndRaw  = new Date(mCur.getFullYear(), mCur.getMonth() + 1, 0, 23, 59, 59);
+    const mEnd     = new Date(Math.min(mEndRaw.getTime(), rangeEnd.getTime()));
     months.push({
-      label: cur.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }),
-      left,
-      width: right - left,
+      label:   mCur.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }),
+      leftPx:  toPx(mStart),
+      widthPx: toPx(mEnd) - toPx(mStart),
     });
-    cur.setMonth(cur.getMonth() + 1);
+    mCur.setMonth(mCur.getMonth() + 1);
   }
 
-  // Linhas de grade
-  const gridLines: number[] = [];
+  // ── Linhas de grade ───────────────────────────────────────────────────────
+  const gridPxs: number[] = [];
   if (zoom === "semana") {
     const d = new Date(rangeStart);
-    // avança até a próxima segunda
     d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7));
-    while (d <= rangeEnd) {
-      gridLines.push(pct(d));
-      d.setDate(d.getDate() + 7);
-    }
+    while (d <= rangeEnd) { gridPxs.push(toPx(d)); d.setDate(d.getDate() + 7); }
   } else {
-    months.forEach((m) => gridLines.push(m.left));
+    months.forEach((m) => gridPxs.push(m.leftPx));
   }
 
-  const todayPct = pct(hoje);
-
-  // Agrupa OAs por capítulo (mesma lógica das outras views)
+  // ── Agrupamento por capítulo ──────────────────────────────────────────────
   const grupos = oas.reduce<Record<string, OAItem[]>>((acc, oa) => {
     const key = `U${oa.capitulo.unidade.numero} — ${oa.capitulo.unidade.nome} / C${oa.capitulo.numero} — ${oa.capitulo.nome}`;
     (acc[key] = acc[key] ?? []).push(oa);
     return acc;
   }, {});
 
-  const LABEL_W = 210;
-  const ROW_H   = 38;
+  const allExpanded = colapsados.size === 0;
+  const toggleGrupo = (key: string) =>
+    setColapsados((prev) => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
+
+  // ── Auto-scroll para hoje ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (!scrollRef.current) return;
+    const target = todayPx - scrollRef.current.clientWidth / 2 + LABEL_W / 2;
+    scrollRef.current.scrollLeft = Math.max(0, target);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zoom]);
+
+  // ── Linha de hoje (reutilizada em cada row) ───────────────────────────────
+  const TodayLine = () =>
+    todayPx >= 0 && todayPx <= totalChartW ? (
+      <Box sx={{
+        position: "absolute", left: todayPx, top: 0, bottom: 0,
+        width: 2, bgcolor: "#ef4444", opacity: 0.65, zIndex: 3, pointerEvents: "none",
+      }} />
+    ) : null;
+
+  const GridLines = () => (
+    <>
+      {gridPxs.map((px, i) => (
+        <Box key={i} sx={{
+          position: "absolute", left: px, top: 0, bottom: 0,
+          width: 1, bgcolor: "divider", opacity: 0.45, pointerEvents: "none",
+        }} />
+      ))}
+    </>
+  );
 
   return (
     <Box>
-      {/* Controle de zoom */}
-      <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1.5, gap: 1, alignItems: "center" }}>
-        <Typography variant="caption" color="text.secondary">Escala:</Typography>
-        <ToggleButtonGroup value={zoom} exclusive size="small"
-          onChange={(_, v) => { if (v) setZoom(v); }}>
-          <ToggleButton value="mes"    sx={{ fontSize: "0.72rem", px: 1.5, py: 0.5 }}>Mês</ToggleButton>
-          <ToggleButton value="semana" sx={{ fontSize: "0.72rem", px: 1.5, py: 0.5 }}>Semana</ToggleButton>
-        </ToggleButtonGroup>
+      {/* ── Controles ── */}
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5 }}>
+        <Button size="small" variant="outlined"
+          onClick={() => allExpanded
+            ? setColapsados(new Set(Object.keys(grupos)))
+            : setColapsados(new Set())}
+          sx={{ fontSize: "0.72rem", py: 0.5 }}>
+          {allExpanded ? "Recolher todos" : "Expandir todos"}
+        </Button>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Typography variant="caption" color="text.secondary">Escala:</Typography>
+          <ToggleButtonGroup value={zoom} exclusive size="small"
+            onChange={(_, v) => { if (v) setZoom(v); }}>
+            <ToggleButton value="mes"    sx={{ fontSize: "0.72rem", px: 1.5, py: 0.5 }}>Mês</ToggleButton>
+            <ToggleButton value="semana" sx={{ fontSize: "0.72rem", px: 1.5, py: 0.5 }}>Semana</ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
       </Box>
 
-      <Card sx={{ overflow: "hidden" }}>
-        <Box sx={{ overflowX: "auto" }}>
-          <Box sx={{ minWidth: 860 }}>
+      <Card sx={{ overflow: "hidden", border: "1px solid", borderColor: "divider" }}>
+        {/* Scroll container */}
+        <Box ref={scrollRef} sx={{ overflowX: "auto" }}>
+          <Box sx={{ minWidth: LABEL_W + totalChartW }}>
 
             {/* ── Cabeçalho de meses ── */}
-            <Box sx={{ display: "flex", borderBottom: "1px solid", borderColor: "divider", bgcolor: "#f8fafc" }}>
-              <Box sx={{ width: LABEL_W, flexShrink: 0, borderRight: "1px solid", borderColor: "divider",
-                display: "flex", alignItems: "center", px: 2 }}>
+            <Box sx={{ display: "flex", height: HEADER_H, borderBottom: "1px solid", borderColor: "divider", bgcolor: "#f8fafc" }}>
+              {/* Célula de label (sticky) */}
+              <Box sx={{
+                width: LABEL_W, flexShrink: 0, position: "sticky", left: 0, zIndex: 10,
+                bgcolor: "#f8fafc", borderRight: "1px solid", borderColor: "divider",
+                display: "flex", alignItems: "center", px: 2,
+              }}>
                 <Typography variant="caption" fontWeight={700} color="text.secondary">OA</Typography>
               </Box>
-              <Box sx={{ flex: 1, position: "relative", height: 34 }}>
+              {/* Área de meses */}
+              <Box sx={{ width: totalChartW, flexShrink: 0, position: "relative" }}>
                 {months.map((m) => (
                   <Box key={m.label} sx={{
-                    position: "absolute", left: `${m.left}%`, width: `${m.width}%`,
+                    position: "absolute", left: m.leftPx, width: Math.max(m.widthPx, 0),
                     height: "100%", display: "flex", alignItems: "center",
-                    borderRight: "1px solid", borderColor: "divider", pl: 1,
+                    borderRight: "1px dashed", borderColor: "divider", pl: 1,
                   }}>
                     <Typography variant="caption" fontWeight={700} color="text.secondary" noWrap
-                      sx={{ textTransform: "capitalize" }}>
+                      sx={{ fontSize: "0.68rem", textTransform: "capitalize" }}>
                       {m.label}
                     </Typography>
                   </Box>
                 ))}
+                {/* Indicador de hoje no cabeçalho */}
+                {todayPx >= 0 && todayPx <= totalChartW && (
+                  <Box sx={{ position: "absolute", left: todayPx, top: 0, bottom: 0, width: 2, bgcolor: "#ef4444", opacity: 0.7, zIndex: 4 }}>
+                    <Typography sx={{ position: "absolute", top: 1, left: "50%", transform: "translateX(-50%)", fontSize: "0.5rem", color: "#ef4444", lineHeight: 1 }}>▼</Typography>
+                  </Box>
+                )}
               </Box>
             </Box>
 
-            {/* ── Grupos e linhas de OA ── */}
+            {/* ── Grupos ── */}
             {Object.entries(grupos).map(([grupo, items]) => {
-              const expandidoGantt = expandidosGantt.has(grupo);
+              const expandido = !colapsados.has(grupo);
+
+              // Barra de resumo do grupo
+              const grupoTs = items.flatMap((oa) => [
+                ...oa.etapas.filter((e) => e.deadlinePrevisto).map((e) => new Date(e.deadlinePrevisto!).getTime()),
+                ...(oa.deadlineFinal ? [new Date(oa.deadlineFinal).getTime()] : []),
+              ]);
+              const grupoStartPx = grupoTs.length > 0 ? toPx(new Date(Math.min(...grupoTs))) : null;
+              const grupoEndPx   = grupoTs.length > 0 ? toPx(new Date(Math.max(...grupoTs))) : null;
+              const grupoW       = grupoStartPx !== null && grupoEndPx !== null ? Math.max(grupoEndPx - grupoStartPx, 2) : 0;
+
               return (
-              <Box key={grupo}>
-
-                {/* Cabeçalho do grupo (clicável) */}
-                <Box
-                  onClick={() => toggleGrupoGantt(grupo)}
-                  sx={{ display: "flex", bgcolor: "#f8fafc", borderBottom: "1px solid", borderColor: "divider",
-                    cursor: "pointer", "&:hover": { bgcolor: "#f1f5f9" }, transition: "background 0.15s" }}
-                >
-                  <Box sx={{ width: LABEL_W, flexShrink: 0, px: 1.5, py: 0.75,
-                    borderRight: "1px solid", borderColor: "divider",
-                    display: "flex", alignItems: "center", gap: 0.5 }}>
-                    <ExpandMoreIcon
-                      sx={{ fontSize: "0.95rem", color: "text.disabled", flexShrink: 0,
-                        transition: "transform 0.2s", transform: expandidoGantt ? "rotate(180deg)" : "rotate(0deg)" }}
-                    />
-                    <Typography variant="caption" fontWeight={700} color="text.disabled"
-                      sx={{ letterSpacing: "0.05em" }} noWrap>
-                      {grupo.toUpperCase()}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ flex: 1, position: "relative", py: 0.75 }}>
-                    {gridLines.map((gl, i) => (
-                      <Box key={i} sx={{ position: "absolute", left: `${gl}%`, top: 0, bottom: 0,
-                        borderLeft: "1px solid", borderColor: "divider", opacity: 0.5 }} />
-                    ))}
-                  </Box>
-                </Box>
-
-                {/* Linhas de OA (colapsável) */}
-                {expandidoGantt && items.map((oa) => {
-                  const etapasComDL  = oa.etapas.filter((e) => e.deadlinePrevisto);
-                  const hasDates     = etapasComDL.length > 0 || !!oa.deadlineFinal;
-                  const tc           = TIPO_CONFIG[oa.tipo];
-                  const sc           = STATUS_CONFIG[oa.status];
-
-                  const barStartD = etapasComDL[0]?.deadlinePrevisto
-                    ? new Date(etapasComDL[0].deadlinePrevisto)
-                    : oa.deadlineFinal ? new Date(oa.deadlineFinal) : null;
-
-                  const barEndD = oa.deadlineFinal
-                    ? new Date(oa.deadlineFinal)
-                    : etapasComDL.length > 0
-                    ? new Date(etapasComDL[etapasComDL.length - 1]!.deadlinePrevisto!)
-                    : null;
-
-                  const barLeft  = barStartD ? pct(barStartD) : null;
-                  const barRight = barEndD   ? pct(barEndD)   : null;
-                  const barW     = barLeft !== null && barRight !== null
-                    ? Math.max(0.4, barRight - barLeft)
-                    : 0;
-
-                  return (
-                    <Box key={oa.id} sx={{
-                      display: "flex", height: ROW_H,
-                      borderBottom: "1px solid", borderColor: "divider",
-                      "&:hover": { bgcolor: "action.hover" },
+                <Box key={grupo}>
+                  {/* Cabeçalho do grupo */}
+                  <Box sx={{ display: "flex", height: GROUP_H, borderBottom: "1px solid", borderColor: "divider", cursor: "pointer" }}
+                    onClick={() => toggleGrupo(grupo)}>
+                    {/* Label (sticky) */}
+                    <Box sx={{
+                      width: LABEL_W, flexShrink: 0, position: "sticky", left: 0, zIndex: 5,
+                      bgcolor: "#f8fafc", borderRight: "1px solid", borderColor: "divider",
+                      display: "flex", alignItems: "center", gap: 0.5, px: 1.5,
+                      "&:hover": { bgcolor: "#f1f5f9" },
                     }}>
-                      {/* Rótulo */}
-                      <Box
-                        onClick={() => onSelect(oa.id)}
-                        sx={{
-                          width: LABEL_W, flexShrink: 0,
-                          borderRight: "1px solid", borderColor: "divider",
-                          display: "flex", alignItems: "center", gap: 1,
-                          px: 1.5, overflow: "hidden",
-                          cursor: "pointer",
-                          "&:hover": { bgcolor: "action.hover" },
-                        }}>
-                        <Typography sx={{
-                          fontFamily: "monospace", fontWeight: 600, fontSize: "0.75rem",
-                          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                        }}>
-                          {oa.codigo}
-                        </Typography>
-                        <Chip label={tc.label} size="small" sx={{
-                          height: 16, fontSize: "0.6rem", flexShrink: 0,
-                          bgcolor: `${tc.color}18`, color: tc.color,
+                      <ExpandMoreIcon sx={{
+                        fontSize: "0.9rem", color: "text.disabled", flexShrink: 0,
+                        transition: "transform 0.2s", transform: expandido ? "rotate(180deg)" : "rotate(0deg)",
+                      }} />
+                      <Typography variant="caption" fontWeight={700} color="text.disabled" noWrap
+                        sx={{ fontSize: "0.63rem", letterSpacing: "0.05em" }}>
+                        {grupo.toUpperCase()}
+                      </Typography>
+                    </Box>
+                    {/* Área de gráfico */}
+                    <Box sx={{ width: totalChartW, flexShrink: 0, position: "relative", bgcolor: "#f8fafc", "&:hover": { bgcolor: "#f1f5f9" } }}>
+                      <GridLines />
+                      <TodayLine />
+                      {/* Barra de span do grupo */}
+                      {grupoStartPx !== null && grupoW > 0 && (
+                        <Box sx={{
+                          position: "absolute", left: grupoStartPx, width: grupoW,
+                          top: "50%", transform: "translateY(-50%)",
+                          height: 8, borderRadius: 4, bgcolor: "#cbd5e1", opacity: 0.8,
                         }} />
-                      </Box>
+                      )}
+                    </Box>
+                  </Box>
 
-                      {/* Timeline */}
-                      <Box sx={{ flex: 1, position: "relative", overflow: "hidden" }}>
-                        {/* Linhas de grade */}
-                        {gridLines.map((gl, i) => (
-                          <Box key={i} sx={{
-                            position: "absolute", left: `${gl}%`, top: 0, bottom: 0,
-                            borderLeft: "1px solid", borderColor: "divider", opacity: 0.4,
-                          }} />
-                        ))}
+                  {/* Linhas de OA */}
+                  {expandido && items.map((oa) => {
+                    const etapasComDL = oa.etapas
+                      .filter((e) => e.deadlinePrevisto)
+                      .sort((a, b) => a.ordem - b.ordem);
+                    const sc = STATUS_CONFIG[oa.status];
+                    const tc = TIPO_CONFIG[oa.tipo];
 
-                        {/* Linha de hoje */}
-                        {todayPct > 0 && todayPct < 100 && (
-                          <Tooltip title="Hoje" placement="top" arrow>
-                            <Box sx={{
-                              position: "absolute", left: `${todayPct}%`,
-                              top: 0, bottom: 0, zIndex: 2,
-                              borderLeft: "2px dashed #2b7cee", opacity: 0.8,
-                              cursor: "default",
-                            }} />
-                          </Tooltip>
-                        )}
+                    const barStartD = etapasComDL[0]?.deadlinePrevisto
+                      ? new Date(etapasComDL[0].deadlinePrevisto)
+                      : oa.deadlineFinal ? new Date(oa.deadlineFinal) : null;
+                    const barEndD = oa.deadlineFinal
+                      ? new Date(oa.deadlineFinal)
+                      : etapasComDL.length > 0
+                        ? new Date(etapasComDL[etapasComDL.length - 1]!.deadlinePrevisto!)
+                        : null;
+                    const barLeftPx  = barStartD ? toPx(barStartD) : null;
+                    const barRightPx = barEndD   ? toPx(barEndD)   : null;
+                    const barWidthPx = barLeftPx !== null && barRightPx !== null
+                      ? Math.max(2, barRightPx - barLeftPx) : 0;
 
-                        {/* Barra do OA */}
-                        {hasDates && barLeft !== null && (
-                          <Box sx={{
-                            position: "absolute",
-                            left: `${barLeft}%`, width: `${barW}%`,
-                            top: "50%", transform: "translateY(-50%)",
-                            height: 14, borderRadius: 1,
-                            bgcolor: sc.bg,
-                            border: `1px solid ${sc.color}40`,
-                            overflow: "hidden",
+                    const etapaAtiva = oa.etapas.find((e) => e.status === "EM_ANDAMENTO")
+                      ?? oa.etapas.find((e) => e.status === "PENDENTE");
+                    const resp = etapaAtiva?.responsavel;
+
+                    return (
+                      <Box key={oa.id} sx={{ display: "flex", height: ROW_H, borderBottom: "1px solid", borderColor: "divider", "&:hover": { bgcolor: "action.hover" } }}>
+                        {/* Label (sticky) */}
+                        <Box
+                          onClick={() => onSelect(oa.id)}
+                          sx={{
+                            width: LABEL_W, flexShrink: 0, position: "sticky", left: 0, zIndex: 5,
+                            bgcolor: "background.paper", borderRight: "1px solid", borderColor: "divider",
+                            display: "flex", alignItems: "center", gap: 1, px: 1.5,
+                            cursor: "pointer", "&:hover": { bgcolor: "#f0f7ff" },
                           }}>
-                            {/* Preenchimento de progresso */}
-                            <Box sx={{
-                              position: "absolute", left: 0, top: 0, bottom: 0,
-                              width: `${oa.progressoPct}%`,
-                              bgcolor: sc.color, opacity: 0.55,
-                              transition: "width 0.3s",
-                            }} />
-                          </Box>
-                        )}
+                          <Typography sx={{ fontFamily: "monospace", fontWeight: 700, fontSize: "0.72rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {oa.codigo}
+                          </Typography>
+                          <Chip label={tc.label} size="small"
+                            sx={{ height: 16, fontSize: "0.58rem", flexShrink: 0, bgcolor: `${tc.color}18`, color: tc.color }} />
+                        </Box>
 
-                        {/* Marcadores de etapa */}
-                        {etapasComDL.map((e) => {
-                          const x     = pct(new Date(e.deadlinePrevisto!));
-                          const color = ETAPA_STATUS_COLOR[e.status] ?? "#94a3b8";
-                          const atras = !["CONCLUIDA"].includes(e.status)
-                            && new Date(e.deadlinePrevisto!) < hoje;
-                          return (
-                            <Tooltip
-                              key={e.id}
-                              placement="top"
-                              arrow
+                        {/* Área do gráfico */}
+                        <Box sx={{ width: totalChartW, flexShrink: 0, position: "relative" }}>
+                          <GridLines />
+                          <TodayLine />
+
+                          {/* Barra do OA */}
+                          {barLeftPx !== null && barWidthPx > 0 && (
+                            <Tooltip placement="top" arrow
                               title={
                                 <Box sx={{ py: 0.25 }}>
-                                  <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: "#1e293b", lineHeight: 1.4 }}>
-                                    {e.etapaDef.nome}
-                                  </Typography>
-                                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mt: 0.5 }}>
-                                    <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: color, flexShrink: 0 }} />
-                                    <Typography sx={{ fontSize: "0.72rem", color: "#475569" }}>
-                                      {ETAPA_STATUS_LABEL[e.status]}
-                                    </Typography>
-                                  </Box>
-                                  <Typography sx={{ fontSize: "0.72rem", color: "#64748b", mt: 0.25 }}>
-                                    Deadline: {fmtData(e.deadlinePrevisto)}
-                                  </Typography>
-                                  {atras && (
-                                    <Typography sx={{ fontSize: "0.72rem", color: "#ef4444", fontWeight: 600, mt: 0.25 }}>
-                                      ⚠ Atrasado
-                                    </Typography>
-                                  )}
+                                  <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: "#1e293b" }}>{oa.codigo}</Typography>
+                                  {oa.titulo && <Typography sx={{ fontSize: "0.7rem", color: "#475569" }} noWrap>{oa.titulo}</Typography>}
+                                  <Typography sx={{ fontSize: "0.72rem", color: "#64748b", mt: 0.5 }}>Progresso: {oa.progressoPct}%</Typography>
+                                  {barEndD && <Typography sx={{ fontSize: "0.72rem", color: "#64748b" }}>Entrega: {fmtData(barEndD.toISOString())}</Typography>}
+                                  {etapaAtiva && <Typography sx={{ fontSize: "0.72rem", color: "#64748b" }}>Etapa: {etapaAtiva.etapaDef.nome}{resp ? ` (${resp.nome})` : ""}</Typography>}
                                 </Box>
                               }
                               componentsProps={{
-                                tooltip: {
-                                  sx: {
-                                    bgcolor: "white",
-                                    color: "#1e293b",
-                                    border: "1px solid #e2e8f0",
-                                    boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
-                                    borderRadius: 1.5,
-                                    px: 1.5, py: 1,
-                                    maxWidth: 220,
-                                  },
-                                },
-                                arrow: {
-                                  sx: {
-                                    color: "white",
-                                    "&::before": { border: "1px solid #e2e8f0" },
-                                  },
-                                },
+                                tooltip: { sx: { bgcolor: "white", color: "#1e293b", border: "1px solid #e2e8f0", boxShadow: "0 4px 12px rgba(0,0,0,0.12)", borderRadius: 1.5, px: 1.5, py: 1, maxWidth: 260 } },
+                                arrow:   { sx: { color: "white", "&::before": { border: "1px solid #e2e8f0" } } },
                               }}
                             >
-                              <Box sx={{
-                                position: "absolute",
-                                left: `${x}%`,
-                                top: "50%",
-                                transform: "translate(-50%, -50%)",
-                                width: 11, height: 11,
-                                borderRadius: "50%",
-                                bgcolor: color,
-                                border: `2px solid ${atras ? "#ef4444" : "white"}`,
-                                boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
-                                zIndex: 3, cursor: "default",
-                              }} />
+                              <Box
+                                onClick={() => onSelect(oa.id)}
+                                sx={{
+                                  position: "absolute", left: barLeftPx, width: barWidthPx,
+                                  top: "50%", transform: "translateY(-50%)",
+                                  height: 20, borderRadius: 1.5,
+                                  bgcolor: sc.bg, border: `1.5px solid ${sc.color}55`,
+                                  overflow: "hidden", cursor: "pointer", zIndex: 2,
+                                  transition: "border-color 0.15s, box-shadow 0.15s",
+                                  "&:hover": { borderColor: sc.color, boxShadow: `0 2px 8px ${sc.color}40` },
+                                }}>
+                                {/* Progresso fill */}
+                                <Box sx={{
+                                  position: "absolute", left: 0, top: 0, bottom: 0,
+                                  width: `${oa.progressoPct}%`, bgcolor: sc.color, opacity: 0.5,
+                                  transition: "width 0.3s",
+                                }} />
+                                {/* % dentro da barra (se couber) */}
+                                {barWidthPx > 42 && (
+                                  <Box sx={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", px: 0.75 }}>
+                                    <Typography sx={{ fontSize: "0.6rem", fontWeight: 800, color: sc.color, whiteSpace: "nowrap", zIndex: 1, textShadow: "0 0 4px #fff" }}>
+                                      {oa.progressoPct}%
+                                    </Typography>
+                                  </Box>
+                                )}
+                              </Box>
                             </Tooltip>
-                          );
-                        })}
+                          )}
 
-                        {!hasDates && (
-                          <Box sx={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)" }}>
-                            <Typography variant="caption" color="text.disabled">Sem deadline</Typography>
-                          </Box>
-                        )}
+                          {/* Marcadores de etapa */}
+                          {etapasComDL.map((e) => {
+                            const xPx   = toPx(new Date(e.deadlinePrevisto!));
+                            const color = ETAPA_STATUS_COLOR[e.status] ?? "#94a3b8";
+                            const atras = e.status !== "CONCLUIDA" && new Date(e.deadlinePrevisto!) < hoje;
+                            return (
+                              <Tooltip key={e.id} placement="top" arrow
+                                title={
+                                  <Box sx={{ py: 0.25 }}>
+                                    <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: "#1e293b", lineHeight: 1.4 }}>
+                                      {e.etapaDef.nome}
+                                    </Typography>
+                                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mt: 0.5 }}>
+                                      <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: color, flexShrink: 0 }} />
+                                      <Typography sx={{ fontSize: "0.72rem", color: "#475569" }}>{ETAPA_STATUS_LABEL[e.status]}</Typography>
+                                    </Box>
+                                    <Typography sx={{ fontSize: "0.72rem", color: "#64748b", mt: 0.25 }}>Deadline: {fmtData(e.deadlinePrevisto)}</Typography>
+                                    {e.responsavel && <Typography sx={{ fontSize: "0.72rem", color: "#64748b" }}>{e.responsavel.nome}</Typography>}
+                                    {atras && <Typography sx={{ fontSize: "0.72rem", color: "#ef4444", fontWeight: 600, mt: 0.25 }}>⚠ Atrasado</Typography>}
+                                  </Box>
+                                }
+                                componentsProps={{
+                                  tooltip: { sx: { bgcolor: "white", color: "#1e293b", border: "1px solid #e2e8f0", boxShadow: "0 4px 12px rgba(0,0,0,0.12)", borderRadius: 1.5, px: 1.5, py: 1, maxWidth: 220 } },
+                                  arrow:   { sx: { color: "white", "&::before": { border: "1px solid #e2e8f0" } } },
+                                }}
+                              >
+                                <Box sx={{
+                                  position: "absolute", left: xPx, top: "50%",
+                                  transform: "translate(-50%, -50%)",
+                                  width: 11, height: 11, borderRadius: "50%",
+                                  bgcolor: color,
+                                  border: `2px solid ${atras ? "#ef4444" : "white"}`,
+                                  boxShadow: "0 1px 4px rgba(0,0,0,0.3)",
+                                  zIndex: 4, cursor: "default",
+                                }} />
+                              </Tooltip>
+                            );
+                          })}
+
+                          {/* Avatar do responsável atual (à direita da barra) */}
+                          {resp && barRightPx !== null && barWidthPx > 0 && (
+                            <Tooltip title={`${etapaAtiva?.etapaDef.nome}: ${resp.nome}`} placement="top" arrow>
+                              <Avatar sx={{
+                                position: "absolute", left: barRightPx + 5, top: "50%", transform: "translateY(-50%)",
+                                width: 20, height: 20, fontSize: "0.58rem", fontWeight: 700,
+                                bgcolor: "#e0e7ff", color: "#4338ca", zIndex: 4, cursor: "default",
+                              }}>
+                                {resp.nome.charAt(0).toUpperCase()}
+                              </Avatar>
+                            </Tooltip>
+                          )}
+
+                          {/* OA sem datas */}
+                          {barLeftPx === null && (
+                            <Box sx={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)" }}>
+                              <Typography variant="caption" color="text.disabled" sx={{ fontSize: "0.63rem" }}>Sem deadline</Typography>
+                            </Box>
+                          )}
+                        </Box>
                       </Box>
-                    </Box>
-                  );
-                })}
-              </Box>
+                    );
+                  })}
+                </Box>
               );
             })}
           </Box>
@@ -1291,28 +1344,18 @@ function GanttView({ oas, onSelect }: { oas: OAItem[]; onSelect: (oaId: string) 
 
         {/* ── Legenda ── */}
         <Box sx={{
-          px: 2.5, py: 1.5,
-          borderTop: "1px solid", borderColor: "divider",
-          display: "flex", gap: 3, flexWrap: "wrap", alignItems: "center",
-          bgcolor: "#fafafa",
+          px: 2.5, py: 1.5, borderTop: "1px solid", borderColor: "divider",
+          display: "flex", gap: 3, flexWrap: "wrap", alignItems: "center", bgcolor: "#fafafa",
         }}>
-          <Typography variant="caption" color="text.disabled" fontWeight={700} sx={{ mr: 0.5 }}>
-            Marcadores de etapa:
-          </Typography>
+          <Typography variant="caption" color="text.disabled" fontWeight={700} sx={{ mr: 0.5 }}>Marcadores de etapa:</Typography>
           {Object.entries(ETAPA_STATUS_COLOR).map(([status, color]) => (
             <Box key={status} sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-              <Box sx={{
-                width: 10, height: 10, borderRadius: "50%",
-                bgcolor: color, border: "2px solid white",
-                boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
-              }} />
-              <Typography variant="caption" color="text.secondary">
-                {ETAPA_STATUS_LABEL[status]}
-              </Typography>
+              <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: color, border: "2px solid white", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
+              <Typography variant="caption" color="text.secondary">{ETAPA_STATUS_LABEL[status]}</Typography>
             </Box>
           ))}
           <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, ml: "auto" }}>
-            <Box sx={{ width: 22, height: 0, borderTop: "2px dashed #2b7cee", opacity: 0.8 }} />
+            <Box sx={{ width: 2, height: 14, bgcolor: "#ef4444", opacity: 0.7, borderRadius: 1 }} />
             <Typography variant="caption" color="text.secondary">Hoje</Typography>
           </Box>
         </Box>
