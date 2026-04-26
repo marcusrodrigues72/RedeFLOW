@@ -136,6 +136,19 @@ export interface DashboardStats {
   emProducao: number;
 }
 
+export interface AtividadeRecente {
+  etapaId: string;
+  oaId: string;
+  oaCodigo: string;
+  oaTitulo: string | null;
+  etapaNome: string;
+  responsavelNome: string | null;
+  responsavelFotoUrl: string | null;
+  cursoNome: string;
+  cursoId: string;
+  concluidaEm: string; // ISO — deadlineReal
+}
+
 export interface ProximaEntrega {
   etapaId: string;
   oaId: string;

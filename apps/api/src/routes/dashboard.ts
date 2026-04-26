@@ -163,6 +163,59 @@ router.get("/detalhe", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /dashboard/atividade?limit=15
+router.get("/atividade", async (req, res, next) => {
+  try {
+    const usuarioId   = req.usuario!.sub;
+    const isAdmin     = req.usuario!.papel === "ADMIN";
+    const cursosWhere = isAdmin ? {} : { membros: { some: { usuarioId } } };
+    const limit       = Math.min(parseInt((req.query["limit"] as string) ?? "15", 10) || 15, 50);
+
+    const etapas = await prisma.etapaOA.findMany({
+      where: {
+        status:      "CONCLUIDA",
+        deadlineReal: { not: null },
+        oa: { capitulo: { unidade: { curso: cursosWhere } } },
+      },
+      select: {
+        id:          true,
+        deadlineReal: true,
+        etapaDef:    { select: { nome: true } },
+        responsavel: { select: { nome: true, fotoUrl: true } },
+        oa: {
+          select: {
+            id:     true,
+            codigo: true,
+            titulo: true,
+            capitulo: {
+              select: {
+                unidade: {
+                  select: { curso: { select: { id: true, nome: true } } },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { deadlineReal: "desc" },
+      take: limit,
+    });
+
+    res.json(etapas.map((e) => ({
+      etapaId:            e.id,
+      oaId:               e.oa.id,
+      oaCodigo:           e.oa.codigo,
+      oaTitulo:           e.oa.titulo,
+      etapaNome:          e.etapaDef.nome,
+      responsavelNome:    e.responsavel?.nome    ?? null,
+      responsavelFotoUrl: e.responsavel?.fotoUrl ?? null,
+      cursoNome:          e.oa.capitulo.unidade.curso.nome,
+      cursoId:            e.oa.capitulo.unidade.curso.id,
+      concluidaEm:        e.deadlineReal!.toISOString(),
+    })));
+  } catch (err) { next(err); }
+});
+
 // GET /dashboard/proximas-entregas?dias=14
 router.get("/proximas-entregas", async (req, res, next) => {
   try {

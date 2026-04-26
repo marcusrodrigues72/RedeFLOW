@@ -18,7 +18,7 @@ import AccessTimeIcon         from "@mui/icons-material/AccessTime";
 import PersonIcon             from "@mui/icons-material/Person";
 import { useState, useRef, useEffect } from "react";
 import { useAuthStore }       from "@/stores/auth.store";
-import { useDashboardStats, useCursos, useDashboardDetalhe, useProximasEntregas } from "@/lib/api/cursos";
+import { useDashboardStats, useCursos, useDashboardDetalhe, useProximasEntregas, useAtividadeRecente } from "@/lib/api/cursos";
 import { useProgressoCursos, useAtrasosResponsavel, usePipelineStatus } from "@/lib/api/relatorios";
 import type { ReactNode }             from "react";
 import type { DashboardDetalheTipo }  from "shared";
@@ -64,7 +64,8 @@ function DashboardPage() {
   const { data: progresso, isLoading: loadProgresso, isError: erroProgresso } = useProgressoCursos();
   const { data: proximasEntregas, isLoading: loadProximas } = useProximasEntregas(14);
   const { data: atrasosResp } = useAtrasosResponsavel();
-  const { data: pipeline, isLoading: loadPipeline } = usePipelineStatus();
+  const { data: pipeline,  isLoading: loadPipeline  } = usePipelineStatus();
+  const { data: atividade, isLoading: loadAtividade } = useAtividadeRecente(15);
   const [drawerTipo, setDrawerTipo]             = useState<DashboardDetalheTipo | null>(null);
 
   const vencendoEm7   = (proximasEntregas ?? []).filter((e) => e.diasRestantes <= 7).length;
@@ -430,40 +431,115 @@ function DashboardPage() {
         onClose={() => setAlertaDrawer(null)}
       />
 
-      {/* ── Snapshot do Pipeline ────────────────────────────────────────────── */}
-      <Card sx={{ mb: 4 }}>
-        <CardContent sx={{ p: 3 }}>
-          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3 }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-              <TrendingUpIcon sx={{ color: "text.secondary", fontSize: 20 }} />
-              <Typography variant="h5">Snapshot do Pipeline</Typography>
-            </Box>
-            <Box sx={{ display: "flex", gap: 2 }}>
-              {[
-                { color: "#94a3b8", label: "Pendente"     },
-                { color: "#f59e0b", label: "Em andamento" },
-                { color: "#ef4444", label: "Bloqueado"    },
-                { color: "#10b981", label: "Concluído"    },
-              ].map((item) => (
-                <Box key={item.label} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                  <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: item.color }} />
-                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.68rem" }}>{item.label}</Typography>
+      {/* ── Snapshot do Pipeline + Atividade Recente ────────────────────────── */}
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Grid size={{ xs: 12, md: 7 }}>
+          <Card sx={{ height: "100%" }}>
+            <CardContent sx={{ p: 3 }}>
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                  <TrendingUpIcon sx={{ color: "text.secondary", fontSize: 20 }} />
+                  <Typography variant="h5">Snapshot do Pipeline</Typography>
                 </Box>
-              ))}
-            </Box>
-          </Box>
+                <Box sx={{ display: "flex", gap: 2 }}>
+                  {[
+                    { color: "#94a3b8", label: "Pendente"     },
+                    { color: "#f59e0b", label: "Em andamento" },
+                    { color: "#ef4444", label: "Bloqueado"    },
+                    { color: "#10b981", label: "Concluído"    },
+                  ].map((item) => (
+                    <Box key={item.label} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                      <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: item.color }} />
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.68rem" }}>{item.label}</Typography>
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
 
-          {loadPipeline ? (
-            [1, 2, 3, 4, 5].map((i) => <Skeleton key={i} height={36} sx={{ mb: 1, borderRadius: 1 }} />)
-          ) : !pipeline?.porEtapa?.length ? (
-            <Box sx={{ textAlign: "center", py: 4 }}>
-              <Typography variant="body2" color="text.secondary">Nenhuma etapa ativa no momento.</Typography>
-            </Box>
-          ) : (
-            <PipelineSnapshot etapas={pipeline.porEtapa} />
-          )}
-        </CardContent>
-      </Card>
+              {loadPipeline ? (
+                [1, 2, 3, 4, 5].map((i) => <Skeleton key={i} height={36} sx={{ mb: 1, borderRadius: 1 }} />)
+              ) : !pipeline?.porEtapa?.length ? (
+                <Box sx={{ textAlign: "center", py: 4 }}>
+                  <Typography variant="body2" color="text.secondary">Nenhuma etapa ativa no momento.</Typography>
+                </Box>
+              ) : (
+                <PipelineSnapshot etapas={pipeline.porEtapa} />
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid size={{ xs: 12, md: 5 }}>
+          <Card sx={{ height: "100%" }}>
+            <CardContent sx={{ p: 3, display: "flex", flexDirection: "column", height: "100%" }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2.5 }}>
+                <CheckCircleOutlineIcon sx={{ color: "#10b981", fontSize: 20 }} />
+                <Typography variant="h5">Atividade Recente</Typography>
+              </Box>
+
+              {loadAtividade ? (
+                [1, 2, 3, 4, 5].map((i) => <Skeleton key={i} height={48} sx={{ mb: 0.5, borderRadius: 1 }} />)
+              ) : !atividade?.length ? (
+                <Box sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Typography variant="body2" color="text.secondary">Nenhuma etapa concluída ainda.</Typography>
+                </Box>
+              ) : (
+                <Box sx={{ overflow: "auto", flex: 1, maxHeight: 420 }}>
+                  {atividade.map((item, idx) => {
+                    const ts   = new Date(item.concluidaEm);
+                    const agora = new Date();
+                    const diffH = Math.floor((agora.getTime() - ts.getTime()) / 3_600_000);
+                    const diffD = Math.floor(diffH / 24);
+                    const tempo = diffH < 1   ? "agora"
+                                : diffH < 24  ? `${diffH}h atrás`
+                                : diffD < 7   ? `${diffD}d atrás`
+                                : ts.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+                    const iniciais = item.responsavelNome
+                      ? item.responsavelNome.split(" ").slice(0, 2).map((p) => p[0]).join("").toUpperCase()
+                      : "?";
+
+                    return (
+                      <Box
+                        key={item.etapaId}
+                        component={Link}
+                        to={`/oas/${item.oaId}`}
+                        sx={{
+                          display: "flex", alignItems: "center", gap: 1.5,
+                          py: 1, px: 0.5, borderRadius: 1,
+                          borderBottom: idx < atividade.length - 1 ? "1px solid" : "none",
+                          borderColor: "divider",
+                          textDecoration: "none", color: "inherit",
+                          "&:hover": { bgcolor: "action.hover" },
+                        }}
+                      >
+                        <Avatar sx={{ width: 30, height: 30, fontSize: "0.68rem", bgcolor: "#f0fdf4", color: "#10b981", fontWeight: 700, flexShrink: 0 }}>
+                          {iniciais}
+                        </Avatar>
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                            <Typography variant="caption" fontWeight={700} sx={{ fontSize: "0.72rem" }} noWrap>
+                              {item.oaCodigo}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.68rem" }} noWrap>
+                              · {item.etapaNome}
+                            </Typography>
+                          </Box>
+                          <Typography variant="caption" color="text.disabled" noWrap sx={{ fontSize: "0.63rem", display: "block" }}>
+                            {item.responsavelNome ?? "—"} · {item.cursoNome}
+                          </Typography>
+                        </Box>
+                        <Typography variant="caption" color="text.disabled" sx={{ fontSize: "0.63rem", flexShrink: 0 }}>
+                          {tempo}
+                        </Typography>
+                      </Box>
+                    );
+                  })}
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
 
       {/* ── Timeline de Projetos ────────────────────────────────────────────── */}
       <Card>
@@ -951,27 +1027,24 @@ type PipelineEtapa = {
 };
 
 function PipelineSnapshot({ etapas }: { etapas: PipelineEtapa[] }) {
-  const maxTotal = Math.max(...etapas.map((e) => e.pendente + e.emAndamento + e.bloqueada), 1);
+  const maxTotal = Math.max(...etapas.map((e) => e.total), 1);
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
       {etapas.map((e) => {
-        const ativo  = e.pendente + e.emAndamento + e.bloqueada;
-        const barW   = Math.round((ativo / maxTotal) * 100);
-        const pPct   = ativo > 0 ? Math.round((e.pendente    / ativo) * 100) : 0;
-        const aPct   = ativo > 0 ? Math.round((e.emAndamento / ativo) * 100) : 0;
-        const bPct   = ativo > 0 ? Math.round((e.bloqueada   / ativo) * 100) : 0;
-        // concluida não entra na barra (OAs passaram dessa etapa)
+        const total = e.total;
+        const pPct  = total > 0 ? (e.pendente    / total) * 100 : 0;
+        const aPct  = total > 0 ? (e.emAndamento / total) * 100 : 0;
+        const bPct  = total > 0 ? (e.bloqueada   / total) * 100 : 0;
+        const cPct  = total > 0 ? (e.concluida   / total) * 100 : 0;
+        const barW  = Math.round((total / maxTotal) * 100);
 
         return (
           <Box key={e.etapa} sx={{ display: "flex", alignItems: "center", gap: 2 }}>
             {/* Nome da etapa */}
-            <Box sx={{ width: 160, flexShrink: 0 }}>
+            <Box sx={{ width: 170, flexShrink: 0 }}>
               <Typography variant="body2" fontWeight={600} noWrap sx={{ fontSize: "0.78rem" }}>
                 {e.etapa}
-              </Typography>
-              <Typography variant="caption" color="text.disabled" sx={{ fontSize: "0.63rem" }}>
-                {e.concluida > 0 ? `${e.concluida} concluídos` : ""}
               </Typography>
             </Box>
 
@@ -987,11 +1060,14 @@ function PipelineSnapshot({ etapas }: { etapas: PipelineEtapa[] }) {
                 <Tooltip title={`Bloqueado: ${e.bloqueada}`} arrow>
                   <Box sx={{ width: `${bPct}%`, bgcolor: "#ef4444", transition: "width 0.4s" }} />
                 </Tooltip>
+                <Tooltip title={`Concluído: ${e.concluida}`} arrow>
+                  <Box sx={{ width: `${cPct}%`, bgcolor: "#10b981", transition: "width 0.4s" }} />
+                </Tooltip>
               </Box>
             </Box>
 
             {/* Contadores */}
-            <Box sx={{ display: "flex", gap: 1, flexShrink: 0, minWidth: 160, justifyContent: "flex-end" }}>
+            <Box sx={{ display: "flex", gap: 0.75, flexShrink: 0, minWidth: 190, justifyContent: "flex-end", alignItems: "center" }}>
               {e.pendente > 0 && (
                 <Chip label={`${e.pendente}P`} size="small"
                   sx={{ bgcolor: "#f1f5f9", color: "#64748b", fontWeight: 700, fontSize: "0.63rem", height: 20 }} />
@@ -1004,8 +1080,12 @@ function PipelineSnapshot({ etapas }: { etapas: PipelineEtapa[] }) {
                 <Chip label={`${e.bloqueada}B`} size="small"
                   sx={{ bgcolor: "#fef2f2", color: "#ef4444", fontWeight: 700, fontSize: "0.63rem", height: 20 }} />
               )}
-              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, fontSize: "0.72rem", minWidth: 28, textAlign: "right", alignSelf: "center" }}>
-                {ativo}
+              {e.concluida > 0 && (
+                <Chip label={`${e.concluida}C`} size="small"
+                  sx={{ bgcolor: "#f0fdf4", color: "#10b981", fontWeight: 700, fontSize: "0.63rem", height: 20 }} />
+              )}
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, fontSize: "0.72rem", minWidth: 28, textAlign: "right" }}>
+                {total}
               </Typography>
             </Box>
           </Box>
