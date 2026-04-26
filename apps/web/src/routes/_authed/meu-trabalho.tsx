@@ -6,6 +6,7 @@ import {
 import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
 import ChevronLeftIcon        from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon       from "@mui/icons-material/ChevronRight";
+import WorkOutlineIcon        from "@mui/icons-material/WorkOutline";
 import { useState, useMemo }  from "react";
 import { useMeuTrabalho, useAtualizarEtapaGeral } from "@/lib/api/cursos";
 import type { OADetalhe, TipoOA, StatusEtapa } from "shared";
@@ -15,6 +16,19 @@ export const Route = createFileRoute("/_authed/meu-trabalho")({
 });
 
 // ─── Configs ──────────────────────────────────────────────────────────────────
+
+const PAPEL_LABEL: Record<string, string> = {
+  COORDENADOR_PRODUCAO:  "Coord. Produção",
+  CONTEUDISTA:           "Conteudista",
+  DESIGNER_INSTRUCIONAL: "Designer Instrucional",
+  PROFESSOR_ATOR:        "Professor/Ator",
+  PROFESSOR_TECNICO:     "Prof. Técnico",
+  ACESSIBILIDADE:        "Acessibilidade",
+  EDITOR_VIDEO:          "Editor de Vídeo",
+  DESIGNER_GRAFICO:      "Designer Gráfico",
+  PRODUTOR_FINAL:        "Produtor Final",
+  VALIDADOR_FINAL:       "Validador Final",
+};
 
 const TIPO_CONFIG: Record<TipoOA, { label: string; color: string }> = {
   VIDEO:       { label: "Vídeo",         color: "#2b7cee" },
@@ -67,25 +81,59 @@ const dow = (d: Date) => (d.getDay() + 6) % 7;
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 function MeuTrabalhoPage() {
-  const { data: oas = [], isLoading, isError } = useMeuTrabalho();
+  const { data, isLoading, isError } = useMeuTrabalho();
+  const oas                          = data?.items ?? [];
+  const concluidosEstaSemana         = data?.stats.concluidosEstaSemana ?? 0;
   const { mutate: atualizarEtapa, isPending: atualizando } = useAtualizarEtapaGeral();
-  const [aba,      setAba]      = useState(0);
-  const [errMsg,   setErrMsg]   = useState<string | null>(null);
+  const [aba,        setAba]        = useState(0);
+  const [errMsg,     setErrMsg]     = useState<string | null>(null);
+  const [papelFiltro, setPapelFiltro] = useState("");
 
-  // KPIs
+  // Papeis únicos presentes nas etapas ativas do usuário, com contagem
+  const papeisDisponiveis = useMemo(() => {
+    const map = new Map<string, number>();
+    oas.forEach((oa) => oa.etapas.forEach((e) => {
+      const p = e.etapaDef.papel;
+      map.set(p, (map.get(p) ?? 0) + 1);
+    }));
+    return Array.from(map.entries())
+      .sort(([a], [b]) => (PAPEL_LABEL[a] ?? a).localeCompare(PAPEL_LABEL[b] ?? b));
+  }, [oas]);
+
+  // OAs filtrados pelo papel selecionado
+  const oasFiltrados = useMemo(() => {
+    if (!papelFiltro) return oas;
+    return oas
+      .map((oa) => ({
+        ...oa,
+        etapas: oa.etapas.filter((e) => e.etapaDef.papel === papelFiltro),
+      }))
+      .filter((oa) => oa.etapas.length > 0);
+  }, [oas, papelFiltro]);
+
+  // KPIs (baseados nos OAs filtrados)
   const porStatus = useMemo(() => {
     const counts = { PENDENTE: 0, EM_ANDAMENTO: 0, BLOQUEADA: 0, CONCLUIDA: 0 };
-    oas.forEach((oa) => {
+    oasFiltrados.forEach((oa) => {
       const s = oa.etapas[0]?.status ?? "PENDENTE";
       counts[s] = (counts[s] ?? 0) + 1;
     });
     return counts;
-  }, [oas]);
+  }, [oasFiltrados]);
 
-  const emAtraso = oas.filter(
+  const emAtraso = oasFiltrados.filter(
     (oa) => oa.etapas[0]?.deadlinePrevisto && new Date(oa.etapas[0].deadlinePrevisto) < hoje
       && oa.etapas[0]?.status !== "CONCLUIDA",
   ).length;
+
+  const em3Dias = new Date(hoje);
+  em3Dias.setDate(em3Dias.getDate() + 3);
+  const vencendoEm3Dias = oasFiltrados.filter((oa) => {
+    const dl = oa.etapas[0]?.deadlinePrevisto;
+    if (!dl || oa.etapas[0]?.status === "CONCLUIDA") return false;
+    const d = new Date(dl); d.setHours(0, 0, 0, 0);
+    return d >= hoje && d <= em3Dias;
+  }).length;
 
   // Wrapper que captura erro 422 de predecessora
   const atualizarComValidacao: typeof atualizarEtapa = (vars, opts) => {
@@ -101,12 +149,13 @@ function MeuTrabalhoPage() {
   };
 
   const kpis = [
-    { label: "Total",        value: oas.length,              color: "#2b7cee", bg: "#eff6ff" },
-    { label: "Pendentes",    value: porStatus.PENDENTE,      color: "#64748b", bg: "#f8fafc" },
-    { label: "Em Andamento", value: porStatus.EM_ANDAMENTO,  color: "#f59e0b", bg: "#fffbeb" },
-    { label: "Bloqueadas",   value: porStatus.BLOQUEADA,     color: "#ef4444", bg: "#fff5f5" },
-    { label: "Concluídas",   value: porStatus.CONCLUIDA,     color: "#10b981", bg: "#f0fdf4" },
-    { label: "Em Atraso",    value: emAtraso,                color: "#dc2626", bg: "#fff0f0" },
+    { label: "Total",               value: oasFiltrados.length,    color: "#2b7cee", bg: "#eff6ff" },
+    { label: "Pendentes",           value: porStatus.PENDENTE,     color: "#64748b", bg: "#f8fafc" },
+    { label: "Em Andamento",        value: porStatus.EM_ANDAMENTO, color: "#f59e0b", bg: "#fffbeb" },
+    { label: "Bloqueadas",          value: porStatus.BLOQUEADA,    color: "#ef4444", bg: "#fff5f5" },
+    { label: "Em Atraso",           value: emAtraso,               color: "#dc2626", bg: "#fff0f0" },
+    { label: "Vencendo em 3 dias",  value: vencendoEm3Dias,        color: "#ea580c", bg: "#fff7ed" },
+    { label: "Concluídos esta sem.", value: concluidosEstaSemana,   color: "#10b981", bg: "#f0fdf4" },
   ];
 
   return (
@@ -134,6 +183,41 @@ function MeuTrabalhoPage() {
         </Box>
       )}
 
+      {/* ── Seletor de papel ── */}
+      {!isLoading && !isError && papeisDisponiveis.length > 1 && (
+        <Box sx={{ mb: 2.5 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+            <WorkOutlineIcon sx={{ fontSize: 16, color: "text.disabled" }} />
+            <Typography variant="caption" fontWeight={700} color="text.disabled" sx={{ letterSpacing: "0.05em" }}>
+              MEU PAPEL NESTE TRABALHO
+            </Typography>
+          </Box>
+          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+            <Chip
+              label={`Todos (${oas.length})`}
+              onClick={() => setPapelFiltro("")}
+              variant={papelFiltro === "" ? "filled" : "outlined"}
+              sx={{
+                fontWeight: 700, fontSize: "0.75rem",
+                ...(papelFiltro === "" && { bgcolor: "#2b7cee", color: "#fff", "& .MuiChip-label": { color: "#fff" } }),
+              }}
+            />
+            {papeisDisponiveis.map(([papel, count]) => (
+              <Chip
+                key={papel}
+                label={`${PAPEL_LABEL[papel] ?? papel} (${count})`}
+                onClick={() => setPapelFiltro(papelFiltro === papel ? "" : papel)}
+                variant={papelFiltro === papel ? "filled" : "outlined"}
+                sx={{
+                  fontWeight: 600, fontSize: "0.75rem",
+                  ...(papelFiltro === papel && { bgcolor: "#7c3aed", color: "#fff", "& .MuiChip-label": { color: "#fff" } }),
+                }}
+              />
+            ))}
+          </Box>
+        </Box>
+      )}
+
       <Tabs
         value={aba} onChange={(_, v) => setAba(v)}
         sx={{ mb: 3, borderBottom: "1px solid", borderColor: "divider" }}
@@ -147,24 +231,28 @@ function MeuTrabalhoPage() {
         [1, 2, 3].map((i) => <Skeleton key={i} height={80} sx={{ mb: 1.5, borderRadius: 2 }} />)
       ) : isError ? (
         <Alert severity="error">Erro ao carregar tarefas.</Alert>
-      ) : oas.length === 0 ? (
+      ) : oasFiltrados.length === 0 ? (
         <Card>
           <CardContent sx={{ p: 6, textAlign: "center" }}>
             <Box sx={{ bgcolor: "#eff6ff", width: 64, height: 64, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", mx: "auto", mb: 2 }}>
               <AssignmentOutlinedIcon sx={{ color: "primary.main", fontSize: 32 }} />
             </Box>
-            <Typography variant="h6" sx={{ mb: 1 }}>Nenhuma tarefa pendente</Typography>
+            <Typography variant="h6" sx={{ mb: 1 }}>
+              {oas.length === 0 ? "Nenhuma tarefa pendente" : "Nenhum OA para este papel"}
+            </Typography>
             <Typography variant="body2" color="text.secondary">
-              Quando alguém atribuir um OA a você, ele aparecerá aqui.
+              {oas.length === 0
+                ? "Quando alguém atribuir um OA a você, ele aparecerá aqui."
+                : "Selecione outro papel ou limpe o filtro."}
             </Typography>
           </CardContent>
         </Card>
       ) : aba === 0 ? (
-        <ListaView oas={oas} atualizarEtapa={atualizarComValidacao} atualizando={atualizando} />
+        <ListaView oas={oasFiltrados} atualizarEtapa={atualizarComValidacao} atualizando={atualizando} />
       ) : aba === 1 ? (
-        <CalendarioView oas={oas} />
+        <CalendarioView oas={oasFiltrados} />
       ) : (
-        <KanbanView oas={oas} atualizarEtapa={atualizarComValidacao} />
+        <KanbanView oas={oasFiltrados} atualizarEtapa={atualizarComValidacao} />
       )}
 
       <Snackbar

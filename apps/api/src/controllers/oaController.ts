@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { oaRepository } from "../repositories/oaRepository.js";
 import { sendMail, tmplEtapaLiberada } from "../lib/mailer.js";
+import { prisma } from "../lib/prisma.js";
 
 export class OAController {
   // GET /cursos/:id/oas?status=&tipo=
@@ -25,11 +26,26 @@ export class OAController {
   meuTrabalho = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const userId = req.usuario!.sub;
-      const oas    = await oaRepository.findByUsuario(userId);
+
+      // Início da semana corrente (segunda-feira, 00:00:00)
+      const inicioSemana = new Date();
+      inicioSemana.setHours(0, 0, 0, 0);
+      inicioSemana.setDate(inicioSemana.getDate() - ((inicioSemana.getDay() + 6) % 7));
+
+      const [oas, concluidosEstaSemana] = await Promise.all([
+        oaRepository.findByUsuario(userId),
+        prisma.etapaOA.count({
+          where: {
+            OR: [{ responsavelId: userId }, { responsavelSecundarioId: userId }],
+            status: "CONCLUIDA",
+            deadlineReal: { gte: inicioSemana },
+          },
+        }),
+      ]);
 
       // Filtra: mostra apenas etapas que pertencem ao usuário, não concluídas,
       // e cuja predecessora já esteja CONCLUIDA (ou seja a primeira etapa)
-      const result = oas.map((oa) => {
+      const items = oas.map((oa) => {
         const etapasFiltradas = oa.etapas.filter((etapa) => {
           const isAssigned = etapa.responsavelId === userId || etapa.responsavelSecundarioId === userId;
           if (!isAssigned || etapa.status === "CONCLUIDA") return false;
@@ -40,7 +56,7 @@ export class OAController {
         return { ...oa, etapas: etapasFiltradas };
       }).filter((oa) => oa.etapas.length > 0);
 
-      res.json(result);
+      res.json({ items, stats: { concluidosEstaSemana } });
     } catch (err) { next(err); }
   };
 

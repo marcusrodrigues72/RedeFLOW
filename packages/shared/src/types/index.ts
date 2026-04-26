@@ -188,6 +188,22 @@ export interface OADetalhe {
   etapas: EtapaOADetalhe[];
 }
 
+export interface CHResponsavelItem {
+  usuarioId:     string;
+  nome:          string;
+  email:         string;
+  fotoUrl:       string | null;
+  totalOAs:      number;
+  chSincHoras:   number;
+  chAssincHoras: number;
+  chTotalHoras:  number;
+}
+
+export interface MeuTrabalhoResponse {
+  items: OADetalhe[];
+  stats: { concluidosEstaSemana: number };
+}
+
 // ─── Comentário ───────────────────────────────────────────────────────────────
 
 export interface ComentarioOA {

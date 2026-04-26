@@ -583,6 +583,76 @@ router.get("/progresso-unidades", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /relatorios/ch-responsavel?cursoId=
+router.get("/ch-responsavel", async (req, res, next) => {
+  try {
+    const { cursoId } = req.query as { cursoId?: string };
+
+    const oas = await prisma.objetoAprendizagem.findMany({
+      where: {
+        status: { not: "CONCLUIDO" },
+        ...(cursoId ? { capitulo: { unidade: { cursoId } } } : {}),
+      },
+      select: {
+        id: true,
+        capitulo: {
+          select: {
+            chSincrona:  true,
+            chAssincrona: true,
+            _count: { select: { oas: true } },
+          },
+        },
+        etapas: {
+          where: { status: { not: "CONCLUIDA" } },
+          orderBy: { ordem: "asc" },
+          take: 1,
+          select: {
+            responsavel: { select: { id: true, nome: true, email: true, fotoUrl: true } },
+          },
+        },
+      },
+    });
+
+    const map = new Map<string, {
+      usuarioId: string; nome: string; email: string; fotoUrl: string | null;
+      totalOAs: number; chSincMin: number; chAssincMin: number;
+    }>();
+
+    for (const oa of oas) {
+      const resp = oa.etapas[0]?.responsavel;
+      if (!resp) continue;
+
+      const totalOAsCapitulo = oa.capitulo._count.oas || 1;
+      const chSinc   = (parseFloat(oa.capitulo.chSincrona?.toString()  ?? "0") || 0) / totalOAsCapitulo;
+      const chAssinc = (parseFloat(oa.capitulo.chAssincrona?.toString() ?? "0") || 0) / totalOAsCapitulo;
+
+      if (!map.has(resp.id)) {
+        map.set(resp.id, { usuarioId: resp.id, nome: resp.nome, email: resp.email,
+          fotoUrl: resp.fotoUrl ?? null, totalOAs: 0, chSincMin: 0, chAssincMin: 0 });
+      }
+      const e = map.get(resp.id)!;
+      e.totalOAs++;
+      e.chSincMin   += chSinc;
+      e.chAssincMin += chAssinc;
+    }
+
+    const result = Array.from(map.values())
+      .map((e) => ({
+        usuarioId:     e.usuarioId,
+        nome:          e.nome,
+        email:         e.email,
+        fotoUrl:       e.fotoUrl,
+        totalOAs:      e.totalOAs,
+        chSincHoras:   Math.round(e.chSincMin  / 60 * 10) / 10,
+        chAssincHoras: Math.round(e.chAssincMin / 60 * 10) / 10,
+        chTotalHoras:  Math.round((e.chSincMin + e.chAssincMin) / 60 * 10) / 10,
+      }))
+      .sort((a, b) => b.chTotalHoras - a.chTotalHoras);
+
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
 // GET /relatorios/export/atrasos?cursoId=
 router.get("/export/atrasos", async (req, res, next) => {
   try {

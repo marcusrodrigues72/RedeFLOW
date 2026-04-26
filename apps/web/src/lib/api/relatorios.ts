@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { RelatorioCurso, RelatorioPipelineStatus, RelatorioAtrasoResponsavel, RelatorioAlocacao, RelatorioBurndown, RelatorioDesvio, RelatorioProgressoUnidades } from "shared";
+import type { RelatorioCurso, RelatorioPipelineStatus, RelatorioAtrasoResponsavel, RelatorioAlocacao, RelatorioBurndown, RelatorioDesvio, RelatorioProgressoUnidades, CHResponsavelItem } from "shared";
 
 export const relatorioKeys = {
   progressoCursos:    () => ["relatorios", "progresso-cursos"]    as const,
@@ -66,6 +66,16 @@ export function useProgressoUnidades(cursoId: string | null) {
     queryKey: ["relatorios", "progresso-unidades", cursoId],
     queryFn:  () => api.get<RelatorioProgressoUnidades>(`/relatorios/progresso-unidades?cursoId=${cursoId}`).then((r) => r.data),
     enabled:  !!cursoId,
+  });
+}
+
+export function useCHResponsavel(cursoId?: string | null) {
+  return useQuery({
+    queryKey: ["relatorios", "ch-responsavel", cursoId ?? "all"],
+    queryFn:  () => {
+      const url = cursoId ? `/relatorios/ch-responsavel?cursoId=${cursoId}` : "/relatorios/ch-responsavel";
+      return api.get<CHResponsavelItem[]>(url).then((r) => r.data);
+    },
   });
 }
 

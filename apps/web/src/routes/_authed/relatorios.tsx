@@ -10,6 +10,7 @@ import WarningAmberIcon      from "@mui/icons-material/WarningAmber";
 import AccountTreeIcon       from "@mui/icons-material/AccountTree";
 import ShowChartIcon         from "@mui/icons-material/ShowChart";
 import SwapVertIcon          from "@mui/icons-material/SwapVert";
+import AccessTimeIcon        from "@mui/icons-material/AccessTime";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon   from "@mui/icons-material/KeyboardArrowUp";
 import OpenInNewIcon         from "@mui/icons-material/OpenInNew";
@@ -21,9 +22,9 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
   ResponsiveContainer, ReferenceLine,
 } from "recharts";
-import { useProgressoCursos, usePipelineStatus, useAtrasosResponsavel, useBurndown, useDesvioDeadline, useProgressoUnidades, downloadRelatorio } from "@/lib/api/relatorios";
+import { useProgressoCursos, usePipelineStatus, useAtrasosResponsavel, useBurndown, useDesvioDeadline, useProgressoUnidades, useCHResponsavel, downloadRelatorio } from "@/lib/api/relatorios";
 import { useDashboardStats, useCursos } from "@/lib/api/cursos";
-import type { StatusOA }     from "shared";
+import type { StatusOA, CHResponsavelItem } from "shared";
 
 export const Route = createFileRoute("/_authed/relatorios")({
   component: RelatoriosPage,
@@ -61,6 +62,7 @@ function RelatoriosPage() {
   const { data: stats,         isLoading: loadStats                           }   = useDashboardStats();
   const { data: desvio,          isLoading: loadDesvio,    isError: errDesvio    } = useDesvioDeadline(cursoId);
   const { data: unidades = [],   isLoading: loadUnidades,  isError: errUnidades  } = useProgressoUnidades(cursoId);
+  const { data: chResp = [],     isLoading: loadCH,        isError: errCH        } = useCHResponsavel(cursoId);
 
   // Filtra progresso ao curso selecionado (client-side)
   const cursos = cursoId ? todosProgresso.filter((c) => c.id === cursoId) : todosProgresso;
@@ -442,6 +444,19 @@ function RelatoriosPage() {
             <AtrasosTable atrasos={atrasos} />
           )}
         </Section>
+
+        {/* ── CH por Responsável (RF-M6-07) ────────────────────────────────────── */}
+        <Section title="Carga Horária por Responsável" icon={<AccessTimeIcon sx={{ fontSize: 18 }} />}>
+          {errCH ? (
+            <Alert severity="error" sx={{ m: 2 }}>Erro ao carregar dados.</Alert>
+          ) : loadCH ? (
+            <LoadingRows n={4} />
+          ) : chResp.length === 0 ? (
+            <Empty msg="Nenhum OA ativo atribuído." ok />
+          ) : (
+            <CHResponsavelTable items={chResp} />
+          )}
+        </Section>
       </Box>
     </Box>
   );
@@ -787,6 +802,76 @@ function ProgressoUnidadesChart({ unidades }: { unidades: RelatorioUnidadeProgre
         );
       })}
     </Box>
+  );
+}
+
+// ─── Tabela CH por Responsável ────────────────────────────────────────────────
+
+function CHResponsavelTable({ items }: { items: CHResponsavelItem[] }) {
+  const maxCH = Math.max(...items.map((i) => i.chTotalHoras), 1);
+
+  return (
+    <Table size="small">
+      <TableHead>
+        <TableRow sx={{ bgcolor: "#f8fafc" }}>
+          {["#", "Responsável", "OAs Ativos", "CH Síncrona", "CH Assíncrona", "CH Total"].map((h) => (
+            <TableCell key={h} sx={{ fontWeight: 700, fontSize: "0.72rem", color: "text.secondary", py: 1.25, whiteSpace: "nowrap" }}>{h}</TableCell>
+          ))}
+        </TableRow>
+      </TableHead>
+      <TableBody>
+        {items.map((item, idx) => {
+          const barPct = maxCH > 0 ? (item.chTotalHoras / maxCH) * 100 : 0;
+          const barColor = barPct > 80 ? "#ef4444" : barPct > 50 ? "#f59e0b" : "#2b7cee";
+          const temCH = item.chTotalHoras > 0;
+          return (
+            <TableRow key={item.usuarioId} sx={{ "&:hover": { bgcolor: "action.hover" } }}>
+              <TableCell sx={{ width: 32, color: "text.disabled", fontWeight: 700, fontSize: "0.75rem" }}>
+                {idx + 1}
+              </TableCell>
+              <TableCell>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Box sx={{
+                    width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
+                    bgcolor: "#2b7cee18", display: "flex", alignItems: "center",
+                    justifyContent: "center",
+                  }}>
+                    <Typography sx={{ fontSize: "0.65rem", fontWeight: 700, color: "#2b7cee" }}>
+                      {item.nome.split(" ").slice(0, 2).map((p) => p[0]).join("").toUpperCase()}
+                    </Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="body2" fontWeight={600} noWrap>{item.nome}</Typography>
+                    <Typography variant="caption" color="text.disabled" noWrap>{item.email}</Typography>
+                  </Box>
+                </Box>
+              </TableCell>
+              <TableCell>
+                <Chip label={item.totalOAs} size="small"
+                  sx={{ fontWeight: 700, fontSize: "0.72rem", bgcolor: "#f1f5f9", color: "#475569" }} />
+              </TableCell>
+              <TableCell sx={{ color: "#7c3aed", fontWeight: 600, fontSize: "0.82rem" }}>
+                {item.chSincHoras > 0 ? `${item.chSincHoras}h` : "—"}
+              </TableCell>
+              <TableCell sx={{ color: "#0891b2", fontWeight: 600, fontSize: "0.82rem" }}>
+                {item.chAssincHoras > 0 ? `${item.chAssincHoras}h` : "—"}
+              </TableCell>
+              <TableCell sx={{ minWidth: 160 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                  <Box sx={{ flex: 1, height: 6, borderRadius: 3, bgcolor: "#f1f5f9", overflow: "hidden" }}>
+                    <Box sx={{ height: "100%", width: `${barPct}%`, bgcolor: barColor, borderRadius: 3, transition: "width 0.4s ease" }} />
+                  </Box>
+                  <Typography variant="body2" fontWeight={800}
+                    sx={{ minWidth: 36, textAlign: "right", color: temCH ? barColor : "text.disabled" }}>
+                    {temCH ? `${item.chTotalHoras}h` : "—"}
+                  </Typography>
+                </Box>
+              </TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
   );
 }
 

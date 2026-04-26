@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { CursoResumo, CursoDetalhe, DashboardStats, ImportPreview, ImportResult, MIPreview, MIResult, OADetalhe, EtapaOADetalhe, ComentarioOA, DashboardDetalheTipo, DashboardDetalheOA, DashboardDetalheAtraso, AtribuicaoPreview, AtribuicaoResult, AuditLogEntry, UsuarioPublico, SugestaoAlocacao, AplicarSugestaoResult, SugestaoItem, CalcularDeadlinesResult, MIHistoricoResumo, MIHistoricoDetalhe, ComentarioMI } from "shared";
+import type { CursoResumo, CursoDetalhe, DashboardStats, ImportPreview, ImportResult, MIPreview, MIResult, OADetalhe, EtapaOADetalhe, ComentarioOA, DashboardDetalheTipo, DashboardDetalheOA, DashboardDetalheAtraso, AtribuicaoPreview, AtribuicaoResult, AuditLogEntry, UsuarioPublico, SugestaoAlocacao, AplicarSugestaoResult, SugestaoItem, CalcularDeadlinesResult, MIHistoricoResumo, MIHistoricoDetalhe, ComentarioMI, MeuTrabalhoResponse } from "shared";
 import { useAuthStore } from "@/stores/auth.store";
 
 // ─── Keys ─────────────────────────────────────────────────────────────────────
@@ -124,7 +124,7 @@ export function useOA(id: string) {
 export function useMeuTrabalho() {
   return useQuery({
     queryKey: oaKeys.meuTrabalho(),
-    queryFn:  () => api.get<OADetalhe[]>("/oas/meu-trabalho").then((r) => r.data),
+    queryFn:  () => api.get<MeuTrabalhoResponse>("/oas/meu-trabalho").then((r) => r.data),
   });
 }
 
