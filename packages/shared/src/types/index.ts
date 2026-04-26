@@ -132,7 +132,21 @@ export interface DashboardStats {
   oasConcluidos: number;
   progressoPct: number;
   oasAtrasados: number;
+  oasBloqueados: number;
   emProducao: number;
+}
+
+export interface ProximaEntrega {
+  etapaId: string;
+  oaId: string;
+  oaCodigo: string;
+  etapaNome: string;
+  responsavelNome: string | null;
+  responsavelFotoUrl: string | null;
+  deadlinePrevisto: string;
+  diasRestantes: number;
+  cursoId: string;
+  cursoNome: string;
 }
 
 // ─── OA Detalhe ───────────────────────────────────────────────────────────────

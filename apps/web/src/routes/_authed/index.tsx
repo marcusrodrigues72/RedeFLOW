@@ -3,6 +3,7 @@ import {
   Box, Typography, Grid2 as Grid, Card, CardContent,
   LinearProgress, Chip, Skeleton, Button, Divider, Avatar, Tooltip,
   Drawer, IconButton, Table, TableHead, TableRow, TableCell, TableBody,
+  List, ListItem, ListItemAvatar, ListItemText,
 } from "@mui/material";
 import AddIcon                from "@mui/icons-material/Add";
 import TrendingUpIcon         from "@mui/icons-material/TrendingUp";
@@ -12,10 +13,13 @@ import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import CalendarTodayIcon      from "@mui/icons-material/CalendarToday";
 import CloseIcon              from "@mui/icons-material/Close";
 import OpenInNewIcon          from "@mui/icons-material/OpenInNew";
+import BlockIcon              from "@mui/icons-material/Block";
+import AccessTimeIcon         from "@mui/icons-material/AccessTime";
+import PersonIcon             from "@mui/icons-material/Person";
 import { useState, useRef, useEffect } from "react";
 import { useAuthStore }       from "@/stores/auth.store";
-import { useDashboardStats, useCursos, useDashboardDetalhe } from "@/lib/api/cursos";
-import { useProgressoCursos }                                from "@/lib/api/relatorios";
+import { useDashboardStats, useCursos, useDashboardDetalhe, useProximasEntregas } from "@/lib/api/cursos";
+import { useProgressoCursos, useAtrasosResponsavel }         from "@/lib/api/relatorios";
 import type { ReactNode }             from "react";
 import type { DashboardDetalheTipo }  from "shared";
 
@@ -54,7 +58,12 @@ function DashboardPage() {
   const { data: stats,  isLoading: loadStats  } = useDashboardStats();
   const { data: cursos, isLoading: loadCursos } = useCursos();
   const { data: progresso, isLoading: loadProgresso, isError: erroProgresso } = useProgressoCursos();
+  const { data: proximasEntregas, isLoading: loadProximas } = useProximasEntregas(14);
+  const { data: atrasosResp } = useAtrasosResponsavel();
   const [drawerTipo, setDrawerTipo]             = useState<DashboardDetalheTipo | null>(null);
+
+  const vencendoEm7 = (proximasEntregas ?? []).filter((e) => e.diasRestantes <= 7).length;
+  const top3atrasados = (atrasosResp ?? []).slice(0, 3);
 
   const hoje = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
 
@@ -131,6 +140,167 @@ function DashboardPage() {
             alert={!!stats?.oasAtrasados}
             onClick={() => setDrawerTipo("atrasos")}
           />
+        </Grid>
+      </Grid>
+
+      {/* ── Alertas + Próximas Entregas ────────────────────────────────────── */}
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        {/* Alertas de Bottleneck */}
+        <Grid size={{ xs: 12, md: 7 }}>
+          <Card sx={{ height: "100%" }}>
+            <CardContent sx={{ p: 3 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2.5 }}>
+                <WarningAmberIcon sx={{ color: "#f59e0b", fontSize: 20 }} />
+                <Typography variant="h5">Alertas de Atenção</Typography>
+              </Box>
+
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                {/* Bloqueados */}
+                <Grid size={{ xs: 12, sm: 4 }}>
+                  <Box sx={{ p: 2, borderRadius: 2, bgcolor: "#fef2f2", border: "1px solid #fecaca", textAlign: "center" }}>
+                    <BlockIcon sx={{ color: "#ef4444", fontSize: 28, mb: 0.5 }} />
+                    {loadStats ? <Skeleton width={40} height={36} sx={{ mx: "auto" }} /> : (
+                      <Typography sx={{ fontSize: "1.75rem", fontWeight: 900, color: "#ef4444", lineHeight: 1 }}>
+                        {stats?.oasBloqueados ?? 0}
+                      </Typography>
+                    )}
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                      OAs Bloqueados
+                    </Typography>
+                  </Box>
+                </Grid>
+
+                {/* Vencendo em 7 dias */}
+                <Grid size={{ xs: 12, sm: 4 }}>
+                  <Box sx={{ p: 2, borderRadius: 2, bgcolor: "#fffbeb", border: "1px solid #fde68a", textAlign: "center" }}>
+                    <AccessTimeIcon sx={{ color: "#f59e0b", fontSize: 28, mb: 0.5 }} />
+                    {loadProximas ? <Skeleton width={40} height={36} sx={{ mx: "auto" }} /> : (
+                      <Typography sx={{ fontSize: "1.75rem", fontWeight: 900, color: "#f59e0b", lineHeight: 1 }}>
+                        {vencendoEm7}
+                      </Typography>
+                    )}
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                      Vencem em 7 dias
+                    </Typography>
+                  </Box>
+                </Grid>
+
+                {/* Atrasos críticos */}
+                <Grid size={{ xs: 12, sm: 4 }}>
+                  <Box sx={{ p: 2, borderRadius: 2, bgcolor: "#fef2f2", border: "1px solid #fecaca", textAlign: "center" }}>
+                    <WarningAmberIcon sx={{ color: "#dc2626", fontSize: 28, mb: 0.5 }} />
+                    {loadStats ? <Skeleton width={40} height={36} sx={{ mx: "auto" }} /> : (
+                      <Typography sx={{ fontSize: "1.75rem", fontWeight: 900, color: "#dc2626", lineHeight: 1 }}>
+                        {stats?.oasAtrasados ?? 0}
+                      </Typography>
+                    )}
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                      Etapas Atrasadas
+                    </Typography>
+                  </Box>
+                </Grid>
+              </Grid>
+
+              {/* Top 3 responsáveis com mais atrasos */}
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, mb: 1, display: "block" }}>
+                Top responsáveis com atrasos
+              </Typography>
+              {top3atrasados.length === 0 ? (
+                <Box sx={{ py: 2, textAlign: "center" }}>
+                  <Typography variant="body2" color="text.secondary">Nenhum atraso registrado.</Typography>
+                </Box>
+              ) : (
+                top3atrasados.map((resp, idx) => (
+                  <Box key={resp.email} sx={{ display: "flex", alignItems: "center", gap: 1.5, py: 1, borderTop: idx > 0 ? "1px solid" : "none", borderColor: "divider" }}>
+                    <Avatar sx={{ width: 32, height: 32, fontSize: "0.75rem", bgcolor: "#fee2e2", color: "#dc2626", fontWeight: 700 }}>
+                      {resp.nome.charAt(0).toUpperCase()}
+                    </Avatar>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="body2" fontWeight={600} noWrap>{resp.nome}</Typography>
+                      <Typography variant="caption" color="text.secondary" noWrap>{resp.email}</Typography>
+                    </Box>
+                    <Chip
+                      label={`${resp.total} atraso${resp.total !== 1 ? "s" : ""}`}
+                      size="small"
+                      sx={{ bgcolor: "#fef2f2", color: "#ef4444", fontWeight: 700, fontSize: "0.65rem", height: 20 }}
+                    />
+                  </Box>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Próximas Entregas */}
+        <Grid size={{ xs: 12, md: 5 }}>
+          <Card sx={{ height: "100%" }}>
+            <CardContent sx={{ p: 3, display: "flex", flexDirection: "column", height: "100%" }}>
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <CalendarTodayIcon sx={{ color: "text.secondary", fontSize: 20 }} />
+                  <Typography variant="h5">Próximas Entregas</Typography>
+                </Box>
+                <Typography variant="caption" color="text.secondary">próximos 14 dias</Typography>
+              </Box>
+
+              {loadProximas ? (
+                [1, 2, 3, 4].map((i) => <Skeleton key={i} height={52} sx={{ mb: 0.5, borderRadius: 1 }} />)
+              ) : !proximasEntregas?.length ? (
+                <Box sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Box sx={{ textAlign: "center" }}>
+                    <CheckCircleOutlineIcon sx={{ fontSize: 40, color: "#10b981", mb: 1 }} />
+                    <Typography variant="body2" color="text.secondary">
+                      Nenhuma entrega nos próximos 14 dias.
+                    </Typography>
+                  </Box>
+                </Box>
+              ) : (
+                <List dense disablePadding sx={{ flex: 1, overflow: "auto", maxHeight: 320 }}>
+                  {proximasEntregas.map((item) => {
+                    const urgent = item.diasRestantes <= 2;
+                    const warning = item.diasRestantes <= 7;
+                    const chipColor = urgent ? "#ef4444" : warning ? "#f59e0b" : "#2b7cee";
+                    const chipBg   = urgent ? "#fef2f2" : warning ? "#fffbeb" : "#eff6ff";
+                    return (
+                      <ListItem
+                        key={item.etapaId}
+                        disablePadding
+                        sx={{ py: 0.75, borderBottom: "1px solid", borderColor: "divider", "&:last-child": { borderBottom: "none" } }}
+                      >
+                        <ListItemAvatar sx={{ minWidth: 36 }}>
+                          <Avatar sx={{ width: 28, height: 28, fontSize: "0.65rem", bgcolor: "#f0f7ff", color: "primary.main", fontWeight: 700 }}>
+                            {item.responsavelNome ? item.responsavelNome.charAt(0).toUpperCase() : <PersonIcon sx={{ fontSize: 14 }} />}
+                          </Avatar>
+                        </ListItemAvatar>
+                        <ListItemText
+                          primary={
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                              <Typography variant="caption" fontWeight={700} sx={{ fontSize: "0.72rem" }}>
+                                {item.oaCodigo}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.68rem" }} noWrap>
+                                · {item.etapaNome}
+                              </Typography>
+                            </Box>
+                          }
+                          secondary={
+                            <Typography variant="caption" color="text.disabled" noWrap sx={{ fontSize: "0.63rem" }}>
+                              {item.cursoNome}
+                            </Typography>
+                          }
+                        />
+                        <Chip
+                          label={item.diasRestantes === 0 ? "hoje" : `${item.diasRestantes}d`}
+                          size="small"
+                          sx={{ bgcolor: chipBg, color: chipColor, fontWeight: 700, fontSize: "0.63rem", height: 18, ml: 0.5 }}
+                        />
+                      </ListItem>
+                    );
+                  })}
+                </List>
+              )}
+            </CardContent>
+          </Card>
         </Grid>
       </Grid>
 

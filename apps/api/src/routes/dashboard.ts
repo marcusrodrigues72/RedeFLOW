@@ -21,6 +21,7 @@ router.get("/stats", async (req, res, next) => {
       totalOAs,
       oasConcluidos,
       oasAtrasados,
+      oasBloqueados,
     ] = await Promise.all([
       prisma.curso.count({ where: cursosWhere }),
       prisma.curso.count({ where: { ...cursosWhere, status: "ATIVO" } }),
@@ -37,6 +38,9 @@ router.get("/stats", async (req, res, next) => {
           oa: { capitulo: { unidade: { curso: cursosWhere } } },
         },
       }),
+      prisma.objetoAprendizagem.count({
+        where: { status: "BLOQUEADO", capitulo: { unidade: { curso: cursosWhere } } },
+      }),
     ]);
 
     res.json({
@@ -46,6 +50,7 @@ router.get("/stats", async (req, res, next) => {
       oasConcluidos,
       progressoPct: totalOAs > 0 ? Math.round((oasConcluidos / totalOAs) * 100) : 0,
       oasAtrasados,
+      oasBloqueados,
       emProducao: totalOAs - oasConcluidos,
     });
   } catch (err) {
@@ -154,6 +159,69 @@ router.get("/detalhe", async (req, res, next) => {
         ? { nome: oa.etapas[0].etapaDef.nome, responsavel: oa.etapas[0].responsavel?.nome ?? null, deadlinePrevisto: oa.etapas[0].deadlinePrevisto?.toISOString() ?? null }
         : null,
     })));
+  } catch (err) { next(err); }
+});
+
+// GET /dashboard/proximas-entregas?dias=14
+router.get("/proximas-entregas", async (req, res, next) => {
+  try {
+    const usuarioId   = req.usuario!.sub;
+    const isAdmin     = req.usuario!.papel === "ADMIN";
+    const cursosWhere = isAdmin ? {} : { membros: { some: { usuarioId } } };
+    const dias        = Math.min(parseInt((req.query["dias"] as string) ?? "14", 10) || 14, 60);
+
+    const hoje  = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const limite = new Date(hoje);
+    limite.setDate(limite.getDate() + dias);
+
+    const etapas = await prisma.etapaOA.findMany({
+      where: {
+        status:          { in: ["PENDENTE", "EM_ANDAMENTO"] },
+        deadlinePrevisto: { gte: hoje, lte: limite },
+        oa: { capitulo: { unidade: { curso: cursosWhere } } },
+      },
+      select: {
+        id:               true,
+        deadlinePrevisto: true,
+        etapaDef:         { select: { nome: true } },
+        responsavel:      { select: { nome: true, fotoUrl: true } },
+        oa: {
+          select: {
+            id:   true,
+            codigo: true,
+            capitulo: {
+              select: {
+                unidade: {
+                  select: { curso: { select: { id: true, nome: true } } },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { deadlinePrevisto: "asc" },
+      take: 30,
+    });
+
+    const result = etapas.map((e) => {
+      const dl = e.deadlinePrevisto!;
+      const diasRestantes = Math.ceil((dl.getTime() - hoje.getTime()) / 86_400_000);
+      return {
+        etapaId:             e.id,
+        oaId:                e.oa.id,
+        oaCodigo:            e.oa.codigo,
+        etapaNome:           e.etapaDef.nome,
+        responsavelNome:     e.responsavel?.nome     ?? null,
+        responsavelFotoUrl:  e.responsavel?.fotoUrl  ?? null,
+        deadlinePrevisto:    dl.toISOString(),
+        diasRestantes,
+        cursoId:   e.oa.capitulo.unidade.curso.id,
+        cursoNome: e.oa.capitulo.unidade.curso.nome,
+      };
+    });
+
+    res.json(result);
   } catch (err) { next(err); }
 });
 

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { CursoResumo, CursoDetalhe, DashboardStats, ImportPreview, ImportResult, MIPreview, MIResult, OADetalhe, EtapaOADetalhe, ComentarioOA, DashboardDetalheTipo, DashboardDetalheOA, DashboardDetalheAtraso, AtribuicaoPreview, AtribuicaoResult, AuditLogEntry, UsuarioPublico, SugestaoAlocacao, AplicarSugestaoResult, SugestaoItem, CalcularDeadlinesResult, MIHistoricoResumo, MIHistoricoDetalhe, ComentarioMI, MeuTrabalhoResponse } from "shared";
+import type { CursoResumo, CursoDetalhe, DashboardStats, ImportPreview, ImportResult, MIPreview, MIResult, OADetalhe, EtapaOADetalhe, ComentarioOA, DashboardDetalheTipo, DashboardDetalheOA, DashboardDetalheAtraso, AtribuicaoPreview, AtribuicaoResult, AuditLogEntry, UsuarioPublico, SugestaoAlocacao, AplicarSugestaoResult, SugestaoItem, CalcularDeadlinesResult, MIHistoricoResumo, MIHistoricoDetalhe, ComentarioMI, MeuTrabalhoResponse, ProximaEntrega } from "shared";
 import { useAuthStore } from "@/stores/auth.store";
 
 // ─── Keys ─────────────────────────────────────────────────────────────────────
@@ -24,6 +24,13 @@ export function useDashboardStats() {
   return useQuery({
     queryKey: cursoKeys.stats(),
     queryFn:  () => api.get<DashboardStats>("/dashboard/stats").then((r) => r.data),
+  });
+}
+
+export function useProximasEntregas(dias = 14) {
+  return useQuery({
+    queryKey: ["dashboard", "proximas-entregas", dias],
+    queryFn:  () => api.get<ProximaEntrega[]>(`/dashboard/proximas-entregas?dias=${dias}`).then((r) => r.data),
   });
 }
 
