@@ -69,7 +69,8 @@
       "Bash(ssh -i /Users/marcusrodrigues/Projetos/Redeflow/education-20260408.pem -o StrictHostKeyChecking=no ubuntu@54.198.193.75 \"cd /home/ubuntu/redeflow && pnpm --filter web build:prod 2>&1 | tail -8\")",
       "Bash(echo \"---exit:$?\")",
       "Bash(ssh -i /Users/marcusrodrigues/Projetos/Redeflow/education-20260408.pem -o StrictHostKeyChecking=no ubuntu@54.198.193.75 \"ls -lh /home/ubuntu/redeflow/apps/web/dist/index.html && ls /home/ubuntu/redeflow/apps/web/dist/assets/ | grep _cursoId\")",
-      "Bash(git cherry:*)"
+      "Bash(git cherry:*)",
+      "Read(//Users/marcusrodrigures/Projetos/Redeflow/apps/web/src/routes/_authed/**)"
     ],
     "additionalDirectories": [
       "/Users/marcusrodrigues/Projetos/Redeflow/apps/api/prisma/migrations"
