@@ -294,7 +294,7 @@ export interface UsuarioAdmin {
 
 // ─── Dashboard Detalhe ────────────────────────────────────────────────────────
 
-export type DashboardDetalheTipo = "em_producao" | "concluidos" | "atrasos" | "cursos";
+export type DashboardDetalheTipo = "em_producao" | "concluidos" | "atrasos" | "cursos" | "bloqueados";
 
 export interface DashboardDetalheOA {
   id: string;

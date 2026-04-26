@@ -51,6 +51,10 @@ const DETALHE_CONFIG: Record<DashboardDetalheTipo, { titulo: string; subtitulo: 
     titulo:    "Cursos Cadastrados",
     subtitulo: (n) => `${n} curso${n !== 1 ? "s" : ""} no sistema`,
   },
+  bloqueados: {
+    titulo:    "OAs Bloqueados",
+    subtitulo: (n) => `${n} objeto${n !== 1 ? "s" : ""} com impedimento`,
+  },
 };
 
 function DashboardPage() {
@@ -62,8 +66,10 @@ function DashboardPage() {
   const { data: atrasosResp } = useAtrasosResponsavel();
   const [drawerTipo, setDrawerTipo]             = useState<DashboardDetalheTipo | null>(null);
 
-  const vencendoEm7 = (proximasEntregas ?? []).filter((e) => e.diasRestantes <= 7).length;
+  const vencendoEm7   = (proximasEntregas ?? []).filter((e) => e.diasRestantes <= 7).length;
   const top3atrasados = (atrasosResp ?? []).slice(0, 3);
+
+  const [alertaDrawer, setAlertaDrawer] = useState<AlertaDrawerStateType | null>(null);
 
   const hoje = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
 
@@ -157,7 +163,10 @@ function DashboardPage() {
               <Grid container spacing={2} sx={{ mb: 3 }}>
                 {/* Bloqueados */}
                 <Grid size={{ xs: 12, sm: 4 }}>
-                  <Box sx={{ p: 2, borderRadius: 2, bgcolor: "#fef2f2", border: "1px solid #fecaca", textAlign: "center" }}>
+                  <Box
+                    onClick={() => setDrawerTipo("bloqueados")}
+                    sx={{ p: 2, borderRadius: 2, bgcolor: "#fef2f2", border: "1px solid #fecaca", textAlign: "center", cursor: "pointer", transition: "box-shadow 0.15s", "&:hover": { boxShadow: "0 2px 12px rgba(239,68,68,0.18)" } }}
+                  >
                     <BlockIcon sx={{ color: "#ef4444", fontSize: 28, mb: 0.5 }} />
                     {loadStats ? <Skeleton width={40} height={36} sx={{ mx: "auto" }} /> : (
                       <Typography sx={{ fontSize: "1.75rem", fontWeight: 900, color: "#ef4444", lineHeight: 1 }}>
@@ -172,7 +181,10 @@ function DashboardPage() {
 
                 {/* Vencendo em 7 dias */}
                 <Grid size={{ xs: 12, sm: 4 }}>
-                  <Box sx={{ p: 2, borderRadius: 2, bgcolor: "#fffbeb", border: "1px solid #fde68a", textAlign: "center" }}>
+                  <Box
+                    onClick={() => setAlertaDrawer({ tipo: "vencendo7d" })}
+                    sx={{ p: 2, borderRadius: 2, bgcolor: "#fffbeb", border: "1px solid #fde68a", textAlign: "center", cursor: "pointer", transition: "box-shadow 0.15s", "&:hover": { boxShadow: "0 2px 12px rgba(245,158,11,0.18)" } }}
+                  >
                     <AccessTimeIcon sx={{ color: "#f59e0b", fontSize: 28, mb: 0.5 }} />
                     {loadProximas ? <Skeleton width={40} height={36} sx={{ mx: "auto" }} /> : (
                       <Typography sx={{ fontSize: "1.75rem", fontWeight: 900, color: "#f59e0b", lineHeight: 1 }}>
@@ -187,7 +199,10 @@ function DashboardPage() {
 
                 {/* Atrasos críticos */}
                 <Grid size={{ xs: 12, sm: 4 }}>
-                  <Box sx={{ p: 2, borderRadius: 2, bgcolor: "#fef2f2", border: "1px solid #fecaca", textAlign: "center" }}>
+                  <Box
+                    onClick={() => setDrawerTipo("atrasos")}
+                    sx={{ p: 2, borderRadius: 2, bgcolor: "#fef2f2", border: "1px solid #fecaca", textAlign: "center", cursor: "pointer", transition: "box-shadow 0.15s", "&:hover": { boxShadow: "0 2px 12px rgba(220,38,38,0.18)" } }}
+                  >
                     <WarningAmberIcon sx={{ color: "#dc2626", fontSize: 28, mb: 0.5 }} />
                     {loadStats ? <Skeleton width={40} height={36} sx={{ mx: "auto" }} /> : (
                       <Typography sx={{ fontSize: "1.75rem", fontWeight: 900, color: "#dc2626", lineHeight: 1 }}>
@@ -211,7 +226,11 @@ function DashboardPage() {
                 </Box>
               ) : (
                 top3atrasados.map((resp, idx) => (
-                  <Box key={resp.email} sx={{ display: "flex", alignItems: "center", gap: 1.5, py: 1, borderTop: idx > 0 ? "1px solid" : "none", borderColor: "divider" }}>
+                  <Box
+                    key={resp.email}
+                    onClick={() => setAlertaDrawer({ tipo: "responsavel", nome: resp.nome, email: resp.email, detalhes: resp.detalhes })}
+                    sx={{ display: "flex", alignItems: "center", gap: 1.5, py: 1, borderTop: idx > 0 ? "1px solid" : "none", borderColor: "divider", cursor: "pointer", borderRadius: 1, px: 0.5, "&:hover": { bgcolor: "action.hover" } }}
+                  >
                     <Avatar sx={{ width: 32, height: 32, fontSize: "0.75rem", bgcolor: "#fee2e2", color: "#dc2626", fontWeight: 700 }}>
                       {resp.nome.charAt(0).toUpperCase()}
                     </Avatar>
@@ -222,7 +241,7 @@ function DashboardPage() {
                     <Chip
                       label={`${resp.total} atraso${resp.total !== 1 ? "s" : ""}`}
                       size="small"
-                      sx={{ bgcolor: "#fef2f2", color: "#ef4444", fontWeight: 700, fontSize: "0.65rem", height: 20 }}
+                      sx={{ bgcolor: "#fef2f2", color: "#ef4444", fontWeight: 700, fontSize: "0.65rem", height: 20, cursor: "pointer" }}
                     />
                   </Box>
                 ))
@@ -265,7 +284,9 @@ function DashboardPage() {
                       <ListItem
                         key={item.etapaId}
                         disablePadding
-                        sx={{ py: 0.75, borderBottom: "1px solid", borderColor: "divider", "&:last-child": { borderBottom: "none" } }}
+                        component={Link}
+                        to={`/oas/${item.oaId}`}
+                        sx={{ py: 0.75, borderBottom: "1px solid", borderColor: "divider", "&:last-child": { borderBottom: "none" }, textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", borderRadius: 1, "&:hover": { bgcolor: "action.hover" } }}
                       >
                         <ListItemAvatar sx={{ minWidth: 36 }}>
                           <Avatar sx={{ width: 28, height: 28, fontSize: "0.65rem", bgcolor: "#f0f7ff", color: "primary.main", fontWeight: 700 }}>
@@ -400,6 +421,13 @@ function DashboardPage() {
 
       {/* ── Drawer de detalhe ──────────────────────────────────────────────── */}
       <DetalheDrawer tipo={drawerTipo} onClose={() => setDrawerTipo(null)} />
+
+      {/* ── Drawer alertas client-side ─────────────────────────────────────── */}
+      <AlertaDrawer
+        state={alertaDrawer}
+        proximasEntregas={proximasEntregas ?? []}
+        onClose={() => setAlertaDrawer(null)}
+      />
 
       {/* ── Timeline de Projetos ────────────────────────────────────────────── */}
       <Card>
@@ -876,6 +904,130 @@ function AtrasosTable({ items }: { items: DashboardDetalheAtraso[] }) {
         ))}
       </TableBody>
     </Table>
+  );
+}
+
+// ─── Alerta Drawer (client-side data) ────────────────────────────────────────
+
+type AlertaDrawerStateType =
+  | { tipo: "vencendo7d" }
+  | { tipo: "responsavel"; nome: string; email: string; detalhes: { oa: string; etapa: string; diasAtraso: number }[] };
+
+import type { ProximaEntrega } from "shared";
+
+function AlertaDrawer({ state, proximasEntregas, onClose }: {
+  state: AlertaDrawerStateType | null;
+  proximasEntregas: ProximaEntrega[];
+  onClose: () => void;
+}) {
+  const vencendo = proximasEntregas.filter((e) => e.diasRestantes <= 7);
+
+  const titulo = !state ? "" :
+    state.tipo === "vencendo7d"   ? "Vencem nos próximos 7 dias" :
+    `Atrasos de ${state.nome}`;
+
+  const subtitulo = !state ? "" :
+    state.tipo === "vencendo7d"   ? `${vencendo.length} etapa${vencendo.length !== 1 ? "s" : ""} prestes a vencer` :
+    `${state.detalhes.length} etapa${state.detalhes.length !== 1 ? "s" : ""} em atraso`;
+
+  return (
+    <Drawer
+      anchor="right"
+      open={!!state}
+      onClose={onClose}
+      PaperProps={{ sx: { width: { xs: "100vw", sm: 520 }, p: 0 } }}
+    >
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 3, py: 2.5, borderBottom: "1px solid", borderColor: "divider" }}>
+        <Box>
+          <Typography variant="h6" fontWeight={700}>{titulo}</Typography>
+          <Typography variant="caption" color="text.secondary">{subtitulo}</Typography>
+        </Box>
+        <IconButton onClick={onClose} size="small"><CloseIcon fontSize="small" /></IconButton>
+      </Box>
+
+      <Box sx={{ overflow: "auto", flex: 1 }}>
+        {state?.tipo === "vencendo7d" && (
+          vencendo.length === 0 ? (
+            <Box sx={{ p: 4, textAlign: "center" }}>
+              <Typography color="text.secondary">Nenhuma entrega nos próximos 7 dias.</Typography>
+            </Box>
+          ) : (
+            <Table size="small" stickyHeader>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem" }}>OA</TableCell>
+                  <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem" }}>Etapa</TableCell>
+                  <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem" }}>Responsável</TableCell>
+                  <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem" }}>Dias</TableCell>
+                  <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem" }}>Curso</TableCell>
+                  <TableCell />
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {vencendo.map((item) => {
+                  const urgent = item.diasRestantes <= 2;
+                  return (
+                    <TableRow key={item.etapaId} hover>
+                      <TableCell sx={{ fontSize: "0.72rem", fontWeight: 600 }}>{item.oaCodigo}</TableCell>
+                      <TableCell sx={{ fontSize: "0.72rem" }}>{item.etapaNome}</TableCell>
+                      <TableCell sx={{ fontSize: "0.72rem" }}>{item.responsavelNome ?? <Typography variant="caption" color="text.disabled">—</Typography>}</TableCell>
+                      <TableCell>
+                        <Chip
+                          label={item.diasRestantes === 0 ? "hoje" : `${item.diasRestantes}d`}
+                          size="small"
+                          sx={{ bgcolor: urgent ? "#fef2f2" : "#fffbeb", color: urgent ? "#ef4444" : "#f59e0b", fontWeight: 700, fontSize: "0.65rem", height: 20 }}
+                        />
+                      </TableCell>
+                      <TableCell sx={{ fontSize: "0.72rem" }}>
+                        <Typography variant="caption" noWrap sx={{ maxWidth: 120, display: "block" }}>{item.cursoNome}</Typography>
+                      </TableCell>
+                      <TableCell>
+                        <IconButton component={Link} to={`/oas/${item.oaId}`} size="small" sx={{ p: 0.5 }} onClick={onClose}>
+                          <OpenInNewIcon sx={{ fontSize: 14 }} />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )
+        )}
+
+        {state?.tipo === "responsavel" && (
+          state.detalhes.length === 0 ? (
+            <Box sx={{ p: 4, textAlign: "center" }}>
+              <Typography color="text.secondary">Nenhum atraso encontrado.</Typography>
+            </Box>
+          ) : (
+            <Table size="small" stickyHeader>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem" }}>OA</TableCell>
+                  <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem" }}>Etapa</TableCell>
+                  <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem" }}>Atraso</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {state.detalhes.map((d, idx) => (
+                  <TableRow key={idx} hover>
+                    <TableCell sx={{ fontSize: "0.72rem", fontWeight: 600 }}>{d.oa}</TableCell>
+                    <TableCell sx={{ fontSize: "0.72rem" }}>{d.etapa}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={`${d.diasAtraso}d`}
+                        size="small"
+                        sx={{ bgcolor: "#fef2f2", color: "#ef4444", fontWeight: 700, fontSize: "0.65rem", height: 20 }}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )
+        )}
+      </Box>
+    </Drawer>
   );
 }
 

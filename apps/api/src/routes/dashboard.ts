@@ -112,10 +112,11 @@ router.get("/detalhe", async (req, res, next) => {
       })));
     }
 
-    // em_producao | concluidos | cursos
+    // em_producao | concluidos | cursos | bloqueados
     const statusFilter =
-      tipo === "concluidos"   ? { status: "CONCLUIDO"    as const } :
-      tipo === "em_producao"  ? { status: { in: ["PENDENTE", "EM_ANDAMENTO", "BLOQUEADO"] as ("PENDENTE" | "EM_ANDAMENTO" | "BLOQUEADO")[] } } :
+      tipo === "concluidos"   ? { status: "CONCLUIDO"                                                                                        as const } :
+      tipo === "em_producao"  ? { status: { in: ["PENDENTE", "EM_ANDAMENTO", "BLOQUEADO"] as ("PENDENTE" | "EM_ANDAMENTO" | "BLOQUEADO")[] } }         :
+      tipo === "bloqueados"   ? { status: "BLOQUEADO"                                                                                        as const } :
       {};
 
     const oas = await prisma.objetoAprendizagem.findMany({
