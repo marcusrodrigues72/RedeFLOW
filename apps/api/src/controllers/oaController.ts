@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import { oaRepository } from "../repositories/oaRepository.js";
 import { sendMail, tmplEtapaLiberada } from "../lib/mailer.js";
 import { prisma } from "../lib/prisma.js";
+import { emitirWebhook } from "../lib/webhookEmitter.js";
 
 export class OAController {
   // GET /cursos/:id/oas?status=&tipo=
@@ -326,6 +327,18 @@ export class OAController {
           where: { id: oa.id },
           data:  { progressoPct: pct, status: novoStatus },
         });
+
+        // RF-M7-07: emite webhook quando OA transita para CONCLUIDO (fire-and-forget)
+        if (novoStatus === "CONCLUIDO") {
+          const cursoId = oa.capitulo.unidade.cursoId;
+          emitirWebhook("oa.concluido", {
+            oaId:        oa.id,
+            oaCodigo:    oa.codigo,
+            oaTitulo:    oa.titulo ?? null,
+            cursoId,
+            concluidoEm: new Date().toISOString(),
+          }, cursoId).catch(() => {/* falha já logada no emitirWebhook */});
+        }
       }
 
       // Auto-ativa o curso quando o primeiro Setup de Produção é concluído

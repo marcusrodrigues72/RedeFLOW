@@ -7,6 +7,7 @@ import relatoriosRouter    from "./relatorios.js";
 import notificacoesRouter  from "./notificacoes.js";
 import usuariosRouter      from "./usuarios.js";
 import adminRouter         from "./admin.js";
+import webhooksRouter      from "./webhooks.js";
 
 const router = Router();
 
@@ -22,5 +23,6 @@ router.use("/relatorios",    relatoriosRouter);
 router.use("/notificacoes",  notificacoesRouter);
 router.use("/usuarios",      usuariosRouter);
 router.use("/admin",         adminRouter);
+router.use("/webhooks",      webhooksRouter);
 
 export default router;

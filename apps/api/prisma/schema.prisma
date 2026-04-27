@@ -105,6 +105,7 @@ model Usuario {
   cursosCoordenaProducao     Curso[]    @relation("CursoCoordenadorProducao")
   cursosValidouMatriz        Curso[]    @relation("CursoMatrizValidadaPor")
   miHistorico                MIHistorico[]
+  webhooks                   Webhook[]
 
   @@map("usuarios")
 }
@@ -159,6 +160,7 @@ model Curso {
   matrizValidadaPor     Usuario? @relation("CursoMatrizValidadaPor",    fields: [matrizValidadaPorId],   references: [id])
   configAlerta          ConfigAlertaCurso?
   miHistorico           MIHistorico[]
+  webhooks              Webhook[]
 
   @@index([status])
   @@map("cursos")
@@ -422,6 +424,29 @@ model Notificacao {
 
   @@index([usuarioId, lida])
   @@map("notificacoes")
+}
+
+// ─── Webhooks (RF-M7-07) ──────────────────────────────────────────────────────
+
+/// Configuração de webhook para integrações externas (ex: Slack).
+/// eventos: array de strings como ["oa.concluido", "oa.atrasado"]
+/// cursoId null = escuta todos os cursos; cursoId preenchido = só aquele curso.
+model Webhook {
+  id           String   @id @default(cuid())
+  nome         String
+  url          String
+  segredo      String?   // HMAC-SHA256 signing secret (opcional)
+  eventos      String[]  // ex: ["oa.concluido", "oa.atrasado"]
+  ativo        Boolean  @default(true)
+  cursoId      String?
+  criadoPorId  String
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  curso     Curso?   @relation(fields: [cursoId],     references: [id], onDelete: SetNull)
+  criadoPor Usuario  @relation(fields: [criadoPorId], references: [id])
+
+  @@map("webhooks")
 }
 
 // ─── Auditoria ────────────────────────────────────────────────────────────────

@@ -588,3 +588,38 @@ export interface CalcularDeadlinesResult {
   totalAtualizadas: number;
   avisos:           string[];
 }
+
+// ─── Webhooks (RF-M7-07) ──────────────────────────────────────────────────────
+
+export type WebhookEvento = "oa.concluido" | "oa.atrasado";
+
+export const WEBHOOK_EVENTOS: WebhookEvento[] = ["oa.concluido", "oa.atrasado"];
+
+export const WEBHOOK_EVENTO_LABEL: Record<WebhookEvento, string> = {
+  "oa.concluido": "OA Concluído",
+  "oa.atrasado":  "OA Atrasado",
+};
+
+export interface WebhookItem {
+  id:           string;
+  nome:         string;
+  url:          string;
+  eventos:      WebhookEvento[];
+  ativo:        boolean;
+  cursoId:      string | null;
+  criadoEm:    string;
+  atualizadoEm: string;
+  curso:        { id: string; nome: string; codigo: string } | null;
+  criadoPor:    { id: string; nome: string };
+}
+
+export interface CriarWebhookPayload {
+  nome:    string;
+  url:     string;
+  segredo: string | null;
+  eventos: WebhookEvento[];
+  ativo:   boolean;
+  cursoId: string | null;
+}
+
+export type AtualizarWebhookPayload = Partial<CriarWebhookPayload>;

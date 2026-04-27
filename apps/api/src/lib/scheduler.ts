@@ -20,6 +20,7 @@ import cron from "node-cron";
 import { prisma } from "./prisma.js";
 import { logger } from "./logger.js";
 import { sendMail, tmplDeadlineVencido, tmplPrazoProximo, tmplDigestoDiario } from "./mailer.js";
+import { emitirWebhook } from "./webhookEmitter.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -176,6 +177,17 @@ export async function runDeadlineChecks(): Promise<void> {
         }));
         enviados++;
       }
+
+      // RF-M7-07: emite webhook oa.atrasado (fire-and-forget)
+      emitirWebhook("oa.atrasado", {
+        oaId,
+        oaCodigo:        etapa.oa.codigo,
+        etapaNome:       etapa.etapaDef.nome,
+        responsavelNome: resp.nome,
+        diasAtraso,
+        deadlinePrevisto: etapa.deadlinePrevisto.toISOString(),
+        cursoId,
+      }, cursoId).catch(() => {/* falha já logada no emitirWebhook */});
 
     } else if (proximo && config.alertPrazoProximo) {
       if (await jaNotificado("PRAZO_PROXIMO", oaId, resp.id)) continue;

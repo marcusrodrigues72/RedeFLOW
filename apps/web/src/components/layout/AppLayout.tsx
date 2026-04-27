@@ -12,6 +12,7 @@ import AssignmentOutlinedIcon     from "@mui/icons-material/AssignmentOutlined";
 import BarChartOutlinedIcon       from "@mui/icons-material/BarChartOutlined";
 import PeopleOutlinedIcon         from "@mui/icons-material/PeopleOutlined";
 import AccountTreeOutlinedIcon    from "@mui/icons-material/AccountTreeOutlined";
+import WebhookIcon                 from "@mui/icons-material/Webhook";
 import CalendarMonthOutlinedIcon  from "@mui/icons-material/CalendarMonthOutlined";
 import NotificationsNoneIcon      from "@mui/icons-material/NotificationsNone";
 import CheckCircleOutlineIcon     from "@mui/icons-material/CheckCircleOutline";
@@ -34,6 +35,7 @@ const NAV: NavItem[] = [
   { label: "Notificações",    to: "/notificacoes",    icon: <NotificationsNoneIcon fontSize="small" /> },
   { label: "Equipe",          to: "/admin/usuarios",  icon: <PeopleOutlinedIcon fontSize="small" />, adminOnly: true },
   { label: "Pipeline",        to: "/admin/pipeline",  icon: <AccountTreeOutlinedIcon fontSize="small" />, adminOnly: true },
+  { label: "Webhooks",        to: "/admin/webhooks",  icon: <WebhookIcon fontSize="small" />, adminOnly: true },
 ];
 
 export default function AppLayout({ children }: { children: ReactNode }) {
@@ -326,6 +328,7 @@ function getBreadcrumb(path: string): string {
   if (path.startsWith("/oas/"))            return "REDEFLOW · OAs · DETALHE";
   if (path.startsWith("/admin/usuarios"))  return "REDEFLOW · EQUIPE";
   if (path.startsWith("/admin/pipeline"))  return "REDEFLOW · PIPELINE";
+  if (path.startsWith("/admin/webhooks"))  return "REDEFLOW · WEBHOOKS";
   if (path.startsWith("/perfil"))          return "REDEFLOW · MEU PERFIL";
   if (path.startsWith("/notificacoes"))    return "REDEFLOW · NOTIFICAÇÕES";
   return "REDEFLOW";
