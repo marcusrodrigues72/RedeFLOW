@@ -26,6 +26,7 @@ import { Route as AuthedCursosImportarRouteImport } from './routes/_authed/curso
 import { Route as AuthedCursosCursoIdRouteImport } from './routes/_authed/cursos/$cursoId'
 import { Route as AuthedAdminUsuariosRouteImport } from './routes/_authed/admin/usuarios'
 import { Route as AuthedAdminPipelineRouteImport } from './routes/_authed/admin/pipeline'
+import { Route as AuthedAdminWebhooksRouteImport } from './routes/_authed/admin/webhooks'
 import { Route as AuthedCursosCursoIdSetupProducaoRouteImport } from './routes/_authed/cursos/$cursoId_/setup-producao'
 import { Route as AuthedCursosCursoIdOasRouteImport } from './routes/_authed/cursos/$cursoId_/oas'
 
@@ -113,6 +114,11 @@ const AuthedAdminPipelineRoute = AuthedAdminPipelineRouteImport.update({
   path: '/admin/pipeline',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedAdminWebhooksRoute = AuthedAdminWebhooksRouteImport.update({
+  id: '/admin/webhooks',
+  path: '/admin/webhooks',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedCursosCursoIdSetupProducaoRoute =
   AuthedCursosCursoIdSetupProducaoRouteImport.update({
     id: '/cursos/$cursoId_/setup-producao',
@@ -138,6 +144,7 @@ export interface FileRoutesByFullPath {
   '/relatorios': typeof AuthedRelatoriosRoute
   '/admin/pipeline': typeof AuthedAdminPipelineRoute
   '/admin/usuarios': typeof AuthedAdminUsuariosRoute
+  '/admin/webhooks': typeof AuthedAdminWebhooksRoute
   '/cursos/$cursoId': typeof AuthedCursosCursoIdRoute
   '/cursos/importar': typeof AuthedCursosImportarRoute
   '/oas/$oaId': typeof AuthedOasOaIdRoute
@@ -158,6 +165,7 @@ export interface FileRoutesByTo {
   '/': typeof AuthedIndexRoute
   '/admin/pipeline': typeof AuthedAdminPipelineRoute
   '/admin/usuarios': typeof AuthedAdminUsuariosRoute
+  '/admin/webhooks': typeof AuthedAdminWebhooksRoute
   '/cursos/$cursoId': typeof AuthedCursosCursoIdRoute
   '/cursos/importar': typeof AuthedCursosImportarRoute
   '/oas/$oaId': typeof AuthedOasOaIdRoute
@@ -180,6 +188,7 @@ export interface FileRoutesById {
   '/_authed/': typeof AuthedIndexRoute
   '/_authed/admin/pipeline': typeof AuthedAdminPipelineRoute
   '/_authed/admin/usuarios': typeof AuthedAdminUsuariosRoute
+  '/_authed/admin/webhooks': typeof AuthedAdminWebhooksRoute
   '/_authed/cursos/$cursoId': typeof AuthedCursosCursoIdRoute
   '/_authed/cursos/importar': typeof AuthedCursosImportarRoute
   '/_authed/oas/$oaId': typeof AuthedOasOaIdRoute
@@ -202,6 +211,7 @@ export interface FileRouteTypes {
     | '/relatorios'
     | '/admin/pipeline'
     | '/admin/usuarios'
+    | '/admin/webhooks'
     | '/cursos/$cursoId'
     | '/cursos/importar'
     | '/oas/$oaId'
@@ -222,6 +232,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin/pipeline'
     | '/admin/usuarios'
+    | '/admin/webhooks'
     | '/cursos/$cursoId'
     | '/cursos/importar'
     | '/oas/$oaId'
@@ -243,6 +254,7 @@ export interface FileRouteTypes {
     | '/_authed/'
     | '/_authed/admin/pipeline'
     | '/_authed/admin/usuarios'
+    | '/_authed/admin/webhooks'
     | '/_authed/cursos/$cursoId'
     | '/_authed/cursos/importar'
     | '/_authed/oas/$oaId'
@@ -380,6 +392,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAdminPipelineRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/admin/webhooks': {
+      id: '/_authed/admin/webhooks'
+      path: '/admin/webhooks'
+      fullPath: '/admin/webhooks'
+      preLoaderRoute: typeof AuthedAdminWebhooksRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/cursos/$cursoId_/setup-producao': {
       id: '/_authed/cursos/$cursoId_/setup-producao'
       path: '/cursos/$cursoId/setup-producao'
@@ -406,6 +425,7 @@ interface AuthedRouteChildren {
   AuthedIndexRoute: typeof AuthedIndexRoute
   AuthedAdminPipelineRoute: typeof AuthedAdminPipelineRoute
   AuthedAdminUsuariosRoute: typeof AuthedAdminUsuariosRoute
+  AuthedAdminWebhooksRoute: typeof AuthedAdminWebhooksRoute
   AuthedCursosCursoIdRoute: typeof AuthedCursosCursoIdRoute
   AuthedCursosImportarRoute: typeof AuthedCursosImportarRoute
   AuthedOasOaIdRoute: typeof AuthedOasOaIdRoute
@@ -423,6 +443,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedIndexRoute: AuthedIndexRoute,
   AuthedAdminPipelineRoute: AuthedAdminPipelineRoute,
   AuthedAdminUsuariosRoute: AuthedAdminUsuariosRoute,
+  AuthedAdminWebhooksRoute: AuthedAdminWebhooksRoute,
   AuthedCursosCursoIdRoute: AuthedCursosCursoIdRoute,
   AuthedCursosImportarRoute: AuthedCursosImportarRoute,
   AuthedOasOaIdRoute: AuthedOasOaIdRoute,
